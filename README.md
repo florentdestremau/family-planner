@@ -61,15 +61,13 @@ Côté serveur, `deploy/server/family-env` (`create | update [--reset-db] | remo
 pilote once ; au plus 4 environnements de PR. Depuis le poste : `bin/server sync` pour copier le
 script, puis `bin/server list`, `bin/server logs production --tail 100`, etc.
 
-**Mise en route (une fois)** :
+**Mise en route** (faite le 05/10/2026) :
 
-1. `bin/server sync`
-2. Clé SSH dédiée à la CI, restreinte au script, dans `~/.ssh/authorized_keys` du serveur :
-   `command="/home/ubuntu/family-planner/family-env ci",restrict ssh-ed25519 AAAA… family-planner-ci`
-3. Secrets du dépôt `ONCE_SSH_KEY` (clé privée) et `ONCE_KNOWN_HOSTS`
-   (`ssh-keyscan ssh.once.florent.cc`), puis variable `DEPLOY_ONCE=true`.
-4. Paquet ghcr.io en public après le premier push (sinon, identifiants de registre pour once).
-5. Production : `bin/server create production --image ghcr.io/florentdestremau/family-planner:sha-<7>`.
+- clé SSH de la CI dans `~/.ssh/authorized_keys` du serveur, restreinte au script :
+  `command="/home/ubuntu/family-planner/family-env ci",restrict ssh-ed25519 … family-planner-ci@github-actions` ;
+- secrets du dépôt `ONCE_SSH_KEY` et `ONCE_KNOWN_HOSTS`, variable `DEPLOY_ONCE=true` (la passer à
+  `false` coupe tous les déploiements automatiques) ;
+- après une modification de `deploy/server/family-env` : `bin/server sync`.
 
 ⚠️ Pas d'authentification forte : qui connaît le lien d'un séjour peut lire et modifier
 les présences ; seule la clé organisateur protège la configuration.
