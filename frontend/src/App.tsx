@@ -1,9 +1,9 @@
 import { Route, Routes } from "react-router";
 import AdminActivities from "./pages/admin/AdminActivities";
 import AdminChores from "./pages/admin/AdminChores";
+import AdminHouseholds from "./pages/admin/AdminHouseholds";
 import AdminLayout from "./pages/admin/AdminLayout";
 import AdminMenus from "./pages/admin/AdminMenus";
-import AdminPersons from "./pages/admin/AdminPersons";
 import AdminRooms from "./pages/admin/AdminRooms";
 import AdminStay from "./pages/admin/AdminStay";
 import Chores from "./pages/Chores";
@@ -34,7 +34,7 @@ export default function App() {
           <Route path="imprimer/:kind" element={<Print />} />
           <Route path="admin" element={<AdminLayout />}>
             <Route index element={<AdminStay />} />
-            <Route path="personnes" element={<AdminPersons />} />
+            <Route path="foyers" element={<AdminHouseholds />} />
             <Route path="chambres" element={<AdminRooms />} />
             <Route path="corvees" element={<AdminChores />} />
             <Route path="activites" element={<AdminActivities />} />

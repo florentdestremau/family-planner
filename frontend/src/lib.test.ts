@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   addDays,
+  sameSets,
+  slotsOf,
+  toSlots,
   buildIndex,
   countLabel,
   dayLabel,
@@ -103,10 +106,24 @@ describe("buildIndex", () => {
     expect(idx.activityParticipants(mandatory).map((p) => p.name)).toEqual(["Alice"]);
   });
 
-  it("foyer : soi-même puis ses enfants", () => {
+  it("foyer : soi-même d'abord, puis les adultes, puis les enfants", () => {
     expect(idx.household(undefined)).toEqual([]);
-    expect(idx.household(snap.persons[0]).map((p) => p.name)).toEqual(["Alice", "Léo"]);
-    expect(idx.household(snap.persons[1]).map((p) => p.name)).toEqual(["Bob"]);
+    expect(idx.household(snap.persons[0]).map((p) => p.name)).toEqual(["Alice", "Bob", "Léo"]);
+    expect(idx.household(snap.persons[2]).map((p) => p.name)).toEqual(["Léo", "Alice", "Bob"]);
+    expect(idx.members(50).map((p) => p.name)).toEqual(["Alice", "Bob", "Léo"]);
+    expect(idx.members(999)).toEqual([]);
+  });
+
+  it("libellé du foyer : son nom, sinon les adultes, sinon les membres", () => {
+    expect(idx.householdLabel(50)).toBe("Alice & Bob");
+    expect(idx.householdLabel(51)).toBe("Mamie");
+    expect(idx.householdLabel(52)).toBe("Nina");
+    expect(idx.householdLabel(999)).toBe("");
+    expect(idx.households().map((h) => [h.label, h.members.length])).toEqual([
+      ["Alice & Bob", 3],
+      ["Mamie", 1],
+      ["Nina", 1],
+    ]);
   });
 });
 
@@ -119,5 +136,21 @@ describe("llmExport", () => {
     expect(text).toContain("- Sam. 31 oct., déjeuner — 2 adultes : (menu non défini)");
     expect(text).not.toContain("petit-déj");
     expect(text.split("\n").filter((l) => l.startsWith("- "))).toHaveLength(2);
+  });
+});
+
+describe("présences en ensembles", () => {
+  const snap = makeSnapshot();
+  it("lit, compare et reconvertit les présences", () => {
+    expect(slotsOf(snap, 1)).toEqual(new Set(["2026-10-30|dinner", "2026-10-31|lunch"]));
+    expect(slotsOf(snap, 5)).toEqual(new Set());
+    expect(sameSets([slotsOf(snap, 1), new Set(["2026-10-31|lunch", "2026-10-30|dinner"])])).toBe(true);
+    expect(sameSets([slotsOf(snap, 1), slotsOf(snap, 2)])).toBe(false);
+    expect(sameSets([new Set(["a"]), new Set(["b"])])).toBe(false);
+    expect(sameSets([new Set(), new Set()])).toBe(true);
+    expect(toSlots(snap, new Set(["2026-10-31|lunch", "2026-10-30|dinner", "hors|séjour"]))).toEqual([
+      { date: "2026-10-30", meal: "dinner" },
+      { date: "2026-10-31", meal: "lunch" },
+    ]);
   });
 });

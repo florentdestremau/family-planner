@@ -1,3 +1,5 @@
+from collections import Counter
+
 from app.fixtures import FIXTURES, load_all
 
 
@@ -20,6 +22,32 @@ def test_fixtures_are_complete_and_idempotent(client) -> None:
         assert client.get(f"/api/stays/{fx.slug}/admin", headers={"X-Admin-Key": "demo"}).status_code == 204
 
     assert client.get("/up").text == "OK"
+
+
+def test_fixtures_have_contrasted_presences(client) -> None:
+    """Arrivées et départs échelonnés : les couverts varient, un foyer au moins est décalé."""
+    load_all()
+    for fx in FIXTURES:
+        snap = client.get(f"/api/stays/{fx.slug}").json()
+        per_slot = Counter((p["date"], p["meal"]) for p in snap["presences"])
+        covers = [per_slot[(s["date"], s["meal"])] for s in snap["slots"]]
+        assert len(set(covers)) >= 5, f"{fx.slug} : couverts trop uniformes {covers}"
+        assert min(covers) <= max(covers) // 2, f"{fx.slug} : pas assez de contraste {covers}"
+        presences = {p["id"]: {(x["date"], x["meal"]) for x in snap["presences"] if x["person_id"] == p["id"]} for p in snap["persons"]}
+        offset = [
+            h["id"]
+            for h in snap["households"]
+            if len({frozenset(presences[p["id"]]) for p in snap["persons"] if p["household_id"] == h["id"]}) > 1
+        ]
+        assert offset, f"{fx.slug} : aucun foyer avec un membre décalé"
+
+
+def test_weekend_is_four_days_with_plenty_of_activities(client) -> None:
+    load_all()
+    snap = client.get("/api/stays/demo").json()
+    assert len(snap["days"]) == 4
+    assert len(snap["activities"]) >= 8
+    assert {a["date"] for a in snap["activities"]} == set(snap["days"]), "des activités chaque jour"
 
 
 def test_command_line(tmp_path) -> None:

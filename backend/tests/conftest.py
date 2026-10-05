@@ -68,11 +68,20 @@ class StayApi:
     def snap(self) -> dict:
         return self.pub("GET", status=200).json()
 
-    def person(self, name: str, kind: str = "adult", guardian: int | None = None, **kw) -> int:
-        body = {"name": name, "kind": kind, "guardian_id": guardian, **kw}
+    def household_of(self, person_id: int) -> int:
+        return self.persons()[person_id]["household_id"]
+
+    def person(self, name: str, kind: str = "adult", with_: int | None = None, **kw) -> int:
+        """Crée une personne : dans son propre foyer, ou dans celui de `with_`."""
+        body = {"name": name, "kind": kind, **kw}
+        if with_ is not None:
+            body["household_id"] = self.household_of(with_)
         return self.adm("POST", "/persons", body, status=201).json()["id"]
 
     def couple(self, a: int, b: int) -> None:
+        """Met b dans le foyer de a si besoin, puis les met en couple."""
+        if self.household_of(a) != self.household_of(b):
+            self.adm("PUT", f"/persons/{b}/household", {"household_id": self.household_of(a)}, status=200)
         self.adm("PUT", f"/persons/{a}/partner", {"partner_id": b}, status=200)
 
     def present(self, person_id: int, slots: list[dict] = SLOTS) -> None:

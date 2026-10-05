@@ -21,11 +21,17 @@ export function makeSnapshot(overrides: Partial<Snapshot> = {}): Snapshot {
       { date: "2026-11-01", meal: "breakfast" },
       { date: "2026-11-01", meal: "lunch" },
     ],
+    households: [
+      { id: 50, name: "" },
+      { id: 51, name: "Mamie" },
+      { id: 52, name: "" },
+    ],
     persons: [
-      { id: 1, name: "Alice", kind: "adult", does_chores: true, does_activities: true, guardian_id: null, partner_id: 2, bed_id: 10 },
-      { id: 2, name: "Bob", kind: "adult", does_chores: true, does_activities: true, guardian_id: null, partner_id: 1, bed_id: 10 },
-      { id: 3, name: "Léo", kind: "child", does_chores: false, does_activities: true, guardian_id: 1, partner_id: null, bed_id: null },
-      { id: 4, name: "Mamie", kind: "adult", does_chores: false, does_activities: false, guardian_id: null, partner_id: null, bed_id: null },
+      { id: 1, name: "Alice", kind: "adult", does_chores: true, does_activities: true, household_id: 50, partner_id: 2, bed_id: 10 },
+      { id: 2, name: "Bob", kind: "adult", does_chores: true, does_activities: true, household_id: 50, partner_id: 1, bed_id: 10 },
+      { id: 3, name: "Léo", kind: "child", does_chores: false, does_activities: true, household_id: 50, partner_id: null, bed_id: null },
+      { id: 4, name: "Mamie", kind: "adult", does_chores: false, does_activities: false, household_id: 51, partner_id: null, bed_id: null },
+      { id: 5, name: "Nina", kind: "child", does_chores: false, does_activities: true, household_id: 52, partner_id: null, bed_id: null },
     ],
     presences: [
       { person_id: 1, date: "2026-10-30", meal: "dinner" },

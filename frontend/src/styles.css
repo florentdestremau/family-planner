@@ -1157,3 +1157,75 @@ details .chips {
     grid-template-columns: 52px 1fr;
   }
 }
+
+.stack-sm {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.who-household {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+.add-member {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.add-member .check input {
+  width: 18px;
+  min-height: 18px;
+  accent-color: var(--primary);
+}
+
+.household-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+.household-card .person-admin {
+  padding: 0.6rem 0;
+}
+.household-card .person-admin-main {
+  grid-template-columns: 1.4fr 1fr 1.2fr;
+}
+.household-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--border);
+  padding-top: 0.6rem;
+}
+@media (max-width: 640px) {
+  .household-grid {
+    grid-template-columns: 1fr;
+  }
+  .household-card .person-admin-main {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.grid-table .row-household th {
+  text-align: left;
+  background: var(--surface-2);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+@media print {
+  .household-rows {
+    break-inside: avoid;
+  }
+}
+
+.person-admin-flags .add-select {
+  max-width: 10rem;
+}

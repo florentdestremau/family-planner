@@ -27,7 +27,7 @@ cd frontend && npm install && npm run dev
 
 ### Fixtures
 
-Deux séjours de démonstration (week-end `/s/demo`, semaine avec arrivées échelonnées `/s/ete`),
+Deux séjours de démonstration aux arrivées et départs très échelonnés (grand week-end de 4 jours `/s/demo`, semaine `/s/ete`),
 clé organisateur `demo` :
 
 ```bash
@@ -61,15 +61,13 @@ Côté serveur, `deploy/server/family-env` (`create | update [--reset-db] | remo
 pilote once ; au plus 4 environnements de PR. Depuis le poste : `bin/server sync` pour copier le
 script, puis `bin/server list`, `bin/server logs production --tail 100`, etc.
 
-**Mise en route (une fois)** :
+**Mise en route** (faite le 05/10/2026) :
 
-1. `bin/server sync`
-2. Clé SSH dédiée à la CI, restreinte au script, dans `~/.ssh/authorized_keys` du serveur :
-   `command="/home/ubuntu/family-planner/family-env ci",restrict ssh-ed25519 AAAA… family-planner-ci`
-3. Secrets du dépôt `ONCE_SSH_KEY` (clé privée) et `ONCE_KNOWN_HOSTS`
-   (`ssh-keyscan ssh.once.florent.cc`), puis variable `DEPLOY_ONCE=true`.
-4. Paquet ghcr.io en public après le premier push (sinon, identifiants de registre pour once).
-5. Production : `bin/server create production --image ghcr.io/florentdestremau/family-planner:sha-<7>`.
+- clé SSH de la CI dans `~/.ssh/authorized_keys` du serveur, restreinte au script :
+  `command="/home/ubuntu/family-planner/family-env ci",restrict ssh-ed25519 … family-planner-ci@github-actions` ;
+- secrets du dépôt `ONCE_SSH_KEY` et `ONCE_KNOWN_HOSTS`, variable `DEPLOY_ONCE=true` (la passer à
+  `false` coupe tous les déploiements automatiques) ;
+- après une modification de `deploy/server/family-env` : `bin/server sync`.
 
 ⚠️ Pas d'authentification forte : qui connaît le lien d'un séjour peut lire et modifier
 les présences ; seule la clé organisateur protège la configuration.
@@ -80,7 +78,9 @@ les présences ; seule la clé organisateur protège la configuration.
 - un lien famille `/s/<slug>` : chacun choisit son nom dans la liste, mémorisé dans le navigateur ;
 - un lien organisateur `/s/<slug>/admin?key=<clé>` : la clé est mémorisée puis retirée de l'URL. Les routes `/api/stays/<slug>/admin/*` exigent l'en-tête `X-Admin-Key`.
 
-**Personnes** — adulte ou enfant (portions), « participe aux corvées » (défaut : oui pour un adulte, non pour un enfant), « participe aux activités ». Un enfant est rattaché à un adulte qui gère ses présences et inscriptions. Le couple est un lien symétrique entre deux adultes.
+**Foyers** — chaque personne appartient à un foyer (les personnes qui viennent ensemble) ; une nouvelle personne forme son propre foyer, un célibataire se crée donc en un geste. Tout adulte du foyer agit pour chacun : présences, inscriptions, corvées. Par défaut, « tout le foyer a les mêmes présences » : mes présences valent pour tous ; on décoche pour décaler quelqu'un. Le couple est un lien entre deux adultes du même foyer, proposé quand un célibataire ajoute un adulte. L'organisateur peut déplacer une personne, fusionner deux foyers (conjoints inscrits séparément) ou en supprimer un.
+
+**Personnes** — adulte ou enfant (portions), « participe aux corvées » (défaut : oui pour un adulte, non pour un enfant), « participe aux activités ».
 
 **Présences** — par repas (petit-déj, déjeuner, dîner) entre le premier repas du premier jour et le dernier repas du dernier jour. Présent sur place = présent au repas ; les couverts sont comptés adultes / enfants.
 
@@ -98,6 +98,6 @@ les présences ; seule la clé organisateur protège la configuration.
 
 ## Limites v1 / pistes
 
-- Pas de migrations (création des tables au démarrage) : ajouter Alembic avant de faire évoluer le schéma en production.
+- Migrations Alembic (`backend/migrations`), appliquées au démarrage ; une base créée avant Alembic est reconnue comme `0001`. Pas de retour arrière : restaurer une sauvegarde once. Nouvelle migration : `cd backend && uv run alembic revision -m "…"` (un test vérifie que modèles et migrations ne divergent pas).
 - Couchage fixe pour tout le séjour (pas de lit par nuit).
 - Hors périmètre : covoiturage, notifications push, génération intégrée de la liste de courses par LLM.

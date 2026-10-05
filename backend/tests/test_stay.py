@@ -56,4 +56,4 @@ def test_changing_first_meal_drops_that_meal_only(api) -> None:
 
 def test_snapshot_shape(api) -> None:
     snap = api.snap()
-    assert set(snap) == {"stay", "days", "slots", "persons", "presences", "rooms", "chore_types", "chore_assignments", "activities", "signups", "menus"}
+    assert set(snap) == {"stay", "days", "slots", "households", "persons", "presences", "rooms", "chore_types", "chore_assignments", "activities", "signups", "menus"}

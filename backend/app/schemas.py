@@ -43,7 +43,8 @@ class StayUpdate(In):
 class PersonCreate(In):
     name: str = Field(min_length=1, max_length=100)
     kind: PersonKind = "adult"
-    guardian_id: int | None = None
+    household_id: int | None = None  # absent : la personne forme son propre foyer
+    partner_id: int | None = None  # en couple avec un adulte du même foyer
     does_chores: bool | None = None  # défaut : oui pour un adulte, non pour un enfant
     does_activities: bool = True
 
@@ -51,9 +52,29 @@ class PersonCreate(In):
 class PersonUpdate(In):
     name: str | None = Field(default=None, min_length=1, max_length=100)
     kind: PersonKind | None = None
-    guardian_id: int | None = None
     does_chores: bool | None = None
     does_activities: bool | None = None
+
+
+class HouseholdIn(In):
+    name: str = Field(default="", max_length=100)
+
+
+class MoveIn(In):
+    household_id: int | None  # absent : nouveau foyer
+
+
+class MergeIn(In):
+    into_id: int
+
+
+class MemberPresences(In):
+    person_id: int
+    slots: list["SlotIn"]
+
+
+class HouseholdPresencesIn(In):
+    members: list[MemberPresences] = Field(min_length=1)
 
 
 class PartnerIn(In):
@@ -137,13 +158,18 @@ class StayCreated(StayOut):
     admin_key: str
 
 
+class HouseholdOut(ORM):
+    id: int
+    name: str
+
+
 class PersonOut(ORM):
     id: int
     name: str
     kind: PersonKind
     does_chores: bool
     does_activities: bool
-    guardian_id: int | None
+    household_id: int
     partner_id: int | None
     bed_id: int | None
 
@@ -220,6 +246,7 @@ class Snapshot(BaseModel):
     stay: StayOut
     days: list[date]
     slots: list[SlotOut]
+    households: list[HouseholdOut]
     persons: list[PersonOut]
     presences: list[PresenceOut]
     rooms: list[RoomOut]

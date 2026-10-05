@@ -3,10 +3,11 @@
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import delete, select
 
+from .. import households as h
 from .. import schemas as s
 from ..deps import DB, AdminStay, owned, person
 from ..lottery import build_occurrences, draw
-from ..models import Activity, Bed, ChoreAssignment, ChoreType, Menu, Person, Presence, Room, Stay
+from ..models import Activity, Bed, ChoreAssignment, ChoreType, Household, Menu, Person, Presence, Room, Stay
 from ..rooms import auto_assign
 from ..slots import BED_PLACES, stay_days, stay_slots
 from .public import validate_dates
@@ -50,57 +51,59 @@ def update_stay(body: s.StayUpdate, stay: AdminStay, db: DB) -> Stay:
 
 @router.post("/persons", response_model=s.PersonOut, status_code=201)
 def create_person(body: s.PersonCreate, stay: AdminStay, db: DB) -> Person:
-    from .public import add_person
-
-    return add_person(body, stay, db)
+    """Par défaut, la personne forme son propre foyer (célibataire en un geste)."""
+    return h.create_person(db, stay, body)
 
 
 @router.patch("/persons/{person_id}", response_model=s.PersonOut)
 def update_person(person_id: int, body: s.PersonUpdate, stay: AdminStay, db: DB) -> Person:
     p = person(db, person_id, stay)
-    data = body.model_dump(exclude_unset=True)
-    if data.get("guardian_id") is not None:
-        if data["guardian_id"] == p.id:
-            raise HTTPException(422, "Une personne ne peut pas être son propre référent")
-        if person(db, data["guardian_id"], stay).kind != "adult":
-            raise HTTPException(422, "Le référent d'un enfant doit être un adulte")
-    if data.get("kind") == "child" and db.scalar(select(Person.id).where(Person.guardian_id == p.id).limit(1)):
-        raise HTTPException(422, f"{p.name} est référent d'enfants : rattachez-les d'abord à un autre adulte")
-    for key, value in data.items():
-        if value is not None or key == "guardian_id":
+    for key, value in body.model_dump(exclude_unset=True).items():
+        if value is not None:
             setattr(p, key, value)
-    if p.kind == "adult":
-        p.guardian_id = None
-    elif p.partner_id is not None:
-        # Le couple est un lien entre adultes (la clé étrangère garantit que le conjoint existe).
-        db.get(Person, p.partner_id).partner_id = None
-        p.partner_id = None
+    if p.kind == "child":
+        h.unlink(db, p)  # le couple est un lien entre adultes
     db.commit()
     return p
 
 
 @router.delete("/persons/{person_id}", status_code=204)
 def delete_person(person_id: int, stay: AdminStay, db: DB) -> None:
-    db.delete(person(db, person_id, stay))
+    p = person(db, person_id, stay)
+    household_id = p.household_id
+    db.delete(p)
+    h.drop_if_empty(db, household_id)
     db.commit()
 
 
 @router.put("/persons/{person_id}/partner", response_model=s.PersonOut)
 def set_partner(person_id: int, body: s.PartnerIn, stay: AdminStay, db: DB) -> Person:
-    """Lien de couple, maintenu symétriquement."""
+    """Lien de couple, maintenu symétriquement, entre deux adultes du même foyer."""
     p = person(db, person_id, stay)
-    new = person(db, body.partner_id, stay) if body.partner_id is not None else None
-    if new is not None and new.id == p.id:
-        raise HTTPException(422, "Une personne ne peut pas être en couple avec elle-même")
-    if new is not None and "child" in (p.kind, new.kind):
-        raise HTTPException(422, "Le couple est un lien entre deux adultes")
-    for old_id in {p.partner_id, new.partner_id if new else None} - {None}:
-        db.get(Person, old_id).partner_id = None
-    p.partner_id = new.id if new else None
-    if new is not None:
-        new.partner_id = p.id
+    h.link_partners(db, p, person(db, body.partner_id, stay) if body.partner_id is not None else None)
     db.commit()
     return p
+
+
+@router.put("/persons/{person_id}/household", response_model=s.PersonOut)
+def move_person(person_id: int, body: s.MoveIn, stay: AdminStay, db: DB) -> Person:
+    return h.move(db, stay, person(db, person_id, stay), body.household_id)
+
+
+# --- Foyers ------------------------------------------------------------------
+
+
+@router.post("/households/{household_id}/merge", response_model=s.HouseholdOut)
+def merge_households(household_id: int, body: s.MergeIn, stay: AdminStay, db: DB) -> Household:
+    """Rassemble deux foyers (par exemple deux conjoints inscrits chacun de leur côté)."""
+    return h.merge(db, stay, household_id, body.into_id)
+
+
+@router.delete("/households/{household_id}", status_code=204)
+def delete_household(household_id: int, stay: AdminStay, db: DB) -> None:
+    """Supprime le foyer et tous ses membres."""
+    db.delete(h.household(db, household_id, stay))
+    db.commit()
 
 
 @router.put("/persons/{person_id}/bed", response_model=s.PersonOut)
@@ -161,7 +164,7 @@ def rooms_auto_assign(stay: AdminStay, db: DB) -> dict:
     people = db.scalars(select(Person).where(Person.stay_id == stay.id)).all()
     beds = db.scalars(select(Bed).join(Room).where(Room.stay_id == stay.id)).all()
     proposal = auto_assign(
-        [{"id": p.id, "kind": p.kind, "partner_id": p.partner_id, "guardian_id": p.guardian_id, "bed_id": p.bed_id} for p in people],
+        [{"id": p.id, "kind": p.kind, "partner_id": p.partner_id, "household_id": p.household_id, "bed_id": p.bed_id} for p in people],
         [{"id": b.id, "room_id": b.room_id, "kind": b.kind} for b in beds],
     )
     for p in people:

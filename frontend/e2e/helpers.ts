@@ -34,17 +34,31 @@ export async function createStay(request: APIRequestContext, name = "Toussaint e
     pub: (method: string, path: string, data?: unknown) => call(method, path, data),
     adm: (method: string, path: string, data?: unknown) => call(method, path, data, true),
     snap: () => call("GET", ""),
-    person: async (name: string, extra: Record<string, unknown> = {}) =>
-      (await call("POST", "/persons", { name, ...extra }, true)).id as number,
+    /** Crée une personne, dans son propre foyer ou dans celui de `extra.with`. */
+    person: async (name: string, extra: Record<string, unknown> = {}) => {
+      const { with: withId, ...rest } = extra;
+      const body: Record<string, unknown> = { name, ...rest };
+      if (withId !== undefined) {
+        const snap = await call("GET", "");
+        body.household_id = snap.persons.find((p: { id: number }) => p.id === withId).household_id;
+      }
+      return (await call("POST", "/persons", body, true)).id as number;
+    },
     present: (id: number, slots = SLOTS) => call("PUT", `/persons/${id}/presences`, { slots }),
   };
   return stay;
 }
 
+/** Bouton « c'est moi » d'une personne : initiale, prénom, puis éventuellement son foyer. */
+export function whoButton(page: Page, name: string) {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return page.getByRole("button", { name: new RegExp(`^. ${escaped}( Foyer .*)?$`) });
+}
+
 /** Ouvre le séjour en tant que `name` (identité mémorisée localement). */
 export async function loginAs(page: Page, url: string, name: string) {
   await page.goto(url);
-  await page.getByRole("button", { name }).click();
+  await whoButton(page, name).click();
   await expect(page.getByRole("heading", { name: `Bonjour ${name}` })).toBeVisible();
 }
 

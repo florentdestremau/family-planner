@@ -6,6 +6,7 @@ from datetime import timedelta
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import delete, select
 
+from .. import households as h
 from .. import schemas as s
 from ..deps import DB, StayDep, person
 from ..models import (
@@ -13,6 +14,7 @@ from ..models import (
     Bed,
     ChoreAssignment,
     ChoreType,
+    Household,
     Menu,
     Person,
     Presence,
@@ -66,6 +68,7 @@ def snapshot(stay: StayDep, db: DB) -> dict:
         "stay": stay,
         "days": stay_days(stay.start_date, stay.end_date),
         "slots": [{"date": d, "meal": m} for d, m in stay_slots(stay.start_date, stay.end_date, stay.first_meal, stay.last_meal)],
+        "households": db.scalars(select(Household).where(Household.stay_id == stay.id).order_by(Household.id)).all(),
         "persons": persons,
         "presences": db.scalars(select(Presence).where(Presence.person_id.in_(person_ids))).all(),
         "rooms": [
@@ -84,33 +87,34 @@ def snapshot(stay: StayDep, db: DB) -> dict:
 
 @router.post("/stays/{slug}/persons", response_model=s.PersonOut, status_code=201)
 def add_person(body: s.PersonCreate, stay: StayDep, db: DB) -> Person:
-    """Un participant peut s'ajouter lui-même ou ajouter un enfant rattaché."""
-    if body.guardian_id is not None and person(db, body.guardian_id, stay).kind != "adult":
-        raise HTTPException(422, "Le référent d'un enfant doit être un adulte")
-    does_chores = body.does_chores if body.does_chores is not None else body.kind == "adult"
-    p = Person(
-        stay_id=stay.id,
-        name=body.name,
-        kind=body.kind,
-        guardian_id=body.guardian_id if body.kind == "child" else None,
-        does_chores=does_chores,
-        does_activities=body.does_activities,
-    )
-    db.add(p)
+    """Un participant s'ajoute (nouveau foyer) ou ajoute quelqu'un à son foyer (conjoint, enfant)."""
+    return h.create_person(db, stay, body)
+
+
+@router.patch("/stays/{slug}/households/{household_id}", response_model=s.HouseholdOut)
+def rename_household(household_id: int, body: s.HouseholdIn, stay: StayDep, db: DB) -> Household:
+    found = h.household(db, household_id, stay)
+    found.name = body.name
     db.commit()
-    return p
+    return found
 
 
 @router.put("/stays/{slug}/persons/{person_id}/presences", status_code=204)
 def set_presences(person_id: int, body: s.PresencesIn, stay: StayDep, db: DB) -> None:
-    person(db, person_id, stay)
-    allowed = set(stay_slots(stay.start_date, stay.end_date, stay.first_meal, stay.last_meal))
-    wanted = {(slot.date, slot.meal) for slot in body.slots}
-    if wanted - allowed:
-        raise HTTPException(422, "Créneau hors des dates du séjour")
-    db.execute(delete(Presence).where(Presence.person_id == person_id))
-    db.add_all(Presence(person_id=person_id, date=d, meal=m) for d, m in wanted)
-    db.commit()
+    h.replace_presences(db, stay, [(person(db, person_id, stay), body.slots)])
+
+
+@router.put("/stays/{slug}/households/{household_id}/presences", status_code=204)
+def set_household_presences(household_id: int, body: s.HouseholdPresencesIn, stay: StayDep, db: DB) -> None:
+    """Présences de plusieurs membres d'un foyer en une fois (par exemple « tout le foyer pareil »)."""
+    found = h.household(db, household_id, stay)
+    members = []
+    for member in body.members:
+        p = person(db, member.person_id, stay)
+        if p.household_id != found.id:
+            raise HTTPException(422, f"{p.name} n'appartient pas à ce foyer")
+        members.append((p, member.slots))
+    h.replace_presences(db, stay, members)
 
 
 @router.put("/stays/{slug}/activities/{activity_id}/signups/{person_id}", status_code=204)

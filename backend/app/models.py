@@ -28,6 +28,16 @@ class Stay(Base):
     created_at: Mapped[datetime] = mapped_column(default=_now)
 
 
+class Household(Base):
+    """Foyer : les personnes qui viennent ensemble ; tout adulte du foyer agit pour chacun."""
+
+    __tablename__ = "households"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    stay_id: Mapped[int] = mapped_column(ForeignKey("stays.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(100), default="")  # vide : noms des adultes
+
+
 class Person(Base):
     __tablename__ = "persons"
 
@@ -37,9 +47,10 @@ class Person(Base):
     kind: Mapped[str] = mapped_column(String(16), default="adult")  # adult | child
     does_chores: Mapped[bool] = mapped_column(default=True)
     does_activities: Mapped[bool] = mapped_column(default=True)
-    # Enfant rattaché à un adulte qui renseigne tout pour lui.
-    guardian_id: Mapped[int | None] = mapped_column(ForeignKey("persons.id", ondelete="SET NULL"))
-    # Lien de couple (symétrique, maintenu des deux côtés).
+    household_id: Mapped[int] = mapped_column(
+        ForeignKey("households.id", ondelete="CASCADE", name="fk_persons_household_id"), index=True
+    )
+    # Lien de couple entre deux adultes du même foyer (symétrique, maintenu des deux côtés).
     partner_id: Mapped[int | None] = mapped_column(ForeignKey("persons.id", ondelete="SET NULL"))
     bed_id: Mapped[int | None] = mapped_column(ForeignKey("beds.id", ondelete="SET NULL"))
 

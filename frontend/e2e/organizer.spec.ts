@@ -15,23 +15,23 @@ test("créer un séjour puis le configurer comme organisateur", async ({ page, c
   const publicLink = await page.locator(".share code").first().textContent();
   expect(publicLink).toMatch(/\/s\/[\w-]{12}$/);
 
-  // Personnes : deux adultes en couple, un enfant rattaché.
-  await page.locator(".subtabs").getByRole("link", { name: "Personnes" }).click();
-  for (const name of ["Florent", "Claire"]) {
-    await page.getByPlaceholder("Prénom").fill(name);
-    await page.getByRole("button", { name: "Ajouter" }).click();
-    await expect(page.locator(".input-name").filter({ hasText: "" }).and(page.locator(`[value="${name}"]`))).toBeVisible();
-  }
-  await page.getByPlaceholder("Prénom").fill("Léo");
-  await page.locator("form select").first().selectOption("child");
-  await page.locator("form select").nth(1).selectOption({ label: "Florent" });
-  await page.getByRole("button", { name: "Ajouter" }).click();
-  const florent = page.locator(".person-admin").filter({ has: page.locator('[value="Florent"]') });
-  await florent.locator("select").nth(1).selectOption({ label: "♥ Claire" });
-  const claire = page.locator(".person-admin").filter({ has: page.locator('[value="Claire"]') });
-  await expect(claire.locator("select").nth(1)).toHaveValue(/\d+/);
-  await expect(florent).toContainText("Enfants : Léo");
-  const leo = page.locator(".person-admin").filter({ has: page.locator('[value="Léo"]') });
+  // Foyers : Florent ajouté seul (nouveau foyer), puis Claire en couple et Léo dans son foyer.
+  await page.locator(".subtabs").getByRole("link", { name: "Foyers" }).click();
+  await page.getByPlaceholder("Prénom").first().fill("Florent");
+  await page.getByRole("button", { name: "Ajouter", exact: true }).click();
+  const foyer = page.locator(".household-card");
+  await expect(foyer).toHaveCount(1);
+  await expect(foyer.getByLabel("Nom du foyer")).toHaveAttribute("placeholder", "Florent");
+  await foyer.getByLabel("Prénom du nouveau membre").fill("Claire");
+  await expect(foyer.getByLabel("En couple avec Florent")).toBeChecked();
+  await foyer.getByRole("button", { name: "Ajouter au foyer" }).click();
+  await expect(foyer.getByLabel("Nom du foyer")).toHaveAttribute("placeholder", "Florent & Claire");
+  await expect(foyer.getByLabel("Couple de Florent")).toHaveValue(/\d+/);
+  await foyer.getByLabel("Prénom du nouveau membre").fill("Léo");
+  await foyer.getByLabel("Adulte ou enfant", { exact: true }).selectOption("child");
+  await foyer.getByRole("button", { name: "Ajouter au foyer" }).click();
+  await expect(foyer.locator(".person-admin")).toHaveCount(3);
+  const leo = foyer.locator(".person-admin").filter({ has: page.locator('[value="Léo"]') });
   await expect(leo.getByRole("checkbox", { name: "Corvées" })).not.toBeChecked();
 
   // Chambres : une chambre, un lit double et un d'appoint, répartition proposée.
@@ -86,7 +86,7 @@ test("l'espace organisateur exige la clé", async ({ page, request }) => {
   await page.goto(`/s/${slug}/admin?key=${admin_key}`);
   await expect(page.getByRole("heading", { name: "Liens de partage" })).toBeVisible();
   await expect(page).toHaveURL(new RegExp(`/s/${slug}/admin$`));
-  await page.goto(`/s/${slug}/admin/personnes`);
+  await page.goto(`/s/${slug}/admin/foyers`);
   await expect(page.getByRole("heading", { name: "Ajouter une personne" })).toBeVisible();
 });
 

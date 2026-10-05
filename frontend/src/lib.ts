@@ -52,6 +52,13 @@ export type Index = ReturnType<typeof buildIndex>;
 /** Structures dérivées du snapshot, pour des recherches rapides. */
 export function buildIndex(snap: Snapshot) {
   const personById = new Map(snap.persons.map((p) => [p.id, p]));
+  const householdById = new Map(snap.households.map((h) => [h.id, h]));
+  // Membres d'un foyer : adultes d'abord, puis enfants, dans l'ordre d'arrivée.
+  const membersByHousehold = new Map<number, Person[]>();
+  for (const p of [...snap.persons].sort((a, b) => (a.kind === b.kind ? a.id - b.id : a.kind === "adult" ? -1 : 1))) {
+    membersByHousehold.set(p.household_id, [...(membersByHousehold.get(p.household_id) ?? []), p]);
+  }
+  const members = (householdId: number): Person[] => membersByHousehold.get(householdId) ?? [];
   const presence = new Set(snap.presences.map((p) => presenceKey(p.person_id, p.date, p.meal)));
   const presentDays = new Set(snap.presences.map((p) => `${p.person_id}|${p.date}`));
   const slotSet = new Set(snap.slots.map((s) => `${s.date}|${s.meal}`));
@@ -88,11 +95,31 @@ export function buildIndex(snap: Snapshot) {
         : p.does_activities && presentDays.has(`${p.id}|${activity.date}`),
     );
 
+  /** Mon foyer : moi d'abord, puis les autres membres. */
   const household = (me: Person | undefined): Person[] =>
-    me ? [me, ...snap.persons.filter((p) => p.guardian_id === me.id && p.id !== me.id)] : [];
+    me ? [me, ...members(me.household_id).filter((p) => p.id !== me.id)] : [];
+
+  /** Nom du foyer, ou à défaut les prénoms des adultes (des membres s'il n'y a que des enfants). */
+  const householdLabel = (householdId: number): string => {
+    const name = householdById.get(householdId)?.name;
+    if (name) return name;
+    const all = members(householdId);
+    const adults = all.filter((p) => p.kind === "adult");
+    return (adults.length ? adults : all).map((p) => p.name).join(" & ");
+  };
+
+  /** Foyers triés par libellé, avec leurs membres. */
+  const households = () =>
+    snap.households
+      .map((h) => ({ ...h, label: householdLabel(h.id), members: members(h.id) }))
+      .sort((a, b) => a.label.localeCompare(b.label));
 
   return {
     personById,
+    householdById,
+    members,
+    householdLabel,
+    households,
     slotSet,
     choreById,
     bedById,
@@ -118,6 +145,20 @@ export function countLabel({ adults, children }: { adults: number; children: num
 /** Toutes les occurrences de corvées triées chronologiquement (déjà tirées ou non). */
 export function sortedMoments(a: { date: string; moment: Moment }, b: { date: string; moment: Moment }): number {
   return a.date.localeCompare(b.date) || MOMENTS.indexOf(a.moment) - MOMENTS.indexOf(b.moment);
+}
+
+/** Présences d'une personne, en clés « date|repas ». */
+export function slotsOf(snap: Snapshot, personId: number): Set<string> {
+  return new Set(snap.presences.filter((p) => p.person_id === personId).map((p) => `${p.date}|${p.meal}`));
+}
+
+export function sameSets(sets: Set<string>[]): boolean {
+  return sets.every((s) => s.size === sets[0].size && [...s].every((k) => sets[0].has(k)));
+}
+
+/** Clés « date|repas » → créneaux de l'API, dans l'ordre du séjour. */
+export function toSlots(snap: Snapshot, keys: Set<string>) {
+  return snap.slots.filter((s) => keys.has(`${s.date}|${s.meal}`)).map(({ date, meal }) => ({ date, meal }));
 }
 
 /** Texte prêt à coller dans un LLM pour générer une liste de courses. */

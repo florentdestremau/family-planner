@@ -11,9 +11,10 @@ def test_full_flow(client, stay) -> None:
 
     # Participants (public) : un adulte s'ajoute et ajoute son enfant.
     alice = client.post(f"{base}/persons", json={"name": "Alice"}).json()
-    kid = client.post(f"{base}/persons", json={"name": "Léo", "kind": "child", "guardian_id": alice["id"]}).json()
-    assert kid["does_chores"] is False and kid["guardian_id"] == alice["id"]
-    bob = client.post(f"{base}/admin/persons", json={"name": "Bob"}, headers=admin).json()
+    home = alice["household_id"]
+    kid = client.post(f"{base}/persons", json={"name": "Léo", "kind": "child", "household_id": home}).json()
+    assert kid["does_chores"] is False and kid["household_id"] == home
+    bob = client.post(f"{base}/admin/persons", json={"name": "Bob", "household_id": home}, headers=admin).json()
     others = [client.post(f"{base}/admin/persons", json={"name": n}, headers=admin).json() for n in ["Cléo", "Dan", "Eve"]]
 
     # Couple symétrique.

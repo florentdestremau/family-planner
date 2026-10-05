@@ -17,17 +17,29 @@ from sqlalchemy.orm import Session
 
 from . import schemas as s
 from .db import SessionLocal
-from .models import Base, Stay
+from .models import Stay
 from .routers import admin, public
 from .slots import stay_slots
 
 
+Meal = tuple[int, str]  # (jour du séjour, à partir de 0 ; repas)
+
+
 @dataclass
 class Family:
-    adults: list[str]  # deux adultes = un couple
+    """Un foyer. Les deux premiers adultes forment un couple, sauf couple=False.
+
+    Présences : du repas `arrive` au repas `leave` inclus (par défaut tout le séjour) ; `members`
+    décale une personne (arrivée, départ) ; `away` retire des repas (dîner au restaurant…).
+    """
+
+    adults: list[str]
     children: list[str] = field(default_factory=list)
-    arrive: int = 0  # décalage en jours par rapport au début du séjour
-    leave: int = 0  # jours avant la fin du séjour
+    couple: bool = True
+    arrive: Meal | None = None
+    leave: Meal | None = None
+    members: dict[str, tuple[Meal | None, Meal | None]] = field(default_factory=dict)
+    away: dict[str, list[Meal]] = field(default_factory=dict)
     teens: list[str] = field(default_factory=list)  # enfants qui participent aux corvées
     no_chores: list[str] = field(default_factory=list)
 
@@ -54,34 +66,54 @@ def _next_weekday(weekday: int) -> int:
 FIXTURES = [
     Fixture(
         slug="demo",
-        name="Week-end chez Mamie",
-        start_in_days=_next_weekday(4),  # vendredi prochain
+        name="Grand week-end chez Mamie",
+        start_in_days=_next_weekday(3),  # jeudi soir → dimanche soir
         days=4,
         first_meal="dinner",
-        last_meal="lunch",
+        last_meal="dinner",
         families=[
-            Family(["Florent", "Claire"], ["Léo", "Emma"]),
-            Family(["Julien", "Sophie"], ["Hugo", "Zoé (15 ans)"], teens=["Zoé (15 ans)"]),
-            Family(["Marc", "Anne"], ["Lina"], leave=1),
-            Family(["Mamie"], no_chores=["Mamie"]),
-            Family(["Thomas"], arrive=1),
+            # Florent et Claire dînent au restaurant samedi soir ; les enfants restent.
+            Family(["Florent", "Claire"], ["Léo", "Emma"], leave=(3, "lunch"), away={"Florent": [(2, "dinner")], "Claire": [(2, "dinner")]}),
+            # Mamie reçoit : son foyer est là tout le temps, sauf Julien (arrive vendredi soir, il
+            # travaille) et Zoé (match de hand samedi matin).
+            Family(
+                ["Julien", "Sophie", "Mamie"],
+                ["Hugo", "Zoé (15 ans)"],
+                teens=["Zoé (15 ans)"],
+                no_chores=["Mamie"],
+                members={"Julien": ((1, "dinner"), None), "Zoé (15 ans)": ((2, "lunch"), None)},
+            ),
+            Family(["Marc", "Anne"], ["Lina"], arrive=(1, "lunch"), leave=(2, "breakfast")),  # aller-retour
+            Family(["Thomas"], arrive=(2, "lunch"), leave=(3, "breakfast")),
+            Family(["Camille"], arrive=(2, "dinner"), leave=(3, "breakfast")),  # célibataire, pour la soirée
         ],
         rooms=[
+            ("Chambre de Mamie", ["single"]),
             ("Chambre bleue", ["double", "extra"]),
             ("Chambre verte", ["double", "single"]),
             ("Grenier", ["bunk", "bunk"]),
             ("Salon", ["double", "extra"]),
         ],
         activities=[
-            dict(day=1, name="Rando au lac", start_time="10:00", end_time="13:00", location="Lac", optional=True,
-                 signups=["Florent", "Léo", "Julien", "Hugo"]),
-            dict(day=1, name="Grand jeu dans le jardin", start_time="15:30"),
-            dict(day=2, name="Soirée crêpes & jeux", start_time="20:30"),
+            dict(day=0, name="Apéro d'arrivée", start_time="19:30", location="Terrasse"),
+            dict(day=1, name="Marché du village", start_time="09:30", end_time="11:30", optional=True,
+                 signups=["Mamie", "Sophie", "Emma"]),
+            dict(day=1, name="Construction de cabanes", start_time="15:00", end_time="17:30", location="Bois derrière la maison",
+                 description="Prévoir des vêtements qui ne craignent rien"),
+            dict(day=1, name="Loup-garou", start_time="21:00", optional=True, signups=["Florent", "Claire", "Hugo", "Léo", "Marc"]),
+            dict(day=2, name="Rando au lac", start_time="09:30", end_time="13:00", location="Lac", optional=True,
+                 signups=["Florent", "Léo", "Julien", "Hugo", "Thomas"]),
+            dict(day=2, name="Grand jeu dans le jardin", start_time="15:30"),
+            dict(day=3, name="Balade au village", start_time="10:30", optional=True, signups=["Mamie", "Julien", "Emma"]),
+            dict(day=3, name="Photo de famille", start_time="14:30", location="Devant la maison"),
         ],
         menus=[
             (0, "dinner", "Soupe de potiron\nQuiche lorraine\nSalade verte", ""),
-            (1, "lunch", "Raclette\nCharcuterie\nSalade", "Sans gluten pour Anne"),
-            (1, "dinner", "Poulet rôti\nGratin dauphinois\nTarte aux pommes", ""),
+            (1, "lunch", "Taboulé\nPoulet froid", ""),
+            (1, "dinner", "Raclette\nCharcuterie\nSalade", "Sans gluten pour Anne"),
+            (2, "lunch", "Pique-nique de la rando : sandwiches, fruits", "Les autres : restes de raclette"),
+            (2, "dinner", "Pâtes bolognaise\nCompote", "Soirée des enfants"),
+            (3, "lunch", "Gigot\nFlageolets\nTarte aux pommes", ""),
         ],
     ),
     Fixture(
@@ -92,13 +124,27 @@ FIXTURES = [
         first_meal="dinner",
         last_meal="lunch",
         families=[
-            Family(["Florent", "Claire"], ["Léo", "Emma"]),
-            Family(["Julien", "Sophie"], ["Hugo", "Zoé"], teens=["Zoé"]),
-            Family(["Marc", "Anne"], ["Lina", "Noé", "Jules (16 ans)"], teens=["Jules (16 ans)"], leave=3),
-            Family(["Paul", "Léa"], ["Rose"], arrive=2),
-            Family(["Bertrand", "Odile"], no_chores=["Bertrand", "Odile"]),
-            Family(["Camille"], arrive=1, leave=2),
-            Family(["Nicolas", "Inès"], ["Adam", "Louise"], arrive=3),
+            # Montée en charge : grands-parents et Florent d'abord, pic en milieu de semaine, départs étalés.
+            Family(["Florent", "Claire"], ["Léo", "Emma"], leave=(6, "lunch")),
+            Family(["Julien", "Sophie"], ["Hugo", "Zoé"], teens=["Zoé"], arrive=(1, "dinner"), leave=(5, "breakfast")),
+            # Jules part en colonie avant le reste de sa famille.
+            Family(
+                ["Marc", "Anne"],
+                ["Lina", "Noé", "Jules (16 ans)"],
+                teens=["Jules (16 ans)"],
+                arrive=(1, "lunch"),
+                leave=(4, "breakfast"),
+                members={"Jules (16 ans)": (None, (2, "lunch"))},
+            ),
+            # Paul et Léa se sont inscrits chacun de leur côté : deux foyers à fusionner.
+            Family(["Paul"], arrive=(2, "dinner")),
+            Family(["Léa"], ["Rose"], arrive=(3, "lunch")),
+            # Les grands-parents déjeunent chez des amis mercredi.
+            Family(["Bertrand", "Odile"], no_chores=["Bertrand", "Odile"], away={"Bertrand": [(4, "lunch")], "Odile": [(4, "lunch")]}),
+            Family(["Camille"], arrive=(1, "lunch"), leave=(2, "breakfast")),  # célibataire, une nuit
+            Family(["Sarah"], ["Tom", "Jade"], arrive=(2, "lunch"), leave=(5, "lunch")),  # parent seul
+            # Nicolas arrive le soir, Inès le lendemain midi.
+            Family(["Nicolas", "Inès"], ["Adam", "Louise"], arrive=(3, "dinner"), members={"Inès": ((4, "lunch"), None)}),
         ],
         rooms=[
             ("Chambre des grands-parents", ["double"]),
@@ -107,6 +153,7 @@ FIXTURES = [
             ("Chambre phare", ["double", "extra"]),
             ("Dortoir des cousins", ["bunk", "bunk", "bunk", "bunk", "single"]),
             ("Mezzanine", ["double", "single", "extra"]),
+            ("Chambre des pins", ["double", "bunk"]),
         ],
         activities=[
             dict(day=1, name="Plage & châteaux de sable", start_time="10:00", location="Plage du centre"),
@@ -142,20 +189,27 @@ def load(db: Session, fx: Fixture) -> Stay:
     slots = stay_slots(start, end, fx.first_meal, fx.last_meal)
     ids: dict[str, int] = {}
     for fam in fx.families:
-        members = []
-        for name in fam.adults:
-            ids[name] = admin.create_person(s.PersonCreate(name=name, does_chores=name not in fam.no_chores), stay, db).id
-            members.append(ids[name])
-        if len(fam.adults) == 2:
-            admin.set_partner(ids[fam.adults[0]], s.PartnerIn(partner_id=ids[fam.adults[1]]), stay, db)
+        household_id = None
+        for i, name in enumerate(fam.adults):
+            partner = ids[fam.adults[0]] if i == 1 and fam.couple else None
+            body = s.PersonCreate(name=name, household_id=household_id, partner_id=partner, does_chores=name not in fam.no_chores)
+            created = admin.create_person(body, stay, db)
+            ids[name], household_id = created.id, created.household_id
         for name in fam.children:
-            body = s.PersonCreate(name=name, kind="child", guardian_id=ids[fam.adults[0]], does_chores=name in fam.teens)
+            body = s.PersonCreate(name=name, kind="child", household_id=household_id, does_chores=name in fam.teens)
             ids[name] = admin.create_person(body, stay, db).id
-            members.append(ids[name])
-        first, last = start + timedelta(days=fam.arrive), end - timedelta(days=fam.leave)
-        present = [s.SlotIn(date=d, meal=m) for d, m in slots if first <= d <= last]
-        for pid in members:
-            public.set_presences(pid, s.PresencesIn(slots=present), stay, db)
+        index = {(d, m): i for i, (d, m) in enumerate(slots)}
+
+        def position(meal: Meal | None, default: int) -> int:
+            return default if meal is None else index[(start + timedelta(days=meal[0]), meal[1])]
+
+        for name in [*fam.adults, *fam.children]:
+            arrive, leave = fam.members.get(name, (None, None))
+            first = position(arrive or fam.arrive, 0)
+            last = position(leave or fam.leave, len(slots) - 1)
+            away = {(start + timedelta(days=day), meal) for day, meal in fam.away.get(name, [])}
+            present = [s.SlotIn(date=d, meal=m) for d, m in slots[first : last + 1] if (d, m) not in away]
+            public.set_presences(ids[name], s.PresencesIn(slots=present), stay, db)
 
     for room_name, beds in fx.rooms:
         room = admin.create_room(s.RoomIn(name=room_name), stay, db)
@@ -192,12 +246,12 @@ def load_all(reset: bool = False) -> list[str]:
 
 
 if __name__ == "__main__":
-    from .db import engine
+    from .migrate import migrate
 
     parser = argparse.ArgumentParser(description="Charge les séjours de démonstration.")
     parser.add_argument("--reset", action="store_true", help="supprime et recharge les séjours de démo")
     args = parser.parse_args()
-    Base.metadata.create_all(engine)
+    migrate()
     loaded = load_all(reset=args.reset)
     for fx in FIXTURES:
         status = "chargé" if fx.slug in loaded else "déjà présent"

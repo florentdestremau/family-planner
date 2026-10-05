@@ -128,14 +128,12 @@ def lodging(draw_):
     people = []
     for i in range(1, n + 1):
         kind = draw_(st.sampled_from(["adult", "adult", "child"]))
-        people.append({"id": i, "kind": kind, "partner_id": None, "guardian_id": None, "bed_id": None})
+        people.append({"id": i, "kind": kind, "partner_id": None, "household_id": draw_(st.integers(1, 4)), "bed_id": None})
     adults = [p for p in people if p["kind"] == "adult"]
     for a, b in zip(adults[::2], adults[1::2]):
         if draw_(st.booleans()):
             a["partner_id"], b["partner_id"] = b["id"], a["id"]
-    for p in people:
-        if p["kind"] == "child" and adults:
-            p["guardian_id"] = draw_(st.sampled_from(adults))["id"]
+            b["household_id"] = a["household_id"]
     beds = [
         {"id": 100 + i, "room_id": draw_(st.integers(1, 3)), "kind": draw_(st.sampled_from(list(BED_PLACES)))}
         for i in range(draw_(st.integers(0, 8)))

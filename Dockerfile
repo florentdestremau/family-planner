@@ -18,6 +18,8 @@ COPY backend/pyproject.toml backend/uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 
 COPY backend/app ./app
+COPY backend/alembic.ini ./
+COPY backend/migrations ./migrations
 COPY --from=front /front/dist ./static
 
 ENV PATH="/app/.venv/bin:$PATH" \

@@ -4,9 +4,9 @@ import { createStay, loginAs, openAdmin } from "./helpers";
 test("tirage au sort, visibilité pour chacun, ajustement manuel", async ({ page, request }) => {
   const stay = await createStay(request);
   const ids: Record<string, number> = {};
-  for (const name of ["Alice", "Bob", "Chloé", "David", "Emma", "Fred"]) ids[name] = await stay.person(name);
-  await stay.adm("PUT", `/persons/${ids.Alice}/partner`, { partner_id: ids.Bob });
-  await stay.adm("PUT", `/persons/${ids.Chloé}/partner`, { partner_id: ids.David });
+  for (const name of ["Alice", "Chloé", "Emma", "Fred"]) ids[name] = await stay.person(name);
+  ids.Bob = await stay.person("Bob", { with: ids.Alice, partner_id: ids.Alice });
+  ids.David = await stay.person("David", { with: ids.Chloé, partner_id: ids.Chloé });
   for (const id of Object.values(ids)) await stay.present(id);
 
   await openAdmin(page, stay.slug, stay.key, "Corvées");
@@ -79,9 +79,8 @@ test("modifier les types de corvées", async ({ page, request }) => {
 test("l'ajout manuel propose d'abord les moins chargés et signale les couples", async ({ page, request }) => {
   const stay = await createStay(request);
   const a = await stay.person("Alice");
-  const b = await stay.person("Bob");
+  const b = await stay.person("Bob", { with: a, partner_id: a });
   const c = await stay.person("Chloé");
-  await stay.adm("PUT", `/persons/${a}/partner`, { partner_id: b });
   for (const id of [a, b, c]) await stay.present(id);
   const chore = (await stay.snap()).chore_types[0].id;
   await stay.adm("PUT", "/chores/occurrence", { chore_type_id: chore, date: "2026-10-31", moment: "lunch", person_ids: [a] });
