@@ -39,9 +39,12 @@ test("créer un séjour puis le configurer comme organisateur", async ({ page, c
   await page.getByPlaceholder("Nouvelle chambre").fill("Chambre bleue");
   await page.getByRole("button", { name: "Ajouter" }).click();
   const room = page.locator(".card").filter({ has: page.locator('[value="Chambre bleue"]') });
+  // Attendre chaque lit : la répartition se fait côté serveur, avec les lits déjà créés.
   await room.getByRole("button", { name: "+ Lit" }).click();
+  await expect(room.locator(".bed")).toHaveCount(1);
   await room.locator(".inline-form select").selectOption("extra");
   await room.getByRole("button", { name: "+ Lit" }).click();
+  await expect(room.locator(".bed")).toHaveCount(2);
   await page.getByRole("button", { name: /Proposer une répartition/ }).click();
   await expect(page.getByText("Tout le monde a un lit.")).toBeVisible();
   await expect(room.locator(".bed").first()).toContainText("Florent");

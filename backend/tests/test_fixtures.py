@@ -56,8 +56,19 @@ def test_command_line(tmp_path) -> None:
     import sys
 
     env = {**os.environ, "DATABASE_URL": f"sqlite:///{tmp_path}/cli.db"}
+    env.pop("DEMO_ADMIN_KEY", None)
     run = lambda *a: subprocess.run([sys.executable, "-m", "app.fixtures", *a], env=env, capture_output=True, text=True, check=True).stdout  # noqa: E731
     first = run()
     assert first.count("(chargé)") == 2 and "/s/demo/admin?key=demo" in first
     assert run().count("(déjà présent)") == 2
     assert run("--reset").count("(chargé)") == 2
+
+
+def test_command_line_with_private_key(tmp_path) -> None:
+    import os
+    import subprocess
+    import sys
+
+    env = {**os.environ, "DATABASE_URL": f"sqlite:///{tmp_path}/cli.db", "DEMO_ADMIN_KEY": "cle-privee"}
+    out = subprocess.run([sys.executable, "-m", "app.fixtures"], env=env, capture_output=True, text=True, check=True).stdout
+    assert "/s/demo/admin?key=cle-privee" in out and "key=demo" not in out
