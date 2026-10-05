@@ -1,0 +1,159 @@
+# CI de family-planner : tests back, image de production construite et testée (/up, fixtures),
+# publiée sur ghcr.io, puis déployée sur le serveur once (adapté d'ardha-app) :
+# - PR → environnement éphémère famille-pr-<n>.once.florent.cc, chargé avec les fixtures ;
+# - master → production famille.once.florent.cc.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE_REPOSITORY: ghcr.io/florentdestremau/family-planner
+  # La tête de la PR (pas le commit de fusion) : l'étiquette sha-<7> désigne exactement ce commit.
+  COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.COMMIT }}
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Tests back
+        working-directory: backend
+        run: uv run pytest -q
+
+      - name: Builder Docker
+        uses: docker/setup-buildx-action@v3
+
+      # Le front (tsc + vite build) est compilé dans l'image.
+      - name: Image de production
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: family-planner:ci
+          cache-from: type=gha,scope=family-planner
+          cache-to: type=gha,mode=max,scope=family-planner
+
+      - name: Test de l'image (/up, fixtures, front servi)
+        run: |
+          docker run -d --name smoke -p 8080:80 -e FIXTURES=true family-planner:ci
+          for _ in $(seq 30); do curl -sf http://localhost:8080/up && break; sleep 1; done
+          curl -sf http://localhost:8080/up
+          curl -sf http://localhost:8080/api/stays/demo | grep -q '"slug":"demo"'
+          curl -sf http://localhost:8080/s/demo | grep -q '<div id="root">'
+          docker rm -f smoke
+
+      # Ni les PR venues d'un fork (pas de droits d'écriture pour elles).
+      - name: Connexion à ghcr.io
+        if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Étiquettes : sha-<7> (immuable, celle que l'on déploie), et pr-<n> ou master (mobiles).
+      - name: Publication de l'image
+        if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          MOVING_TAG: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'master' }}
+        run: |
+          for tag in "sha-${COMMIT::7}" "$MOVING_TAG"; do
+            docker tag family-planner:ci "$IMAGE_REPOSITORY:$tag"
+            docker push --quiet "$IMAGE_REPOSITORY:$tag"
+          done
+          echo "Image publiée : $IMAGE_REPOSITORY:sha-${COMMIT::7} ($MOVING_TAG)" >> "$GITHUB_STEP_SUMMARY"
+
+  # Environnement de la PR, créé ou mis à jour avec l'image testée. Interrupteur : variable du dépôt
+  # DEPLOY_ONCE=true, posée une fois la clé SSH de la CI installée sur le serveur.
+  deploy-pr:
+    needs: test
+    if: vars.DEPLOY_ONCE == 'true' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    concurrency:
+      group: deploy-pr-${{ github.event.number }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      pull-requests: write
+    environment:
+      name: pr-${{ github.event.number }}
+      url: https://famille-pr-${{ github.event.number }}.once.florent.cc/s/demo
+    steps:
+      - name: Accès SSH au serveur (clé à commande forcée, family-env ci)
+        env:
+          ONCE_SSH_KEY: ${{ secrets.ONCE_SSH_KEY }}
+          ONCE_KNOWN_HOSTS: ${{ secrets.ONCE_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$ONCE_SSH_KEY" > ~/.ssh/id_ed25519 && chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$ONCE_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Déploiement
+        id: deploiement
+        env:
+          NAME: pr-${{ github.event.number }}
+        run: |
+          image="$IMAGE_REPOSITORY:sha-${COMMIT::7}"
+          server() { ssh -o BatchMode=yes ubuntu@ssh.once.florent.cc "$*"; }
+          if server list | grep -q "^$NAME"$'\t'; then
+            # Pas de migrations : base neuve à chaque push, fixtures rechargées.
+            server update "$NAME" --image "$image" --reset-db
+          else
+            server create "$NAME" --image "$image"
+            echo "fresh=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Lien de l'environnement dans la PR
+        if: steps.deploiement.outputs.fresh == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.number }}
+        run: |
+          url="https://famille-pr-$PR.once.florent.cc"
+          body="Environnement de la PR : $url (image \`sha-${COMMIT::7}\`), rechargé à chaque push.
+          - Week-end : $url/s/demo — organisateur : $url/s/demo/admin?key=demo
+          - Semaine : $url/s/ete — organisateur : $url/s/ete/admin?key=demo"
+          gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --edit-last --create-if-none --body "$body"
+
+  # master → production, avec l'image testée.
+  deploy-production:
+    needs: test
+    if: vars.DEPLOY_ONCE == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    environment:
+      name: production
+      url: https://famille.once.florent.cc
+    steps:
+      - name: Accès SSH au serveur (clé à commande forcée, family-env ci)
+        env:
+          ONCE_SSH_KEY: ${{ secrets.ONCE_SSH_KEY }}
+          ONCE_KNOWN_HOSTS: ${{ secrets.ONCE_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$ONCE_SSH_KEY" > ~/.ssh/id_ed25519 && chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$ONCE_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Déploiement
+        run: ssh -o BatchMode=yes ubuntu@ssh.once.florent.cc "update production --image $IMAGE_REPOSITORY:sha-${COMMIT::7}"

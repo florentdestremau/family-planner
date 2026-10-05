@@ -1,0 +1,251 @@
+#!/usr/bin/env bash
+# Environnements de family-planner sur le serveur once : la production et un environnement par PR.
+# Adapté d'ardha-env, en plus simple : la base SQLite vit dans le volume /storage de chaque
+# application once, il n'y a ni base ni service partagé à gérer. Ne touche qu'aux applications
+# family-planner (le serveur est partagé).
+#
+#   family-env create <nom> --image <image>              crée l'environnement et le déploie
+#   family-env update <nom> --image <image> [--reset-db]
+#   family-env remove <nom> [--confirm production]       supprime l'application et ses données
+#   family-env list                                      environnements, hôte, image, état
+#   family-env logs <nom> [--tail <n>] [--follow]        journaux du conteneur
+#   family-env sweep --keep <pr-1,pr-7,…>                supprime les PR absentes de la liste (fermées)
+#   family-env ci                                        commande forcée de la clé SSH de la CI
+#
+# <nom> : `production` ou `pr-<numéro>`.
+set -euo pipefail
+
+FP_HOME=${FP_HOME:-$HOME/family-planner}
+FP_DOMAIN=${FP_DOMAIN:-once.florent.cc}
+FP_HOST_PREFIX=${FP_HOST_PREFIX:-famille}
+FP_IMAGE_RE=${FP_IMAGE_RE:-'^ghcr\.io/florentdestremau/family-planner:sha-[0-9a-f]{7}$'}
+FP_MAX_PR=${FP_MAX_PR:-4}
+FP_MEMORY_PRODUCTION=${FP_MEMORY_PRODUCTION:-512}
+FP_MEMORY_PR=${FP_MEMORY_PR:-256}
+ONCE=${ONCE:-once}
+
+ENVS="$FP_HOME/envs"
+
+die() {
+  echo "family-env : $*" >&2
+  exit 1
+}
+
+usage() {
+  sed -n '/^#   family-env/s/^#   //p' "$0" >&2
+  exit 2
+}
+
+check_name() {
+  [[ ${1:-} =~ ^(production|pr-[0-9]{1,6})$ ]] || die "nom invalide « ${1:-} » : production ou pr-<numéro>"
+}
+host_of() { if [[ $1 == production ]]; then echo "$FP_HOST_PREFIX.$FP_DOMAIN"; else echo "$FP_HOST_PREFIX-$1.$FP_DOMAIN"; fi; }
+meta_file() { echo "$ENVS/$1.meta"; }
+meta() { sed -n "s/^$2=//p" "$(meta_file "$1")" 2>/dev/null || true; }
+
+once_hosts() {
+  # `once list` colore et lie les hôtes (OSC 8) : on n'en garde que le texte.
+  "$ONCE" list | sed -E 's/\x1b\]8;;[^\x07\x1b]*(\x07|\x1b\\)//g; s/\x1b\[[0-9;]*m//g'
+}
+app_exists() { once_hosts | grep -q "^$1 "; }
+
+container_of() {
+  local host=$1 name label
+  while IFS=$'\t' read -r name label; do
+    if [[ $label == *"\"host\":\"$host\""* ]]; then
+      echo "$name"
+      return
+    fi
+  done < <(docker ps --format '{{.Names}}	{{.Label "once"}}')
+  die "aucun conteneur en service pour $host"
+}
+
+# Une PR démarre sur les jeux de données (/s/demo et /s/ete, clé organisateur « demo »).
+env_args() {
+  [[ $1 == pr-* ]] && printf '%s\n' --env FIXTURES=true
+  return 0
+}
+
+deploy() { # deploy <nom> <image>
+  local name=$1 image=$2 host memory
+  host=$(host_of "$name")
+  memory=$FP_MEMORY_PR
+  [[ $name == production ]] && memory=$FP_MEMORY_PRODUCTION
+  local args=(deploy "$image" --host "$host" --memory "$memory" --auto-update=false)
+  if [[ $name == production ]]; then
+    mkdir -p "$FP_HOME/backups/production"
+    args+=(--backup-path "$FP_HOME/backups/production" --auto-backup)
+  fi
+  local envs=()
+  mapfile -t envs < <(env_args "$name")
+  echo "Déploiement de $image sur https://$host …"
+  "$ONCE" "${args[@]}" "${envs[@]}"
+}
+
+cmd_create() {
+  local name=${1:-} image=''
+  check_name "$name"
+  shift
+  while (($#)); do
+    case $1 in
+      --image) image=${2:-}; shift 2 ;;
+      *) usage ;;
+    esac
+  done
+  [[ -n $image ]] || die "--image manquant"
+  [[ ! -f $(meta_file "$name") ]] || die "$name existe déjà : « family-env update $name --image … »"
+  local host
+  host=$(host_of "$name")
+  if app_exists "$host"; then die "$host est déjà une application once"; fi
+  mkdir -p "$ENVS"
+  if [[ $name == pr-* ]]; then
+    local count
+    count=$(find "$ENVS" -name 'pr-*.meta' | wc -l)
+    ((count < FP_MAX_PR)) || die "déjà $count environnements de PR (au plus $FP_MAX_PR) : en supprimer un"
+  fi
+  deploy "$name" "$image" || die "échec du déploiement de $name"
+  printf 'HOST=%s\nIMAGE=%s\nCREATED=%s\n' "$host" "$image" "$(date -Iseconds)" > "$(meta_file "$name")"
+  echo "Environnement $name prêt : https://$host"
+}
+
+cmd_update() {
+  local name=${1:-} image='' reset=false
+  check_name "$name"
+  shift
+  while (($#)); do
+    case $1 in
+      --image) image=${2:-}; shift 2 ;;
+      --reset-db) reset=true; shift ;;
+      *) usage ;;
+    esac
+  done
+  [[ -n $image ]] || die "--image manquant"
+  [[ -f $(meta_file "$name") ]] || die "$name n'existe pas : « family-env create $name --image … »"
+  local host
+  host=$(host_of "$name")
+  if $reset; then
+    # Pas de migrations : une base neuve = l'application redéployée avec un volume vide.
+    [[ $name != production ]] || die "--reset-db refusé sur la production"
+    if app_exists "$host"; then "$ONCE" remove "$host" --remove-data; fi
+    deploy "$name" "$image"
+  else
+    local envs=()
+    mapfile -t envs < <(env_args "$name")
+    echo "Mise à jour de $name vers $image …"
+    "$ONCE" update "$host" --image "$image" "${envs[@]}"
+  fi
+  sed -i "s|^IMAGE=.*|IMAGE=$image|" "$(meta_file "$name")"
+  echo "Environnement $name à jour : https://$host"
+}
+
+cmd_remove() {
+  local name=${1:-} confirm=''
+  check_name "$name"
+  shift
+  while (($#)); do
+    case $1 in
+      --confirm) confirm=${2:-}; shift 2 ;;
+      *) usage ;;
+    esac
+  done
+  [[ $name != production || $confirm == production ]] \
+    || die "supprimer la production demande « --confirm production »"
+  local host
+  host=$(host_of "$name")
+  if app_exists "$host"; then
+    "$ONCE" remove "$host" --remove-data
+  fi
+  rm -f "$(meta_file "$name")"
+  echo "Environnement $name supprimé."
+}
+
+cmd_list() {
+  local hosts file name host status
+  hosts=$(once_hosts)
+  printf '%s\t%s\t%s\t%s\n' NOM HÔTE ÉTAT IMAGE
+  for file in "$ENVS"/*.meta; do
+    [[ -e $file ]] || continue
+    name=$(basename "$file" .meta)
+    host=$(host_of "$name")
+    status=$(sed -n "s/^$host (\(.*\))$/\1/p" <<< "$hosts")
+    printf '%s\t%s\t%s\t%s\n' "$name" "https://$host" "${status:-absent de once}" "$(meta "$name" IMAGE)"
+  done
+}
+
+cmd_logs() {
+  local name=${1:-} args=()
+  check_name "$name"
+  shift
+  while (($#)); do
+    case $1 in
+      --tail) args+=(--tail "${2:-}"); shift 2 ;;
+      --follow) args+=(--follow); shift ;;
+      *) usage ;;
+    esac
+  done
+  docker logs "${args[@]}" "$(container_of "$(host_of "$name")")"
+}
+
+cmd_sweep() {
+  local keep=''
+  while (($#)); do
+    case $1 in
+      # Sans valeur : aucune PR ouverte, tout part.
+      --keep) keep=${2-}; shift; (($#)) && shift ;;
+      *) usage ;;
+    esac
+  done
+  [[ $keep =~ ^(pr-[0-9]{1,6}(,pr-[0-9]{1,6})*)?$ ]] || die "--keep : liste de pr-<n> séparés par des virgules"
+  local file name removed=0
+  for file in "$ENVS"/pr-*.meta; do
+    [[ -e $file ]] || continue
+    name=$(basename "$file" .meta)
+    if [[ ,$keep, != *",$name,"* ]]; then
+      cmd_remove "$name"
+      removed=$((removed + 1))
+    fi
+  done
+  echo "Balayage : $removed environnement(s) supprimé(s)."
+}
+
+# Commande forcée de la clé SSH de la CI (`command="…/family-env ci",restrict` dans authorized_keys) :
+# la CI ne peut que créer, mettre à jour, supprimer ou balayer des environnements de PR, mettre à
+# jour la production, lister et lire des journaux, avec une image à étiquette immuable seulement.
+cmd_ci() {
+  local words=()
+  read -ra words <<< "${SSH_ORIGINAL_COMMAND:-}"
+  # `bin/server` appelle `family-planner/family-env <commande>` : même client pour un humain et la CI.
+  [[ ${words[0]:-} == family-planner/family-env ]] && words=("${words[@]:1}")
+  set -- "${words[@]}"
+  local command=${1:-} name=${2:-}
+  refuse() { die "commande refusée à la CI : ${SSH_ORIGINAL_COMMAND:-(vide)}"; }
+  case $command in
+    list) (($# == 1)) || refuse ;;
+    create | remove) [[ $name =~ ^pr-[0-9]{1,6}$ ]] || refuse ;;
+    update) [[ $name =~ ^(production|pr-[0-9]{1,6})$ ]] || refuse ;;
+    logs) [[ $name =~ ^(production|pr-[0-9]{1,6})$ && ($# == 2 || ($# == 4 && $3 == --tail && $4 =~ ^[0-9]{1,5}$)) ]] || refuse ;;
+    sweep) [[ ${2:-} == --keep && $# -le 3 ]] || refuse ;;
+    *) refuse ;;
+  esac
+  case $command in
+    create | update)
+      [[ ${3:-} == --image && ${4:-} =~ $FP_IMAGE_RE ]] || refuse
+      (($# == 4)) || [[ $# == 5 && $5 == --reset-db && $name != production ]] || refuse
+      ;;
+    remove) (($# == 2)) || refuse ;;
+  esac
+  "cmd_$command" "${@:2}"
+}
+
+command=${1:-}
+(($#)) && shift
+case $command in
+  create) cmd_create "$@" ;;
+  update) cmd_update "$@" ;;
+  remove) cmd_remove "$@" ;;
+  list) cmd_list "$@" ;;
+  logs) cmd_logs "$@" ;;
+  sweep) cmd_sweep "$@" ;;
+  ci) cmd_ci ;;
+  *) usage ;;
+esac

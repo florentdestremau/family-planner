@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Pilote les environnements once depuis le poste : `bin/server sync` copie le script serveur,
+# toute autre commande est transmise à family-env (voir deploy/server/family-env).
+#
+#   bin/server sync
+#   bin/server create pr-12 --image ghcr.io/florentdestremau/family-planner:sha-abc1234
+#   bin/server list | logs production --tail 100 | remove pr-12
+set -euo pipefail
+
+SERVER=${FP_SERVER:-ubuntu@ssh.once.florent.cc}
+ROOT=$(cd "$(dirname "$0")/.." && pwd)
+
+case ${1:-} in
+  sync)
+    ssh "$SERVER" 'mkdir -p family-planner && chmod 700 family-planner'
+    scp -q "$ROOT/deploy/server/family-env" "$SERVER:family-planner/family-env"
+    ssh "$SERVER" 'chmod 755 family-planner/family-env'
+    echo "Script synchronisé sur $SERVER:~/family-planner/family-env"
+    ;;
+  "") sed -n '2,8s/^# \{0,1\}//p' "$0" >&2; exit 2 ;;
+  *)
+    tty=()
+    [[ ${1:-} == logs && " $* " == *" --follow "* ]] && tty=(-t)
+    # shellcheck disable=SC2029  # arguments échappés côté client, exprès
+    ssh "${tty[@]}" "$SERVER" "family-planner/family-env $(printf '%q ' "$@")"
+    ;;
+esac
