@@ -3,8 +3,8 @@
     uv run python -m app.fixtures            # charge les séjours absents
     uv run python -m app.fixtures --reset    # les supprime puis les recharge
 
-Chaque séjour a un slug fixe et la clé organisateur « demo » (DEMO_ADMIN_KEY pour la changer) :
-/s/demo/admin?key=demo, /s/ete/admin?key=demo.
+Chaque séjour a un slug fixe et la clé organisateur « demo » ; en production, en choisir une
+autre avec DEMO_ADMIN_KEY (la clé « demo » est publique).
 """
 
 import argparse
@@ -253,6 +253,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     migrate()
     loaded = load_all(reset=args.reset)
+    key = os.environ.get("DEMO_ADMIN_KEY", "demo")
     for fx in FIXTURES:
         status = "chargé" if fx.slug in loaded else "déjà présent"
-        print(f"{fx.name} ({status}) : /s/{fx.slug}  —  organisateur : /s/{fx.slug}/admin?key=demo")
+        print(f"{fx.name} ({status}) : /s/{fx.slug}  —  organisateur : /s/{fx.slug}/admin?key={key}")

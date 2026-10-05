@@ -109,3 +109,29 @@ test("l'organisateur fusionne deux foyers puis déplace quelqu'un", async ({ pag
   await expect(page.locator(".household-card")).toHaveCount(2);
   await expect.poll(async () => (await stay.snap()).persons.every((p: { partner_id: number | null }) => p.partner_id === null)).toBe(true);
 });
+
+test("des clics rapides ne perdent aucune présence, même si le réseau désordonne les envois", async ({ page, request }) => {
+  const stay = await createStay(request);
+  await stay.person("Alice");
+  await loginAs(page, stay.url, "Alice");
+
+  // Le premier envoi est ralenti : sans file d'attente, il arriverait après le second et l'écraserait.
+  let first = true;
+  await page.route("**/presences", async (route) => {
+    if (first) {
+      first = false;
+      await new Promise((r) => setTimeout(r, 800));
+    }
+    await route.continue();
+  });
+  await page.getByRole("button", { name: "Ven. 30 oct. Dîner" }).click();
+  await page.getByRole("button", { name: "Sam. 31 oct.", exact: true }).click();
+  await page.getByRole("button", { name: "Dim. 1 nov. Petit-déj" }).click();
+  await expect(page.getByText("5 repas sur 6")).toBeVisible();
+
+  await expect.poll(async () => (await stay.snap()).presences.length, { timeout: 5000 }).toBe(5);
+  await page.waitForTimeout(1000);
+  expect((await stay.snap()).presences).toHaveLength(5);
+  await page.reload();
+  await expect(page.getByText("5 repas sur 6")).toBeVisible();
+});

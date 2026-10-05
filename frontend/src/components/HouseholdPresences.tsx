@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Person } from "../api";
 import { sameSets, slotsOf, toSlots } from "../lib";
 import { useStay } from "../stay";
@@ -16,15 +16,35 @@ export default function HouseholdPresences({ me }: { me: Person }) {
   const [state, setState] = useState(fromServer);
   const [together, setTogether] = useState(() => sameSets([...fromServer().values()]));
   const memberIds = members.map((p) => p.id).join(",");
+  // Enregistrements en file : chaque envoi remplace toutes les présences du foyer, deux envois en
+  // parallèle pourraient arriver dans le désordre et l'ancien écraserait le récent. Un seul envoi à
+  // la fois, toujours avec le dernier état connu.
+  const queue = useRef<{ running: boolean; next: Map<number, Set<string>> | null }>({ running: false, next: null });
 
-  // Resynchronise si les données changent ailleurs (autre membre du foyer, autre appareil).
-  useEffect(() => setState(fromServer()), [snap.presences, memberIds]);
+  // Resynchronise si les données changent ailleurs (autre membre du foyer, autre appareil), sauf
+  // pendant nos propres enregistrements.
+  useEffect(() => {
+    if (!queue.current.running) setState(fromServer());
+  }, [snap.presences, memberIds]);
+
+  async function flush() {
+    const q = queue.current;
+    if (q.running) return;
+    q.running = true;
+    while (q.next) {
+      const next = q.next;
+      q.next = null;
+      await call("PUT", `/households/${me.household_id}/presences`, {
+        members: [...next].map(([person_id, keys]) => ({ person_id, slots: toSlots(snap, keys) })),
+      });
+    }
+    q.running = false;
+  }
 
   function save(next: Map<number, Set<string>>) {
     setState(next);
-    void call("PUT", `/households/${me.household_id}/presences`, {
-      members: [...next].map(([person_id, keys]) => ({ person_id, slots: toSlots(snap, keys) })),
-    });
+    queue.current.next = next;
+    void flush();
   }
 
   const mine = state.get(me.id) ?? new Set<string>();
