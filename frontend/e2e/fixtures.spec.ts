@@ -31,7 +31,7 @@ test("impressions et export LLM", async ({ page, context }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await page.goto("/s/demo/imprimer");
   const exportText = await page.locator("textarea.export").inputValue();
-  expect(exportText).toContain("« Week-end chez Mamie »");
+  expect(exportText).toContain("« Grand week-end chez Mamie »");
   expect(exportText).toMatch(/dîner — \d+ adultes · \d+ enfants : Soupe de potiron ; Quiche lorraine ; Salade verte/);
   await page.getByRole("button", { name: "Copier" }).click();
   await expect(page.getByRole("button", { name: "Copié ✓" })).toBeVisible();

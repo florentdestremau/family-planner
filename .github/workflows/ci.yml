@@ -166,7 +166,6 @@ jobs:
           printf '%s\n' "$ONCE_KNOWN_HOSTS" > ~/.ssh/known_hosts
 
       - name: Déploiement
-        id: deploiement
         env:
           NAME: pr-${{ github.event.number }}
         run: |
@@ -177,20 +176,27 @@ jobs:
             server update "$NAME" --image "$image" --reset-db
           else
             server create "$NAME" --image "$image"
-            echo "fresh=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Lien de l'environnement dans la PR
-        if: steps.deploiement.outputs.fresh == 'true'
+      # À chaque déploiement : un seul commentaire, mis à jour, avec les liens participant et
+      # organisateur des fixtures (clé « demo », publique : ce sont des données de démonstration).
+      - name: Liens de l'environnement dans la PR
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.number }}
         run: |
           url="https://family-planning-pr-$PR.once.florent.cc"
-          body="Environnement de la PR : $url (image \`sha-${COMMIT::7}\`), rechargé à chaque push.
-          - Week-end : $url/s/demo — organisateur : $url/s/demo/admin?key=demo
-          - Semaine : $url/s/ete — organisateur : $url/s/ete/admin?key=demo"
-          gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --edit-last --create-if-none --body "$body"
+          cat > comment.md <<EOF
+          ### Environnement de la PR : $url
+
+          Image \`sha-${COMMIT::7}\`, déployée le $(TZ=Europe/Paris date '+%d/%m/%Y à %H:%M'). Base neuve à chaque push, chargée avec les fixtures.
+
+          | Séjour | Participants | Organisation |
+          | --- | --- | --- |
+          | Grand week-end chez Mamie (4 jours) | $url/s/demo | [admin]($url/s/demo/admin?key=demo) |
+          | Semaine des cousins à la mer | $url/s/ete | [admin]($url/s/ete/admin?key=demo) |
+          EOF
+          gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --edit-last --create-if-none --body-file comment.md
 
   # master → production, avec l'image testée.
   deploy-production:

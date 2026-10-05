@@ -27,7 +27,7 @@ cd frontend && npm install && npm run dev
 
 ### Fixtures
 
-Deux séjours de démonstration (week-end `/s/demo`, semaine avec arrivées échelonnées `/s/ete`),
+Deux séjours de démonstration aux arrivées et départs très échelonnés (grand week-end de 4 jours `/s/demo`, semaine `/s/ete`),
 clé organisateur `demo` :
 
 ```bash
