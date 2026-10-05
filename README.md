@@ -16,7 +16,14 @@ cd backend && uv run uvicorn app.main:app --reload
 cd frontend && npm install && npm run dev
 ```
 
-Tests back : `cd backend && uv run pytest`
+### Tests
+
+| Commande | Ce qui est vérifié |
+| --- | --- |
+| `cd backend && uv run pytest --cov` | API (droits sur chaque route organisateur, isolation entre séjours, validations, règles métier), propriétés du tirage et des couchages (Hypothesis), service du front, fixtures, script serveur `family-env` (faux `once`). Couverture lignes + branches exigée : 100 %. |
+| `cd frontend && npm run typecheck` | Types TypeScript. |
+| `cd frontend && npm run test:coverage` | Logique du front (`lib`, `storage`, `api`) avec vitest, couverture 100 %. |
+| `cd frontend && npm run test:e2e` | Parcours complets dans Chromium, bureau et mobile, contre le vrai back (base jetable, fixtures). |
 
 ### Fixtures
 
@@ -45,9 +52,9 @@ docker run -p 8080:80 -v family-planner-data:/storage family-planner
 `.github/workflows/ci.yml` : tests back, image construite et testée (`/up`, fixtures, front servi),
 publiée sur `ghcr.io/florentdestremau/family-planner` (`sha-<7>` immuable, `pr-<n>` ou `master`), puis :
 
-- **PR** → `https://famille-pr-<n>.once.florent.cc`, chargé avec les fixtures, base neuve à chaque
+- **PR** → `https://family-planning-pr-<n>.once.florent.cc`, chargé avec les fixtures, base neuve à chaque
   push ; lien en commentaire de la PR ;
-- **master** → production `https://famille.once.florent.cc` (sauvegardes automatiques once) ;
+- **master** → production `https://family-planning.once.florent.cc` (sauvegardes automatiques once) ;
 - **PR fermée** → environnement supprimé ; balayage nocturne des orphelins (`environments.yml`).
 
 Côté serveur, `deploy/server/family-env` (`create | update [--reset-db] | remove | list | logs | sweep`)

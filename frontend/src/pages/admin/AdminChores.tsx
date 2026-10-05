@@ -107,7 +107,12 @@ function OccurrenceRow({ occ }: { occ: Occ }) {
   const set = (personIds: number[]) =>
     call("PUT", "/chores/occurrence", { chore_type_id: occ.chore.id, date: occ.date, moment: occ.moment, person_ids: personIds }, { admin: true });
   const present = (pid: number) => (occ.moment === "day" ? idx.isPresentOnDay(pid, occ.date) : idx.isPresent(pid, occ.date, occ.moment));
-  const candidates = snap.persons.filter((p) => !occ.people.includes(p.id) && present(p.id) && p.does_chores);
+  const load = (pid: number) => snap.chore_assignments.filter((a) => a.person_id === pid).length;
+  const conflict = (pid: number) => occ.people.includes(idx.personById.get(pid)?.partner_id ?? -1);
+  // Les mieux placés d'abord : pas de conjoint déjà sur ce créneau, puis les moins chargés.
+  const candidates = snap.persons
+    .filter((p) => !occ.people.includes(p.id) && present(p.id) && p.does_chores)
+    .sort((a, b) => Number(conflict(a.id)) - Number(conflict(b.id)) || load(a.id) - load(b.id) || a.name.localeCompare(b.name));
   const missing = occ.chore.people_needed - occ.people.length;
   const partners = occ.people.some((id) => occ.people.includes(idx.personById.get(id)?.partner_id ?? -1));
 
@@ -122,7 +127,11 @@ function OccurrenceRow({ occ }: { occ: Occ }) {
         {occ.people.map((id) => (
           <Chip key={id} person={idx.personById.get(id)} onRemove={() => set(occ.people.filter((x) => x !== id))} />
         ))}
-        <AddPersonSelect people={candidates} onPick={(id) => set([...occ.people, id])} />
+        <AddPersonSelect
+          people={candidates}
+          onPick={(id) => set([...occ.people, id])}
+          hint={(p) => `${load(p.id)} corvée${load(p.id) > 1 ? "s" : ""}${conflict(p.id) ? " · ♥ en couple avec un inscrit" : ""}`}
+        />
       </div>
     </li>
   );

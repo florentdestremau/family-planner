@@ -1,23 +1,29 @@
 from datetime import date
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 Meal = Literal["breakfast", "lunch", "dinner"]
 Moment = Literal["breakfast", "lunch", "dinner", "day"]
 PersonKind = Literal["adult", "child"]
 BedKind = Literal["double", "single", "bunk", "extra"]
-Time = Field(default="", pattern=r"^(\d{2}:\d{2})?$")
+Time = Field(default="", pattern=r"^(([01]\d|2[0-3]):[0-5]\d)?$")
 
 
 class ORM(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class In(BaseModel):
+    """Entrées : espaces de début et de fin retirés avant validation (un nom « » est refusé)."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
 # --- Entrées -----------------------------------------------------------------
 
 
-class StayCreate(BaseModel):
+class StayCreate(In):
     name: str = Field(min_length=1, max_length=200)
     start_date: date
     end_date: date
@@ -25,7 +31,7 @@ class StayCreate(BaseModel):
     last_meal: Meal = "lunch"
 
 
-class StayUpdate(BaseModel):
+class StayUpdate(In):
     name: str | None = Field(default=None, min_length=1, max_length=200)
     start_date: date | None = None
     end_date: date | None = None
@@ -34,7 +40,7 @@ class StayUpdate(BaseModel):
     separate_couples: bool | None = None
 
 
-class PersonCreate(BaseModel):
+class PersonCreate(In):
     name: str = Field(min_length=1, max_length=100)
     kind: PersonKind = "adult"
     guardian_id: int | None = None
@@ -42,7 +48,7 @@ class PersonCreate(BaseModel):
     does_activities: bool = True
 
 
-class PersonUpdate(BaseModel):
+class PersonUpdate(In):
     name: str | None = Field(default=None, min_length=1, max_length=100)
     kind: PersonKind | None = None
     guardian_id: int | None = None
@@ -50,48 +56,48 @@ class PersonUpdate(BaseModel):
     does_activities: bool | None = None
 
 
-class PartnerIn(BaseModel):
+class PartnerIn(In):
     partner_id: int | None
 
 
-class BedAssignIn(BaseModel):
+class BedAssignIn(In):
     bed_id: int | None
 
 
-class SlotIn(BaseModel):
+class SlotIn(In):
     date: date
     meal: Meal
 
 
-class PresencesIn(BaseModel):
+class PresencesIn(In):
     slots: list[SlotIn]
 
 
-class RoomIn(BaseModel):
+class RoomIn(In):
     name: str = Field(min_length=1, max_length=100)
     notes: str = ""
 
 
-class BedIn(BaseModel):
+class BedIn(In):
     kind: BedKind
     label: str = ""
 
 
-class ChoreTypeIn(BaseModel):
+class ChoreTypeIn(In):
     name: str = Field(min_length=1, max_length=100)
     moments: list[Moment] = Field(min_length=1)
     people_needed: int = Field(default=1, ge=1, le=20)
     every_n_days: int = Field(default=1, ge=1, le=30)
 
 
-class OccurrenceIn(BaseModel):
+class OccurrenceIn(In):
     chore_type_id: int
     date: date
     moment: Moment
     person_ids: list[int]
 
 
-class ActivityIn(BaseModel):
+class ActivityIn(In):
     name: str = Field(min_length=1, max_length=200)
     description: str = ""
     location: str = ""
@@ -100,8 +106,14 @@ class ActivityIn(BaseModel):
     end_time: str = Time
     optional: bool = False
 
+    @model_validator(mode="after")
+    def _end_after_start(self) -> "ActivityIn":
+        if self.start_time and self.end_time and self.end_time < self.start_time:
+            raise ValueError("L'heure de fin doit suivre l'heure de début")
+        return self
 
-class MenuIn(BaseModel):
+
+class MenuIn(In):
     date: date
     meal: Meal
     dishes: str = ""

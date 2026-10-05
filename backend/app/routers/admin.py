@@ -62,12 +62,19 @@ def update_person(person_id: int, body: s.PersonUpdate, stay: AdminStay, db: DB)
     if data.get("guardian_id") is not None:
         if data["guardian_id"] == p.id:
             raise HTTPException(422, "Une personne ne peut pas être son propre référent")
-        person(db, data["guardian_id"], stay)
+        if person(db, data["guardian_id"], stay).kind != "adult":
+            raise HTTPException(422, "Le référent d'un enfant doit être un adulte")
+    if data.get("kind") == "child" and db.scalar(select(Person.id).where(Person.guardian_id == p.id).limit(1)):
+        raise HTTPException(422, f"{p.name} est référent d'enfants : rattachez-les d'abord à un autre adulte")
     for key, value in data.items():
         if value is not None or key == "guardian_id":
             setattr(p, key, value)
     if p.kind == "adult":
         p.guardian_id = None
+    elif p.partner_id is not None:
+        # Le couple est un lien entre adultes (la clé étrangère garantit que le conjoint existe).
+        db.get(Person, p.partner_id).partner_id = None
+        p.partner_id = None
     db.commit()
     return p
 
@@ -85,10 +92,10 @@ def set_partner(person_id: int, body: s.PartnerIn, stay: AdminStay, db: DB) -> P
     new = person(db, body.partner_id, stay) if body.partner_id is not None else None
     if new is not None and new.id == p.id:
         raise HTTPException(422, "Une personne ne peut pas être en couple avec elle-même")
+    if new is not None and "child" in (p.kind, new.kind):
+        raise HTTPException(422, "Le couple est un lien entre deux adultes")
     for old_id in {p.partner_id, new.partner_id if new else None} - {None}:
-        old = db.get(Person, old_id)
-        if old is not None:
-            old.partner_id = None
+        db.get(Person, old_id).partner_id = None
     p.partner_id = new.id if new else None
     if new is not None:
         new.partner_id = p.id
@@ -223,6 +230,12 @@ def draw_chores(stay: AdminStay, db: DB) -> dict:
 def set_occurrence(body: s.OccurrenceIn, stay: AdminStay, db: DB) -> None:
     """Ajustement manuel d'une occurrence de corvée."""
     owned(db, ChoreType, body.chore_type_id, stay)
+    if body.moment == "day":
+        valid = stay.start_date <= body.date <= stay.end_date
+    else:
+        valid = (body.date, body.moment) in set(stay_slots(stay.start_date, stay.end_date, stay.first_meal, stay.last_meal))
+    if not valid:
+        raise HTTPException(422, "Créneau hors du séjour")
     for pid in body.person_ids:
         person(db, pid, stay)
     db.execute(

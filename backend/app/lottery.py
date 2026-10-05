@@ -118,7 +118,7 @@ def _single_draw(occurrences: list[Occurrence], partners: dict[int, int], separa
     deviation = sum((counts[p] - expected[p]) ** 2 for p in expected)
     repeats = sum(n - 1 for n in pairs.values() if n > 1)
     score = unfilled * 1_000_000 + doubles * 1_000 + deviation * 10 + repeats
-    return DrawResult(result, unfilled, score, dict(counts))
+    return DrawResult(result, unfilled, score, {p: n for p, n in counts.items() if n})
 
 
 def draw(

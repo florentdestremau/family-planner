@@ -5,3 +5,10 @@ __pycache__/
 *.db
 .pixel/
 backend/static/
+*.db-*
+.coverage
+coverage/
+.hypothesis/
+frontend/test-results/
+frontend/playwright-report/
+*.tsbuildinfo

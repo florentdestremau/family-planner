@@ -74,10 +74,13 @@ export function AddPersonSelect({
   people,
   onPick,
   placeholder = "+ Ajouter…",
+  hint,
 }: {
   people: Person[];
   onPick: (id: number) => void;
   placeholder?: string;
+  /** Précision affichée après le nom (charge, conflit…). */
+  hint?: (p: Person) => string;
 }) {
   if (!people.length) return null;
   return (
@@ -93,6 +96,7 @@ export function AddPersonSelect({
         <option key={p.id} value={p.id}>
           {p.name}
           {p.kind === "child" ? " (enfant)" : ""}
+          {hint ? ` — ${hint(p)}` : ""}
         </option>
       ))}
     </select>

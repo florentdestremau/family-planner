@@ -85,12 +85,12 @@ def snapshot(stay: StayDep, db: DB) -> dict:
 @router.post("/stays/{slug}/persons", response_model=s.PersonOut, status_code=201)
 def add_person(body: s.PersonCreate, stay: StayDep, db: DB) -> Person:
     """Un participant peut s'ajouter lui-même ou ajouter un enfant rattaché."""
-    if body.guardian_id is not None:
-        person(db, body.guardian_id, stay)
+    if body.guardian_id is not None and person(db, body.guardian_id, stay).kind != "adult":
+        raise HTTPException(422, "Le référent d'un enfant doit être un adulte")
     does_chores = body.does_chores if body.does_chores is not None else body.kind == "adult"
     p = Person(
         stay_id=stay.id,
-        name=body.name.strip(),
+        name=body.name,
         kind=body.kind,
         guardian_id=body.guardian_id if body.kind == "child" else None,
         does_chores=does_chores,

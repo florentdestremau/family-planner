@@ -17,7 +17,7 @@ set -euo pipefail
 
 FP_HOME=${FP_HOME:-$HOME/family-planner}
 FP_DOMAIN=${FP_DOMAIN:-once.florent.cc}
-FP_HOST_PREFIX=${FP_HOST_PREFIX:-famille}
+FP_HOST_PREFIX=${FP_HOST_PREFIX:-family-planning}
 FP_IMAGE_RE=${FP_IMAGE_RE:-'^ghcr\.io/florentdestremau/family-planner:sha-[0-9a-f]{7}$'}
 FP_MAX_PR=${FP_MAX_PR:-4}
 FP_MEMORY_PRODUCTION=${FP_MEMORY_PRODUCTION:-512}

@@ -11,10 +11,23 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "httpx>=0.28.1",
+    "httpx2>=2.13.1",
+    "hypothesis>=6.168.4",
     "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+
+[tool.coverage.run]
+source = ["app"]
+branch = true
+# Sous-processus (python -m app.fixtures) mesurés aussi.
+patch = ["subprocess"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+fail_under = 100

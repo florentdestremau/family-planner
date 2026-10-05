@@ -20,3 +20,16 @@ def test_fixtures_are_complete_and_idempotent(client) -> None:
         assert client.get(f"/api/stays/{fx.slug}/admin", headers={"X-Admin-Key": "demo"}).status_code == 204
 
     assert client.get("/up").text == "OK"
+
+
+def test_command_line(tmp_path) -> None:
+    import os
+    import subprocess
+    import sys
+
+    env = {**os.environ, "DATABASE_URL": f"sqlite:///{tmp_path}/cli.db"}
+    run = lambda *a: subprocess.run([sys.executable, "-m", "app.fixtures", *a], env=env, capture_output=True, text=True, check=True).stdout  # noqa: E731
+    first = run()
+    assert first.count("(chargé)") == 2 and "/s/demo/admin?key=demo" in first
+    assert run().count("(déjà présent)") == 2
+    assert run("--reset").count("(chargé)") == 2

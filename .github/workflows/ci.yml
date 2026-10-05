@@ -1,7 +1,9 @@
-# CI de family-planner : tests back, image de production construite et testée (/up, fixtures),
-# publiée sur ghcr.io, puis déployée sur le serveur once (adapté d'ardha-app) :
-# - PR → environnement éphémère famille-pr-<n>.once.florent.cc, chargé avec les fixtures ;
-# - master → production famille.once.florent.cc.
+# CI de family-planner : tests back (couverture 100 %), script serveur, types et tests du front
+# (couverture 100 % de la logique), tests e2e dans Chromium (bureau et mobile), image de production
+# construite et testée (/up, fixtures), publiée sur ghcr.io, puis déployée sur le serveur once
+# (adapté d'ardha-app) :
+# - PR → environnement éphémère family-planning-pr-<n>.once.florent.cc, chargé avec les fixtures ;
+# - master → production family-planning.once.florent.cc.
 name: CI
 
 on:
@@ -33,9 +35,66 @@ jobs:
 
       - uses: astral-sh/setup-uv@v6
 
-      - name: Tests back
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Dépendances
+        run: |
+          (cd backend && uv sync --frozen)
+          (cd frontend && npm ci)
+
+      - name: Script serveur (shellcheck)
+        run: shellcheck deploy/server/family-env bin/server
+
+      - name: Types du front
+        working-directory: frontend
+        run: npm run typecheck
+
+      - name: Tests back (couverture des lignes et des branches ≥ 100 %)
         working-directory: backend
-        run: uv run pytest -q
+        run: uv run pytest -q --cov
+
+      - name: Tests du front (couverture 100 % de la logique)
+        working-directory: frontend
+        run: npm run test:coverage
+
+      - name: Build du front
+        working-directory: frontend
+        run: npm run build
+
+      - name: Version de Playwright
+        id: playwright
+        working-directory: frontend
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache de Chromium
+        id: chromium-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+
+      - name: Chromium des tests e2e
+        if: steps.chromium-cache.outputs.cache-hit != 'true'
+        working-directory: frontend
+        run: npx playwright install chromium
+
+      - name: Tests e2e (bureau et mobile)
+        working-directory: frontend
+        run: npm run test:e2e
+        env:
+          E2E_SKIP_FRONT_BUILD: '1'
+
+      - name: Rapport e2e
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          retention-days: 7
 
       - name: Builder Docker
         uses: docker/setup-buildx-action@v3
@@ -95,7 +154,7 @@ jobs:
       pull-requests: write
     environment:
       name: pr-${{ github.event.number }}
-      url: https://famille-pr-${{ github.event.number }}.once.florent.cc/s/demo
+      url: https://family-planning-pr-${{ github.event.number }}.once.florent.cc/s/demo
     steps:
       - name: Accès SSH au serveur (clé à commande forcée, family-env ci)
         env:
@@ -127,7 +186,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.number }}
         run: |
-          url="https://famille-pr-$PR.once.florent.cc"
+          url="https://family-planning-pr-$PR.once.florent.cc"
           body="Environnement de la PR : $url (image \`sha-${COMMIT::7}\`), rechargé à chaque push.
           - Week-end : $url/s/demo — organisateur : $url/s/demo/admin?key=demo
           - Semaine : $url/s/ete — organisateur : $url/s/ete/admin?key=demo"
@@ -144,7 +203,7 @@ jobs:
       cancel-in-progress: false
     environment:
       name: production
-      url: https://famille.once.florent.cc
+      url: https://family-planning.once.florent.cc
     steps:
       - name: Accès SSH au serveur (clé à commande forcée, family-env ci)
         env:
