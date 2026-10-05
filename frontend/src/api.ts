@@ -13,13 +13,19 @@ export interface Stay {
   separate_couples: boolean;
 }
 
+export interface Household {
+  id: number;
+  /** Vide : on affiche les prénoms des adultes. */
+  name: string;
+}
+
 export interface Person {
   id: number;
   name: string;
   kind: PersonKind;
   does_chores: boolean;
   does_activities: boolean;
-  guardian_id: number | null;
+  household_id: number;
   partner_id: number | null;
   bed_id: number | null;
 }
@@ -87,6 +93,7 @@ export interface Snapshot {
   stay: Stay;
   days: string[];
   slots: Slot[];
+  households: Household[];
   persons: Person[];
   presences: Presence[];
   rooms: Room[];

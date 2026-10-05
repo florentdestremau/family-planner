@@ -1,10 +1,14 @@
-"""Proposition automatique de couchages pour les personnes non logées."""
+"""Proposition automatique de couchages pour les personnes non logées.
+
+Couples dans un lit double, enfants puis adultes seuls ; chacun de préférence dans la chambre
+où dort déjà quelqu'un de son foyer.
+"""
 
 from .slots import BED_PLACES
 
 
 def auto_assign(
-    people: list[dict],  # {id, kind, partner_id, guardian_id, bed_id}
+    people: list[dict],  # {id, kind, partner_id, household_id, bed_id}
     beds: list[dict],  # {id, room_id, kind}
 ) -> dict[int, int]:
     """Retourne {person_id: bed_id} pour les personnes sans lit."""
@@ -18,53 +22,56 @@ def auto_assign(
     by_id = {p["id"]: p for p in people}
     todo = [p for p in people if p["bed_id"] is None]
 
-    def bed_of(pid: int) -> int | None:
-        return assigned.get(pid) or by_id[pid]["bed_id"]
+    def household_room(p: dict) -> int | None:
+        for other in people:
+            if other["household_id"] == p["household_id"]:
+                bed = assigned.get(other["id"]) or other["bed_id"]
+                if bed in bed_by_id:
+                    return bed_by_id[bed]["room_id"]
+        return None
 
-    def take(pid: int, kinds: list[str], room_id: int | None = None, empty_only: bool = False) -> bool:
+    def find(kinds: list[str], room_id: int | None, places: int = 1, empty_only: bool = False) -> int | None:
         for kind in kinds:
-            for bid, places in free.items():
+            for bid, left in free.items():
                 bed = bed_by_id[bid]
-                if bed["kind"] != kind or places <= 0:
+                if bed["kind"] != kind or left < places:
                     continue
                 if room_id is not None and bed["room_id"] != room_id:
                     continue
-                if empty_only and places < BED_PLACES[kind]:
+                if empty_only and left < BED_PLACES[kind]:
                     continue
-                free[bid] -= 1
-                assigned[pid] = bid
-                return True
-        return False
+                return bid
+        return None
 
-    # 1. Couples : un lit double ensemble.
+    def place(group: list[dict], kinds: list[str], empty_only: bool = False) -> bool:
+        """Place le groupe dans un même lit : chambre du foyer d'abord, puis n'importe où."""
+        room = household_room(group[0])
+        bid = (room is not None and find(kinds, room, len(group), empty_only)) or find(kinds, None, len(group), empty_only)
+        if not bid:
+            return False
+        for p in group:
+            free[bid] -= 1
+            assigned[p["id"]] = bid
+        return True
+
     done: set[int] = set()
+    # 1. Couples : un lit double ensemble.
     for p in todo:
         partner = by_id.get(p["partner_id"]) if p["partner_id"] else None
-        if p["kind"] != "adult" or not partner or partner["bed_id"] is not None or p["id"] in done:
+        if p["id"] in done or not partner or partner["bed_id"] is not None:
             continue
-        for bid, places in free.items():
-            if bed_by_id[bid]["kind"] == "double" and places >= 2:
-                free[bid] -= 2
-                assigned[p["id"]] = assigned[partner["id"]] = bid
-                done |= {p["id"], partner["id"]}
-                break
+        if place([p, partner], ["double"]):
+            done |= {p["id"], partner["id"]}
 
-    # 2. Enfants : de préférence dans la chambre de leur adulte référent.
-    kid_kinds = ["bunk", "single", "extra", "double"]
+    # 2. Enfants.
     for p in todo:
-        if p["id"] in done or p["kind"] != "child":
-            continue
-        room_id = None
-        guardian = p["guardian_id"]
-        if guardian and guardian in by_id and (gbed := bed_of(guardian)) in bed_by_id:
-            room_id = bed_by_id[gbed]["room_id"]
-        if (room_id is not None and take(p["id"], kid_kinds, room_id)) or take(p["id"], kid_kinds):
+        if p["id"] not in done and p["kind"] == "child" and place([p], ["bunk", "single", "extra", "double"]):
             done.add(p["id"])
 
-    # 3. Adultes seuls : lits simples d'abord, double vide en dernier recours.
+    # 3. Adultes seuls : lits simples d'abord, double vide ensuite, double partagé en dernier recours.
     for p in todo:
         if p["id"] in done or p["kind"] != "adult":
             continue
-        if take(p["id"], ["single", "extra", "bunk"]) or take(p["id"], ["double"], empty_only=True) or take(p["id"], ["double"]):
+        if place([p], ["single", "extra", "bunk"]) or place([p], ["double"], empty_only=True) or place([p], ["double"]):
             done.add(p["id"])
     return assigned

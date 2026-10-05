@@ -80,7 +80,9 @@ les présences ; seule la clé organisateur protège la configuration.
 - un lien famille `/s/<slug>` : chacun choisit son nom dans la liste, mémorisé dans le navigateur ;
 - un lien organisateur `/s/<slug>/admin?key=<clé>` : la clé est mémorisée puis retirée de l'URL. Les routes `/api/stays/<slug>/admin/*` exigent l'en-tête `X-Admin-Key`.
 
-**Personnes** — adulte ou enfant (portions), « participe aux corvées » (défaut : oui pour un adulte, non pour un enfant), « participe aux activités ». Un enfant est rattaché à un adulte qui gère ses présences et inscriptions. Le couple est un lien symétrique entre deux adultes.
+**Foyers** — chaque personne appartient à un foyer (les personnes qui viennent ensemble) ; une nouvelle personne forme son propre foyer, un célibataire se crée donc en un geste. Tout adulte du foyer agit pour chacun : présences, inscriptions, corvées. Par défaut, « tout le foyer a les mêmes présences » : mes présences valent pour tous ; on décoche pour décaler quelqu'un. Le couple est un lien entre deux adultes du même foyer, proposé quand un célibataire ajoute un adulte. L'organisateur peut déplacer une personne, fusionner deux foyers (conjoints inscrits séparément) ou en supprimer un.
+
+**Personnes** — adulte ou enfant (portions), « participe aux corvées » (défaut : oui pour un adulte, non pour un enfant), « participe aux activités ».
 
 **Présences** — par repas (petit-déj, déjeuner, dîner) entre le premier repas du premier jour et le dernier repas du dernier jour. Présent sur place = présent au repas ; les couverts sont comptés adultes / enfants.
 
@@ -98,6 +100,6 @@ les présences ; seule la clé organisateur protège la configuration.
 
 ## Limites v1 / pistes
 
-- Pas de migrations (création des tables au démarrage) : ajouter Alembic avant de faire évoluer le schéma en production.
+- Migrations Alembic (`backend/migrations`), appliquées au démarrage ; une base créée avant Alembic est reconnue comme `0001`. Pas de retour arrière : restaurer une sauvegarde once. Nouvelle migration : `cd backend && uv run alembic revision -m "…"` (un test vérifie que modèles et migrations ne divergent pas).
 - Couchage fixe pour tout le séjour (pas de lit par nuit).
 - Hors périmètre : covoiturage, notifications push, génération intégrée de la liste de courses par LLM.

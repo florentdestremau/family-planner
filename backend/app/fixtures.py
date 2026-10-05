@@ -17,15 +17,18 @@ from sqlalchemy.orm import Session
 
 from . import schemas as s
 from .db import SessionLocal
-from .models import Base, Stay
+from .models import Stay
 from .routers import admin, public
 from .slots import stay_slots
 
 
 @dataclass
 class Family:
-    adults: list[str]  # deux adultes = un couple
+    """Un foyer. Les deux premiers adultes forment un couple, sauf couple=False."""
+
+    adults: list[str]
     children: list[str] = field(default_factory=list)
+    couple: bool = True
     arrive: int = 0  # décalage en jours par rapport au début du séjour
     leave: int = 0  # jours avant la fin du séjour
     teens: list[str] = field(default_factory=list)  # enfants qui participent aux corvées
@@ -61,9 +64,9 @@ FIXTURES = [
         last_meal="lunch",
         families=[
             Family(["Florent", "Claire"], ["Léo", "Emma"]),
-            Family(["Julien", "Sophie"], ["Hugo", "Zoé (15 ans)"], teens=["Zoé (15 ans)"]),
+            # Mamie vit avec Julien et Sophie : trois adultes, un seul couple.
+            Family(["Julien", "Sophie", "Mamie"], ["Hugo", "Zoé (15 ans)"], teens=["Zoé (15 ans)"], no_chores=["Mamie"]),
             Family(["Marc", "Anne"], ["Lina"], leave=1),
-            Family(["Mamie"], no_chores=["Mamie"]),
             Family(["Thomas"], arrive=1),
         ],
         rooms=[
@@ -95,9 +98,12 @@ FIXTURES = [
             Family(["Florent", "Claire"], ["Léo", "Emma"]),
             Family(["Julien", "Sophie"], ["Hugo", "Zoé"], teens=["Zoé"]),
             Family(["Marc", "Anne"], ["Lina", "Noé", "Jules (16 ans)"], teens=["Jules (16 ans)"], leave=3),
-            Family(["Paul", "Léa"], ["Rose"], arrive=2),
+            # Paul et Léa se sont inscrits chacun de leur côté : deux foyers à fusionner.
+            Family(["Paul"], arrive=2),
+            Family(["Léa"], ["Rose"], arrive=2),
             Family(["Bertrand", "Odile"], no_chores=["Bertrand", "Odile"]),
-            Family(["Camille"], arrive=1, leave=2),
+            Family(["Camille"], arrive=1, leave=2),  # célibataire
+            Family(["Sarah"], ["Tom", "Jade"]),  # parent seul
             Family(["Nicolas", "Inès"], ["Adam", "Louise"], arrive=3),
         ],
         rooms=[
@@ -107,6 +113,7 @@ FIXTURES = [
             ("Chambre phare", ["double", "extra"]),
             ("Dortoir des cousins", ["bunk", "bunk", "bunk", "bunk", "single"]),
             ("Mezzanine", ["double", "single", "extra"]),
+            ("Chambre des pins", ["double", "bunk"]),
         ],
         activities=[
             dict(day=1, name="Plage & châteaux de sable", start_time="10:00", location="Plage du centre"),
@@ -143,13 +150,15 @@ def load(db: Session, fx: Fixture) -> Stay:
     ids: dict[str, int] = {}
     for fam in fx.families:
         members = []
-        for name in fam.adults:
-            ids[name] = admin.create_person(s.PersonCreate(name=name, does_chores=name not in fam.no_chores), stay, db).id
+        household_id = None
+        for i, name in enumerate(fam.adults):
+            partner = ids[fam.adults[0]] if i == 1 and fam.couple else None
+            body = s.PersonCreate(name=name, household_id=household_id, partner_id=partner, does_chores=name not in fam.no_chores)
+            created = admin.create_person(body, stay, db)
+            ids[name], household_id = created.id, created.household_id
             members.append(ids[name])
-        if len(fam.adults) == 2:
-            admin.set_partner(ids[fam.adults[0]], s.PartnerIn(partner_id=ids[fam.adults[1]]), stay, db)
         for name in fam.children:
-            body = s.PersonCreate(name=name, kind="child", guardian_id=ids[fam.adults[0]], does_chores=name in fam.teens)
+            body = s.PersonCreate(name=name, kind="child", household_id=household_id, does_chores=name in fam.teens)
             ids[name] = admin.create_person(body, stay, db).id
             members.append(ids[name])
         first, last = start + timedelta(days=fam.arrive), end - timedelta(days=fam.leave)
@@ -192,12 +201,12 @@ def load_all(reset: bool = False) -> list[str]:
 
 
 if __name__ == "__main__":
-    from .db import engine
+    from .migrate import migrate
 
     parser = argparse.ArgumentParser(description="Charge les séjours de démonstration.")
     parser.add_argument("--reset", action="store_true", help="supprime et recharge les séjours de démo")
     args = parser.parse_args()
-    Base.metadata.create_all(engine)
+    migrate()
     loaded = load_all(reset=args.reset)
     for fx in FIXTURES:
         status = "chargé" if fx.slug in loaded else "déjà présent"

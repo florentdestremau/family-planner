@@ -23,6 +23,7 @@ export default function AdminStay() {
   }
 
   const stats = {
+    households: snap.households.length,
     adults: snap.persons.filter((p) => p.kind === "adult").length,
     children: snap.persons.filter((p) => p.kind === "child").length,
     noPresence: snap.persons.filter((p) => !snap.presences.some((pr) => pr.person_id === p.id)).length,
@@ -52,16 +53,16 @@ export default function AdminStay() {
         <h2>En bref</h2>
         <div className="stats">
           <div>
+            <strong>{stats.households}</strong>
+            <span>foyers</span>
+          </div>
+          <div>
             <strong>{stats.adults}</strong>
             <span>adultes</span>
           </div>
           <div>
             <strong>{stats.children}</strong>
             <span>enfants</span>
-          </div>
-          <div>
-            <strong>{snap.slots.length}</strong>
-            <span>repas</span>
           </div>
           <div className={stats.noPresence ? "warn" : ""}>
             <strong>{stats.noPresence}</strong>

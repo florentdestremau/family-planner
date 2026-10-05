@@ -9,7 +9,8 @@ from .conftest import make_stay
 def two(client):
     """Séjour A peuplé ; séjour B vide, qui tente d'atteindre les objets de A."""
     a, b = make_stay(client), make_stay(client)
-    ids = {"adult": a.person("Alice"), "partner": a.person("Bob")}
+    ids = {"adult": a.person("Alice")}
+    ids["household"] = a.household_of(ids["adult"])
     ids["child"] = a.person("Léo", "child", ids["adult"])
     room = a.adm("POST", "/rooms", {"name": "Bleue"}, status=201).json()
     ids["room"] = room["id"]
@@ -19,6 +20,7 @@ def two(client):
         "POST", "/activities", {"name": "Rando", "date": "2026-10-31", "optional": True}, status=201
     ).json()["id"]
     ids["b_adult"] = b.person("Brigitte")
+    ids["b_household"] = b.household_of(ids["b_adult"])
     ids["b_room"] = b.adm("POST", "/rooms", {"name": "Verte"}, status=201).json()["id"]
     ids["b_activity"] = b.adm(
         "POST", "/activities", {"name": "Jeux", "date": "2026-10-31", "optional": True}, status=201
@@ -31,9 +33,16 @@ CASES = [
     ("pub", "PUT", "/activities/{activity}/signups/{b_adult}", None),
     ("pub", "PUT", "/activities/{b_activity}/signups/{adult}", None),
     ("pub", "DELETE", "/activities/{b_activity}/signups/{adult}", None),
-    ("pub", "POST", "/persons", {"name": "X", "kind": "child", "guardian_id": "{adult}"}),
+    ("pub", "POST", "/persons", {"name": "X", "kind": "child", "household_id": "{household}"}),
+    ("pub", "PATCH", "/households/{household}", {"name": "Piraté"}),
+    ("pub", "PUT", "/households/{household}/presences", {"members": [{"person_id": "{adult}", "slots": []}]}),
+    ("pub", "PUT", "/households/{b_household}/presences", {"members": [{"person_id": "{adult}", "slots": []}]}),
+    ("adm", "PUT", "/persons/{adult}/household", {"household_id": None}),
+    ("adm", "PUT", "/persons/{b_adult}/household", {"household_id": "{household}"}),
+    ("adm", "POST", "/households/{household}/merge", {"into_id": "{b_household}"}),
+    ("adm", "POST", "/households/{b_household}/merge", {"into_id": "{household}"}),
+    ("adm", "DELETE", "/households/{household}", None),
     ("adm", "PATCH", "/persons/{adult}", {"name": "Piraté"}),
-    ("adm", "PATCH", "/persons/{b_adult}", {"guardian_id": "{adult}"}),
     ("adm", "DELETE", "/persons/{adult}", None),
     ("adm", "PUT", "/persons/{adult}/partner", {"partner_id": None}),
     ("adm", "PUT", "/persons/{b_adult}/partner", {"partner_id": "{adult}"}),
@@ -56,6 +65,8 @@ def _fill(value, ids):
         return ids[value[1:-1]]
     if isinstance(value, dict):
         return {k: _fill(v, ids) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_fill(v, ids) for v in value]
     return value
 
 
@@ -80,6 +91,7 @@ def test_snapshot_only_contains_own_data(two) -> None:
     a.present(ids["adult"])
     snap = b.snap()
     assert [p["name"] for p in snap["persons"]] == ["Brigitte"]
+    assert [h["id"] for h in snap["households"]] == [ids["b_household"]]
     assert snap["presences"] == [] and snap["signups"] == []
     assert [r["name"] for r in snap["rooms"]] == ["Verte"]
     assert [a["name"] for a in snap["activities"]] == ["Jeux"]

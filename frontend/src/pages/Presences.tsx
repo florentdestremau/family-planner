@@ -4,7 +4,6 @@ import { useStay } from "../stay";
 /** Tableau global personnes × repas, avec les couverts par repas. */
 export function PresenceTable() {
   const { snap, idx, me } = useStay();
-  const persons = [...snap.persons].sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === "adult" ? -1 : 1));
   return (
     <div className="table-wrap">
       <table className="grid-table">
@@ -29,21 +28,26 @@ export function PresenceTable() {
             ))}
           </tr>
         </thead>
-        <tbody>
-          {persons.map((p) => (
-            <tr key={p.id} className={p.id === me?.id ? "row-me" : ""}>
-              <th className="th-person">
-                {p.name}
-                {p.kind === "child" && <span className="muted"> (e)</span>}
-              </th>
-              {snap.slots.map((s) => (
-                <td key={`${s.date}${s.meal}`} className={idx.isPresent(p.id, s.date, s.meal) ? "cell-on" : ""}>
-                  {idx.isPresent(p.id, s.date, s.meal) ? "●" : ""}
-                </td>
-              ))}
+        {idx.households().map((h) => (
+          <tbody key={h.id} className="household-rows">
+            <tr className="row-household">
+              <th colSpan={snap.slots.length + 1}>Foyer {h.label}</th>
             </tr>
-          ))}
-        </tbody>
+            {h.members.map((p) => (
+              <tr key={p.id} className={p.id === me?.id ? "row-me" : ""}>
+                <th className="th-person">
+                  {p.name}
+                  {p.kind === "child" && <span className="muted"> (e)</span>}
+                </th>
+                {snap.slots.map((s) => (
+                  <td key={`${s.date}${s.meal}`} className={idx.isPresent(p.id, s.date, s.meal) ? "cell-on" : ""}>
+                    {idx.isPresent(p.id, s.date, s.meal) ? "●" : ""}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        ))}
         <tfoot>
           <tr>
             <th>Adultes</th>

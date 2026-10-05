@@ -4,7 +4,7 @@ import { useStay } from "../stay";
 
 /** Sélection de son identité, mémorisée localement (pas de compte). */
 export default function WhoAmI() {
-  const { snap, setMe, call } = useStay();
+  const { snap, idx, setMe, call } = useStay();
   const [name, setName] = useState("");
   const adults = snap.persons.filter((p) => p.kind === "adult");
 
@@ -23,7 +23,12 @@ export default function WhoAmI() {
           {adults.map((p) => (
             <button key={p.id} className="who-pick" onClick={() => setMe(p.id)}>
               <span className="avatar">{p.name.charAt(0).toUpperCase()}</span>
-              {p.name}
+              <span>
+                {p.name}
+                {idx.members(p.household_id).length > 1 && (
+                  <span className="who-household">Foyer {idx.householdLabel(p.household_id)}</span>
+                )}
+              </span>
             </button>
           ))}
         </div>

@@ -56,7 +56,7 @@ export default function AdminLayout() {
         <NavLink to={base} end>
           Séjour
         </NavLink>
-        <NavLink to={`${base}/personnes`}>Personnes</NavLink>
+        <NavLink to={`${base}/foyers`}>Foyers</NavLink>
         <NavLink to={`${base}/chambres`}>Chambres</NavLink>
         <NavLink to={`${base}/corvees`}>Corvées</NavLink>
         <NavLink to={`${base}/activites`}>Activités</NavLink>

@@ -3,7 +3,7 @@ import { expectNoHorizontalScroll, loginAs, openAdmin } from "./helpers";
 
 // Séjours des fixtures (FIXTURES=true) : lecture seule, aucune écriture dans ces tests.
 const PAGES = ["", "/planning", "/repas", "/corvees", "/presences", "/chambres", "/imprimer"];
-const ADMIN_PAGES = ["", "/personnes", "/chambres", "/corvees", "/activites", "/menus"];
+const ADMIN_PAGES = ["", "/foyers", "/chambres", "/corvees", "/activites", "/menus"];
 
 for (const slug of ["demo", "ete"]) {
   test(`toutes les pages de « ${slug} » s'affichent sans erreur ni débordement`, async ({ page }) => {
