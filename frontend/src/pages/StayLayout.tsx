@@ -3,7 +3,6 @@ import { Link, NavLink, Outlet, useParams } from "react-router";
 import { ApiError } from "../api";
 import { rangeLabel } from "../lib";
 import { StayProvider, useSnapshot, useStay } from "../stay";
-import { storage } from "../storage";
 
 export default function StayLayout() {
   const { slug = "" } = useParams();
@@ -11,10 +10,9 @@ export default function StayLayout() {
 
   useEffect(() => {
     if (data) {
-      storage.rememberStay(slug, data.stay.name);
       document.title = data.stay.name;
     }
-  }, [slug, data]);
+  }, [data]);
 
   if (isPending) return <div className="center muted">Chargement…</div>;
   if (error || !data)

@@ -19,22 +19,9 @@ describe("storage", () => {
     expect(localStorage.getItem("fp:me:a")).toBeNull();
   });
 
-  it("garde les séjours connus, le plus récent d'abord, sans doublon, 20 au plus", () => {
-    storage.rememberStay("a", "A");
-    storage.rememberStay("b", "B");
-    storage.rememberStay("a", "A renommé");
-    expect(storage.knownStays()).toEqual([
-      { slug: "a", name: "A renommé" },
-      { slug: "b", name: "B" },
-    ]);
-    for (let i = 0; i < 30; i++) storage.rememberStay(`s${i}`, `S${i}`);
-    expect(storage.knownStays()).toHaveLength(20);
-    expect(storage.knownStays()[0].slug).toBe("s29");
-  });
-
   it("résiste à un contenu corrompu", () => {
-    localStorage.setItem("fp:stays", "{pas du json");
-    expect(storage.knownStays()).toEqual([]);
+    localStorage.setItem("fp:me:a", "{pas du json");
+    expect(storage.me("a")).toBeNull();
   });
 
   it("résiste à un stockage indisponible (navigation privée, quota)", () => {
@@ -46,6 +33,6 @@ describe("storage", () => {
     });
     expect(() => storage.setMe("a", 1)).not.toThrow();
     expect(storage.me("a")).toBeNull();
-    expect(storage.knownStays()).toEqual([]);
+    expect(storage.adminKey("a")).toBeNull();
   });
 });

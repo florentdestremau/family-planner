@@ -1,4 +1,4 @@
-/** Petites préférences locales (identité, clé organisateur, séjours connus). */
+/** Petites préférences locales (identité, clé organisateur). */
 
 function read<T>(key: string, fallback: T): T {
   try {
@@ -23,9 +23,4 @@ export const storage = {
   setMe: (slug: string, id: number | null) => write(`fp:me:${slug}`, id),
   adminKey: (slug: string) => read<string | null>(`fp:admin:${slug}`, null),
   setAdminKey: (slug: string, key: string | null) => write(`fp:admin:${slug}`, key),
-  knownStays: () => read<{ slug: string; name: string }[]>("fp:stays", []),
-  rememberStay: (slug: string, name: string) => {
-    const others = storage.knownStays().filter((s) => s.slug !== slug);
-    write("fp:stays", [{ slug, name }, ...others].slice(0, 20));
-  },
 };

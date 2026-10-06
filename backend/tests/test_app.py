@@ -48,7 +48,7 @@ def test_no_path_traversal(spa, path) -> None:
     assert "SECRET" not in spa.get(path).text
 
 
-@pytest.mark.parametrize("path", ["/api", "/api/", "/api/inconnue", "/api/stays"])
+@pytest.mark.parametrize("path", ["/api", "/api/", "/api/inconnue", "/api/stays/inconnu/rien"])
 def test_unknown_api_routes_are_not_the_spa(spa, path) -> None:
     r = spa.get(path)
     assert r.status_code in (404, 405) and "INDEX" not in r.text

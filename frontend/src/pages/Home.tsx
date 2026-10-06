@@ -1,7 +1,8 @@
+import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { api, type Meal, type Stay } from "../api";
-import { addDays, MEALS, MOMENT_LABEL, toIso } from "../lib";
+import { api, type Meal, type Stay, type StaySummary } from "../api";
+import { addDays, groupStays, MEALS, MOMENT_LABEL, shortRange, toIso } from "../lib";
 import { storage } from "../storage";
 import { toast } from "../toast";
 
@@ -13,7 +14,6 @@ function nextFriday(): string {
 
 export default function Home() {
   const navigate = useNavigate();
-  const known = storage.knownStays();
   const [form, setForm] = useState(() => {
     const start = nextFriday();
     return { name: "", start_date: start, end_date: addDays(start, 2), first_meal: "dinner" as Meal, last_meal: "lunch" as Meal };
@@ -26,7 +26,6 @@ export default function Home() {
     try {
       const stay = await api<Stay & { admin_key: string }>("POST", "/stays", form);
       storage.setAdminKey(stay.slug, stay.admin_key);
-      storage.rememberStay(stay.slug, stay.name);
       navigate(`/s/${stay.slug}/admin`);
     } catch (err) {
       toast(err instanceof Error ? err.message : "Erreur", "error");
@@ -43,20 +42,7 @@ export default function Home() {
         <p className="muted">Menus, chambres, activités, présences et corvées : toute la logistique du séjour au même endroit.</p>
       </header>
 
-      {known.length > 0 && (
-        <section className="card">
-          <h2>Mes séjours</h2>
-          <ul className="list">
-            {known.map((s) => (
-              <li key={s.slug}>
-                <Link to={`/s/${s.slug}`} className="list-link">
-                  {s.name} <span aria-hidden>→</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+      <StayList />
 
       <section className="card">
         <h2>Organiser un nouveau séjour</h2>
@@ -122,5 +108,49 @@ export default function Home() {
         </form>
       </section>
     </main>
+  );
+}
+
+function StayList() {
+  const { data, isPending, error } = useQuery({
+    queryKey: ["stays"],
+    queryFn: () => api<StaySummary[]>("GET", "/stays"),
+  });
+  if (isPending) return <p className="muted center-text">Chargement des séjours…</p>;
+  if (error) return <p className="warn center-text">Impossible de charger les séjours.</p>;
+  if (!data.length) return null;
+
+  const { current, upcoming, past } = groupStays(data, toIso(new Date()));
+  return (
+    <section className="card">
+      <h2>Séjours</h2>
+      {[
+        { title: "En cours", stays: current },
+        { title: "À venir", stays: upcoming },
+        { title: "Passés", stays: past },
+      ]
+        .filter((g) => g.stays.length)
+        .map((g) => (
+          <div key={g.title} className="stay-group">
+            <h3>{g.title}</h3>
+            <ul className="list">
+              {g.stays.map((s) => (
+                <li key={s.slug}>
+                  <Link to={`/s/${s.slug}`} className="stay-link">
+                    <span className="stay-link-main">
+                      <strong>{s.name}</strong>
+                      {storage.adminKey(s.slug) && <span className="badge badge-accent">organisateur</span>}
+                    </span>
+                    <span className="muted small">
+                      {shortRange(s.start_date, s.end_date)} · {s.households} foyer{s.households > 1 ? "s" : ""} · {s.persons}{" "}
+                      personne{s.persons > 1 ? "s" : ""}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+    </section>
   );
 }

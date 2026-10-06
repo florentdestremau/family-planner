@@ -1,4 +1,4 @@
-import type { Activity, BedKind, Meal, Moment, Person, Snapshot } from "./api";
+import type { Activity, BedKind, Meal, Moment, Person, Snapshot, StaySummary } from "./api";
 
 export const MEALS: Meal[] = ["breakfast", "lunch", "dinner"];
 export const MOMENTS: Moment[] = [...MEALS, "day"];
@@ -181,4 +181,18 @@ export function llmExport(snap: Snapshot, idx: Index): string {
     );
   }
   return lines.join("\n");
+}
+
+/** Séjours de l'accueil : en cours et à venir dans l'ordre chronologique, passés du plus récent au plus ancien. */
+export function groupStays(stays: StaySummary[], today: string) {
+  const byStart = [...stays].sort((a, b) => a.start_date.localeCompare(b.start_date) || a.name.localeCompare(b.name));
+  return {
+    current: byStart.filter((s) => s.start_date <= today && today <= s.end_date),
+    upcoming: byStart.filter((s) => s.start_date > today),
+    past: byStart.filter((s) => s.end_date < today).reverse(),
+  };
+}
+
+export function shortRange(start: string, end: string): string {
+  return start === end ? dayLabel(start) : `${dayLabel(start)} → ${dayLabel(end)}`;
 }
