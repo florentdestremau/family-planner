@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   addDays,
+  groupStays,
+  shortRange,
   sameSets,
   slotsOf,
   toSlots,
@@ -152,5 +154,29 @@ describe("présences en ensembles", () => {
       { date: "2026-10-30", meal: "dinner" },
       { date: "2026-10-31", meal: "lunch" },
     ]);
+  });
+});
+
+describe("groupStays", () => {
+  const stay = (name: string, start_date: string, end_date: string) => ({ slug: name, name, start_date, end_date, households: 0, persons: 0 });
+  it("sépare en cours, à venir et passés", () => {
+    const stays = [
+      stay("Noël", "2026-12-24", "2026-12-26"),
+      stay("Été", "2026-07-01", "2026-07-08"),
+      stay("Pâques", "2026-04-03", "2026-04-06"),
+      stay("Aujourd'hui", "2026-10-06", "2026-10-06"),
+      stay("Toussaint", "2026-10-30", "2026-11-01"),
+      stay("En cours", "2026-10-04", "2026-10-08"),
+      stay("Avant", "2026-10-30", "2026-11-02"),
+    ];
+    const { current, upcoming, past } = groupStays(stays, "2026-10-06");
+    expect(current.map((s) => s.name)).toEqual(["En cours", "Aujourd'hui"]);
+    expect(upcoming.map((s) => s.name)).toEqual(["Avant", "Toussaint", "Noël"]);
+    expect(past.map((s) => s.name)).toEqual(["Été", "Pâques"]);
+  });
+
+  it("formate une période courte", () => {
+    expect(shortRange("2026-10-30", "2026-11-01")).toBe("Ven. 30 oct. → Dim. 1 nov.");
+    expect(shortRange("2026-10-30", "2026-10-30")).toBe("Ven. 30 oct.");
   });
 });

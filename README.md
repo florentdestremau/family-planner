@@ -69,12 +69,13 @@ script, puis `bin/server list`, `bin/server logs production --tail 100`, etc.
   `false` coupe tous les déploiements automatiques) ;
 - après une modification de `deploy/server/family-env` : `bin/server sync`.
 
-⚠️ Pas d'authentification forte : qui connaît le lien d'un séjour peut lire et modifier
-les présences ; seule la clé organisateur protège la configuration.
+⚠️ Pas d'authentification forte, et **la page d'accueil liste tous les séjours** (choix assumé :
+instance familiale). Tout visiteur peut donc ouvrir un séjour, lire et modifier les présences ;
+seule la clé organisateur protège la configuration.
 
 ## Fonctionnement
 
-**Accès (modèle Tricount)** — pas de compte. Chaque séjour a :
+**Accès (modèle Tricount)** — pas de compte. L'accueil liste tous les séjours (en cours, à venir, passés). Chaque séjour a :
 - un lien famille `/s/<slug>` : chacun choisit son nom dans la liste, mémorisé dans le navigateur ;
 - un lien organisateur `/s/<slug>/admin?key=<clé>` : la clé est mémorisée puis retirée de l'URL. Les routes `/api/stays/<slug>/admin/*` exigent l'en-tête `X-Admin-Key`.
 

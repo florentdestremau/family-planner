@@ -154,6 +154,15 @@ class StayOut(ORM):
     separate_couples: bool
 
 
+class StaySummary(BaseModel):
+    slug: str
+    name: str
+    start_date: date
+    end_date: date
+    households: int
+    persons: int
+
+
 class StayCreated(StayOut):
     admin_key: str
 

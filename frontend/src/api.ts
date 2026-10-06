@@ -13,6 +13,15 @@ export interface Stay {
   separate_couples: boolean;
 }
 
+export interface StaySummary {
+  slug: string;
+  name: string;
+  start_date: string;
+  end_date: string;
+  households: number;
+  persons: number;
+}
+
 export interface Household {
   id: number;
   /** Vide : on affiche les prénoms des adultes. */

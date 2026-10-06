@@ -4,7 +4,7 @@ import secrets
 from datetime import timedelta
 
 from fastapi import APIRouter, HTTPException
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 
 from .. import households as h
 from .. import schemas as s
@@ -53,6 +53,23 @@ def create_stay(body: s.StayCreate, db: DB) -> Stay:
         db.add(ChoreType(stay_id=stay.id, name=name, moments=moments, people_needed=needed, every_n_days=every))
     db.commit()
     return stay
+
+
+@router.get("/stays", response_model=list[s.StaySummary])
+def list_stays(db: DB) -> list[dict]:
+    """Tous les séjours, pour la page d'accueil (choix assumé : l'instance est familiale)."""
+    persons = select(Person.stay_id, func.count(Person.id).label("n")).group_by(Person.stay_id).subquery()
+    households = select(Household.stay_id, func.count(Household.id).label("n")).group_by(Household.stay_id).subquery()
+    rows = db.execute(
+        select(Stay, func.coalesce(households.c.n, 0), func.coalesce(persons.c.n, 0))
+        .outerjoin(households, households.c.stay_id == Stay.id)
+        .outerjoin(persons, persons.c.stay_id == Stay.id)
+        .order_by(Stay.start_date, Stay.id)
+    ).all()
+    return [
+        {"slug": st.slug, "name": st.name, "start_date": st.start_date, "end_date": st.end_date, "households": h, "persons": n}
+        for st, h, n in rows
+    ]
 
 
 @router.get("/stays/{slug}", response_model=s.Snapshot)
