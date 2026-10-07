@@ -152,6 +152,7 @@ class StayOut(ORM):
     first_meal: Meal
     last_meal: Meal
     separate_couples: bool
+    cover_version: int | None
 
 
 class StaySummary(BaseModel):
@@ -159,6 +160,7 @@ class StaySummary(BaseModel):
     name: str
     start_date: date
     end_date: date
+    cover_version: int | None
     households: int
     persons: int
 

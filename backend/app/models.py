@@ -1,6 +1,6 @@
 from datetime import date, datetime, timezone
 
-from sqlalchemy import ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import ForeignKey, LargeBinary, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -26,6 +26,18 @@ class Stay(Base):
     last_meal: Mapped[str] = mapped_column(String(16), default="lunch")
     separate_couples: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(default=_now)
+    # Incrémenté à chaque nouvelle image de couverture (cache navigateur) ; vide : pas d'image.
+    cover_version: Mapped[int | None]
+
+
+class StayCover(Base):
+    """Image de couverture, à part pour ne pas la charger avec le séjour."""
+
+    __tablename__ = "stay_covers"
+
+    stay_id: Mapped[int] = mapped_column(ForeignKey("stays.id", ondelete="CASCADE"), primary_key=True)
+    content_type: Mapped[str] = mapped_column(String(32))
+    data: Mapped[bytes] = mapped_column(LargeBinary)
 
 
 class Household(Base):

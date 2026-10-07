@@ -4,14 +4,19 @@ import type { Person } from "../api";
 import AddMember from "../components/AddMember";
 import HouseholdPresences from "../components/HouseholdPresences";
 import { Chip, Empty, Toggle } from "../components/ui";
-import { BED_LABEL, dayLabel, MOMENT_LABEL, sortedMoments } from "../lib";
+import { BED_LABEL, coverUrl, dayLabel, MOMENT_LABEL, sortedMoments } from "../lib";
 import { useStay } from "../stay";
 import WhoAmI from "./WhoAmI";
 
 export default function Me() {
-  const { me } = useStay();
-  if (!me) return <WhoAmI />;
-  return <Dashboard me={me} />;
+  const { me, slug, snap } = useStay();
+  const version = snap.stay.cover_version;
+  return (
+    <>
+      {version != null && <img className="stay-cover" src={coverUrl(slug, version)} alt={snap.stay.name} />}
+      {me ? <Dashboard me={me} /> : <WhoAmI />}
+    </>
+  );
 }
 
 function Dashboard({ me }: { me: Person }) {

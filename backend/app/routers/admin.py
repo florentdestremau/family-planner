@@ -1,13 +1,16 @@
 """Espace organisateur : configuration du séjour, tirage des corvées, affectations."""
 
-from fastapi import APIRouter, HTTPException
+from typing import Annotated
+
+from fastapi import APIRouter, Body, HTTPException
 from sqlalchemy import delete, select
 
 from .. import households as h
 from .. import schemas as s
 from ..deps import DB, AdminStay, owned, person
 from ..lottery import build_occurrences, draw
-from ..models import Activity, Bed, ChoreAssignment, ChoreType, Household, Menu, Person, Presence, Room, Stay
+from ..images import MAX_COVER_BYTES, image_type
+from ..models import Activity, Bed, ChoreAssignment, ChoreType, Household, Menu, Person, Presence, Room, Stay, StayCover
 from ..rooms import auto_assign
 from ..slots import BED_PLACES, stay_days, stay_slots
 from .public import validate_dates
@@ -42,6 +45,28 @@ def update_stay(body: s.StayUpdate, stay: AdminStay, db: DB) -> Stay:
     for a in db.scalars(select(ChoreAssignment).where(ChoreAssignment.stay_id == stay.id)):
         if a.date not in days or (a.moment != "day" and (a.date, a.moment) not in slots):
             db.delete(a)
+    db.commit()
+    return stay
+
+
+@router.put("/cover", response_model=s.StayOut)
+def set_cover(data: Annotated[bytes, Body(media_type="image/*")], stay: AdminStay, db: DB) -> Stay:
+    """Image de couverture, envoyée telle quelle dans le corps (le front la réduit avant)."""
+    if len(data) > MAX_COVER_BYTES:
+        raise HTTPException(413, f"Image trop lourde (au plus {MAX_COVER_BYTES // 1_000_000} Mo)")
+    content_type = image_type(data)
+    if content_type is None:
+        raise HTTPException(415, "Format d'image non pris en charge (JPEG, PNG ou WebP)")
+    db.merge(StayCover(stay_id=stay.id, content_type=content_type, data=data))
+    stay.cover_version = (stay.cover_version or 0) + 1
+    db.commit()
+    return stay
+
+
+@router.delete("/cover", response_model=s.StayOut)
+def delete_cover(stay: AdminStay, db: DB) -> Stay:
+    db.execute(delete(StayCover).where(StayCover.stay_id == stay.id))
+    stay.cover_version = None
     db.commit()
     return stay
 

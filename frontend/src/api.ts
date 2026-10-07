@@ -11,6 +11,8 @@ export interface Stay {
   first_meal: Meal;
   last_meal: Meal;
   separate_couples: boolean;
+  /** Incrémenté à chaque nouvelle image de couverture ; null : pas d'image. */
+  cover_version: number | null;
 }
 
 export interface StaySummary {
@@ -18,6 +20,7 @@ export interface StaySummary {
   name: string;
   start_date: string;
   end_date: string;
+  cover_version: number | null;
   households: number;
   persons: number;
 }
@@ -128,13 +131,15 @@ export async function api<T = unknown>(
   body?: unknown,
   adminKey?: string | null,
 ): Promise<T> {
+  // Un Blob (image) part tel quel, avec son propre type ; le reste en JSON.
+  const raw = body instanceof Blob;
   const headers: Record<string, string> = {};
-  if (body !== undefined) headers["Content-Type"] = "application/json";
+  if (body !== undefined && !raw) headers["Content-Type"] = "application/json";
   if (adminKey) headers["X-Admin-Key"] = adminKey;
   const res = await fetch(`/api${path}`, {
     method,
     headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: body === undefined ? undefined : raw ? body : JSON.stringify(body),
   });
   if (!res.ok) {
     let message = res.statusText;

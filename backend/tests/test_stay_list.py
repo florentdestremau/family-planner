@@ -18,6 +18,7 @@ def test_lists_all_stays_sorted_with_counts(client) -> None:
         "name": "Toussaint",
         "start_date": "2026-10-30",
         "end_date": "2026-11-01",
+        "cover_version": None,
         "households": 2,
         "persons": 3,
     }
