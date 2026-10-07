@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router";
 import { api, type Meal, type Stay, type StaySummary } from "../api";
 import { addDays, groupStays, MEALS, MOMENT_LABEL, shortRange, toIso } from "../lib";
 import { storage } from "../storage";
+import { ThemeToggle } from "../theme";
 import { toast } from "../toast";
 
 function nextFriday(): string {
@@ -36,16 +37,19 @@ export default function Home() {
 
   return (
     <main className="home">
+      <div className="home-topbar">
+        <ThemeToggle />
+      </div>
       <header className="home-hero">
-        <div className="home-logo">🏡</div>
+        <div className="home-logo">🎉</div>
         <h1>Week-end en famille</h1>
-        <p className="muted">Menus, chambres, activités, présences et corvées : toute la logistique du séjour au même endroit.</p>
+        <p className="muted">Menus, chambres, activités, présences et corvées : toute la logistique du séjour au même endroit. ✨</p>
       </header>
 
       <StayList />
 
       <section className="card">
-        <h2>Organiser un nouveau séjour</h2>
+        <h2>✨ Organiser un nouveau séjour</h2>
         <form onSubmit={submit} className="form">
           <label>
             Nom du séjour
@@ -100,10 +104,10 @@ export default function Home() {
             </label>
           </div>
           <button className="btn btn-primary" disabled={busy}>
-            Créer le séjour
+            🚀 Créer le séjour
           </button>
           <p className="hint">
-            Vous obtiendrez un lien à partager avec la famille et un lien organisateur, à garder pour vous.
+            🎁 Vous obtiendrez un lien à partager avec la famille et un lien organisateur, à garder pour vous.
           </p>
         </form>
       </section>
@@ -123,11 +127,11 @@ function StayList() {
   const { current, upcoming, past } = groupStays(data, toIso(new Date()));
   return (
     <section className="card">
-      <h2>Séjours</h2>
+      <h2>🏡 Séjours</h2>
       {[
-        { title: "En cours", stays: current },
-        { title: "À venir", stays: upcoming },
-        { title: "Passés", stays: past },
+        { title: "🔥 En cours", stays: current },
+        { title: "📅 À venir", stays: upcoming },
+        { title: "📸 Passés", stays: past },
       ]
         .filter((g) => g.stays.length)
         .map((g) => (

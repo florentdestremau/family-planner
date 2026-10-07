@@ -30,14 +30,14 @@ function Dashboard({ me }: { me: Person }) {
 
       <section className="card">
         <div className="card-head">
-          <h2>Présences</h2>
+          <h2>✅ Présences</h2>
           <span className="muted small">Présent sur place = présent au repas</span>
         </div>
         <HouseholdPresences me={me} />
       </section>
 
       <section className="card">
-        <h2>Corvées</h2>
+        <h2>🧹 Corvées</h2>
         {myChores.length === 0 ? (
           <Empty>Aucune corvée pour l'instant{snap.chore_assignments.length === 0 ? " — le tirage n'a pas encore eu lieu" : ""}.</Empty>
         ) : (
@@ -69,7 +69,7 @@ function Dashboard({ me }: { me: Person }) {
 
       {optional.length > 0 && (
         <section className="card">
-          <h2>Activités facultatives</h2>
+          <h2>🎯 Activités facultatives</h2>
           <ul className="list">
             {optional.map((a) => (
               <li key={a.id} className="list-row list-row-wrap">
@@ -106,7 +106,7 @@ function Dashboard({ me }: { me: Person }) {
       )}
 
       <section className="card">
-        <h2>Couchage</h2>
+        <h2>🛏️ Couchage</h2>
         <ul className="list">
           {household.map((p) => {
             const bed = p.bed_id != null ? idx.bedById.get(p.bed_id) : undefined;
@@ -143,7 +143,7 @@ function HouseholdCard({ me }: { me: Person }) {
   return (
     <section className="card">
       <div className="card-head">
-        <h2>Mon foyer</h2>
+        <h2>👨‍👩‍👧‍👦 Mon foyer</h2>
         <span className="muted small">Chacun peut agir pour tout le foyer</span>
       </div>
       <input
