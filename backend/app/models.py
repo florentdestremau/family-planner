@@ -25,6 +25,7 @@ class Stay(Base):
     first_meal: Mapped[str] = mapped_column(String(16), default="dinner")
     last_meal: Mapped[str] = mapped_column(String(16), default="lunch")
     separate_couples: Mapped[bool] = mapped_column(default=True)
+    cover_image: Mapped[str | None] = mapped_column(String(255), default=None)
     created_at: Mapped[datetime] = mapped_column(default=_now)
 
 

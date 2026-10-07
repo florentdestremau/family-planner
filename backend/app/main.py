@@ -5,6 +5,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
+from . import uploads
 from .migrate import migrate
 from .routers import admin, public
 
@@ -30,6 +31,10 @@ def create_app(static_dir: Path = STATIC_DIR) -> FastAPI:
     def up() -> str:
         """Sonde de santé (HEALTHCHECK de l'image, proxy once)."""
         return "OK"
+
+    # Images uploadées (couvertures des séjours).
+    uploads.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    app.mount("/uploads", StaticFiles(directory=uploads.UPLOAD_DIR), name="uploads")
 
     if static_dir.is_dir():
         root = static_dir.resolve()

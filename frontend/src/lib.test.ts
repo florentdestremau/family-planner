@@ -158,7 +158,7 @@ describe("présences en ensembles", () => {
 });
 
 describe("groupStays", () => {
-  const stay = (name: string, start_date: string, end_date: string) => ({ slug: name, name, start_date, end_date, households: 0, persons: 0 });
+  const stay = (name: string, start_date: string, end_date: string) => ({ slug: name, name, start_date, end_date, households: 0, persons: 0, cover_image: null });
   it("sépare en cours, à venir et passés", () => {
     const stays = [
       stay("Noël", "2026-12-24", "2026-12-26"),

@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
-import type { Meal } from "../../api";
+import { useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
+import { api, apiUpload, coverUrl, type Meal, type Stay } from "../../api";
 import { CopyButton, Toggle } from "../../components/ui";
 import { MEALS, MOMENT_LABEL } from "../../lib";
 import { useStay } from "../../stay";
@@ -48,6 +49,8 @@ export default function AdminStay() {
           <CopyButton text={adminLink} />
         </div>
       </section>
+
+      <CoverImageSection slug={slug} stay={snap.stay} adminKey={adminKey} />
 
       <section className="card">
         <h2>En bref</h2>
@@ -123,5 +126,78 @@ export default function AdminStay() {
         />
       </section>
     </div>
+  );
+}
+
+function CoverImageSection({ slug, stay, adminKey }: { slug: string; stay: Stay; adminKey: string | null }) {
+  const qc = useQueryClient();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const url = coverUrl(slug, stay.cover_image);
+
+  async function refresh() {
+    await qc.invalidateQueries({ queryKey: ["stay", slug] });
+  }
+
+  async function upload(file: File) {
+    setBusy(true);
+    try {
+      await apiUpload<Stay>("POST", `/stays/${slug}/admin/stay/cover`, file, adminKey);
+      toast("Image de couverture enregistrée");
+      await refresh();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Erreur lors de l'upload", "error");
+    } finally {
+      setBusy(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  }
+
+  async function remove() {
+    if (!confirm("Supprimer l'image de couverture ?")) return;
+    setBusy(true);
+    try {
+      await api<Stay>("DELETE", `/stays/${slug}/admin/stay/cover`, undefined, adminKey);
+      toast("Image de couverture supprimée");
+      await refresh();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Erreur lors de la suppression", "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="card">
+      <h2>🖼️ Image de couverture</h2>
+      {url && (
+        <div className="cover-preview">
+          <img src={url} alt={`Couverture — ${stay.name}`} />
+        </div>
+      )}
+      <div className="cover-actions">
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/gif,image/webp"
+          disabled={busy}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) upload(file);
+          }}
+          className="cover-input"
+          id="cover-upload"
+        />
+        <label htmlFor="cover-upload" className={`btn ${busy ? "btn-disabled" : ""}`}>
+          {busy ? "Envoi…" : url ? "Changer l'image" : "Ajouter une image"}
+        </label>
+        {url && (
+          <button className="btn btn-danger" disabled={busy} onClick={remove}>
+            Supprimer
+          </button>
+        )}
+      </div>
+      <p className="hint">JPEG, PNG, GIF ou WebP — 5 Mo maximum. Affichée sur la page d'accueil et en haut du séjour.</p>
+    </section>
   );
 }

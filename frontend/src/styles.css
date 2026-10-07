@@ -1602,3 +1602,59 @@ details .chips {
 .center-text {
   text-align: center;
 }
+
+/* --- Image de couverture -------------------------------------------------- */
+
+.stay-link {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.75rem;
+}
+.stay-link-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.stay-thumb {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+  box-shadow: var(--shadow);
+}
+
+.stay-cover {
+  height: 180px;
+  background-size: cover;
+  background-position: center;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  box-shadow: var(--shadow);
+  margin-bottom: -1rem;
+}
+
+.cover-preview {
+  margin-bottom: 0.75rem;
+}
+.cover-preview img {
+  width: 100%;
+  max-height: 240px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+}
+.cover-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.cover-input {
+  display: none;
+}
+.btn-disabled {
+  opacity: 0.5;
+  cursor: default;
+  pointer-events: none;
+}

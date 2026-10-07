@@ -11,6 +11,7 @@ export function makeSnapshot(overrides: Partial<Snapshot> = {}): Snapshot {
       first_meal: "dinner",
       last_meal: "lunch",
       separate_couples: true,
+      cover_image: null,
     },
     days: ["2026-10-30", "2026-10-31", "2026-11-01"],
     slots: [

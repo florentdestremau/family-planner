@@ -67,7 +67,15 @@ def list_stays(db: DB) -> list[dict]:
         .order_by(Stay.start_date, Stay.id)
     ).all()
     return [
-        {"slug": st.slug, "name": st.name, "start_date": st.start_date, "end_date": st.end_date, "households": h, "persons": n}
+        {
+            "slug": st.slug,
+            "name": st.name,
+            "start_date": st.start_date,
+            "end_date": st.end_date,
+            "households": h,
+            "persons": n,
+            "cover_image": st.cover_image,
+        }
         for st, h, n in rows
     ]
 
