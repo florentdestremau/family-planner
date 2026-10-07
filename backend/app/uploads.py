@@ -27,13 +27,6 @@ def cover_path(slug: str, filename: str) -> Path:
     return cover_dir(slug) / filename
 
 
-def cover_url(slug: str, filename: str | None) -> str | None:
-    """URL publique de l'image, ou None si pas d'image."""
-    if not filename:
-        return None
-    return f"/uploads/{slug}/{filename}"
-
-
 def _safe_filename(filename: str) -> str:
     """Garde uniquement le nom de base, sans chemin relatif."""
     name = Path(filename).name
@@ -62,8 +55,7 @@ async def save_cover(slug: str, file: UploadFile) -> str:
 
     # Supprime l'ancienne image de couverture si elle existe.
     for old in directory.glob("cover-*"):
-        if old.name != filename:
-            old.unlink(missing_ok=True)
+        old.unlink(missing_ok=True)
 
     (directory / filename).write_bytes(data)
     return filename

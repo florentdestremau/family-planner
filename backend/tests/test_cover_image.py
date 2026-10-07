@@ -1,7 +1,9 @@
 """Image de couverture : upload, remplacement, suppression, validation."""
 
-import io
+import pytest
+from fastapi import HTTPException
 
+from app.uploads import MAX_SIZE, _safe_filename
 from .conftest import make_stay
 
 # PNG 1×1 transparent minimal.
@@ -129,3 +131,31 @@ def test_stay_list_includes_cover(client) -> None:
     stays = client.get("/api/stays").json()
     found = [s for s in stays if s["slug"] == api.slug]
     assert found[0]["cover_image"] == filename
+
+
+def test_upload_cover_rejects_too_large(client) -> None:
+    api = make_stay(client)
+    big = b"x" * (MAX_SIZE + 1)
+    r = client.post(
+        f"{api.base}/admin/stay/cover",
+        files={"file": ("big.png", big, "image/png")},
+        headers={"X-Admin-Key": api.key},
+    )
+    assert r.status_code == 422
+    assert "lourde" in r.json()["detail"]
+
+
+def test_delete_cover_when_none(client) -> None:
+    """Supprimer alors qu'aucune image n'existe ne plante pas."""
+    api = make_stay(client)
+    r = client.delete(f"{api.base}/admin/stay/cover", headers={"X-Admin-Key": api.key})
+    assert r.status_code == 200
+    assert r.json()["cover_image"] is None
+
+
+def test_safe_filename_rejects_path_traversal() -> None:
+    assert _safe_filename("cover-abc.png") == "cover-abc.png"
+    assert _safe_filename("../../etc/passwd") == "passwd"
+    with pytest.raises(HTTPException) as exc:
+        _safe_filename("bad file!.png")
+    assert exc.value.status_code == 422
