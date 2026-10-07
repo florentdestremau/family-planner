@@ -1626,12 +1626,10 @@ details .chips {
 }
 
 .stay-cover {
-  height: 180px;
+  height: 160px;
   background-size: cover;
   background-position: center;
-  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
   box-shadow: var(--shadow);
-  margin-bottom: -1rem;
 }
 
 .cover-preview {
