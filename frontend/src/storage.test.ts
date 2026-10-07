@@ -35,4 +35,30 @@ describe("storage", () => {
     expect(storage.me("a")).toBeNull();
     expect(storage.adminKey("a")).toBeNull();
   });
+
+  it("mémorise le thème (défaut: system)", () => {
+    expect(storage.theme()).toBe("system");
+    storage.setTheme("dark");
+    expect(storage.theme()).toBe("dark");
+    storage.setTheme("light");
+    expect(storage.theme()).toBe("light");
+    storage.setTheme("system");
+    expect(storage.theme()).toBe("system");
+  });
+
+  it("résiste à un thème corrompu", () => {
+    localStorage.setItem("fp:theme", "{pas du json");
+    expect(storage.theme()).toBe("system");
+  });
+
+  it("résiste à un stockage indisponible pour le thème", () => {
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("SecurityError");
+    });
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("QuotaExceededError");
+    });
+    expect(() => storage.setTheme("dark")).not.toThrow();
+    expect(storage.theme()).toBe("system");
+  });
 });

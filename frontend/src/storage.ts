@@ -18,9 +18,13 @@ function write(key: string, value: unknown): void {
   }
 }
 
+export type Theme = "light" | "dark" | "system";
+
 export const storage = {
   me: (slug: string) => read<number | null>(`fp:me:${slug}`, null),
   setMe: (slug: string, id: number | null) => write(`fp:me:${slug}`, id),
   adminKey: (slug: string) => read<string | null>(`fp:admin:${slug}`, null),
   setAdminKey: (slug: string, key: string | null) => write(`fp:admin:${slug}`, key),
+  theme: () => read<Theme>("fp:theme", "system"),
+  setTheme: (theme: Theme) => write("fp:theme", theme),
 };

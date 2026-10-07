@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useParams } from "react-router";
 import { ApiError } from "../api";
 import { rangeLabel } from "../lib";
 import { StayProvider, useSnapshot, useStay } from "../stay";
+import { ThemeToggle } from "../theme";
 
 export default function StayLayout() {
   const { slug = "" } = useParams();
@@ -36,15 +37,15 @@ function Shell() {
   const { slug, snap, me, setMe, adminKey } = useStay();
   const base = `/s/${slug}`;
   const tabs = [
-    { to: base, label: "Moi", end: true },
-    { to: `${base}/planning`, label: "Activités" },
-    { to: `${base}/repas`, label: "Repas" },
-    { to: `${base}/corvees`, label: "Corvées" },
-    { to: `${base}/presences`, label: "Présences" },
-    { to: `${base}/chambres`, label: "Chambres" },
-    { to: `${base}/imprimer`, label: "Imprimer" },
+    { to: base, label: "🏠 Moi", end: true },
+    { to: `${base}/planning`, label: "🎯 Activités" },
+    { to: `${base}/repas`, label: "🍽️ Repas" },
+    { to: `${base}/corvees`, label: "🧹 Corvées" },
+    { to: `${base}/presences`, label: "✅ Présences" },
+    { to: `${base}/chambres`, label: "🛏️ Chambres" },
+    { to: `${base}/imprimer`, label: "🖨️ Imprimer" },
   ];
-  if (adminKey) tabs.push({ to: `${base}/admin`, label: "⚙ Organisation" });
+  if (adminKey) tabs.push({ to: `${base}/admin`, label: "⚙️ Organisation" });
 
   return (
     <div className="app">
@@ -52,19 +53,22 @@ function Shell() {
         <div className="topbar-inner">
           <div className="topbar-title">
             <Link to="/" className="brand" aria-label="Accueil">
-              🏡
+              🎉
             </Link>
             <div>
               <div className="stay-name">{snap.stay.name}</div>
               <div className="stay-dates">{rangeLabel(snap.stay.start_date, snap.stay.end_date)}</div>
             </div>
           </div>
-          {me && (
-            <button className="who" onClick={() => setMe(null)} title="Changer de personne">
-              <span className="avatar">{me.name.charAt(0).toUpperCase()}</span>
-              <span className="who-name">{me.name}</span>
-            </button>
-          )}
+          <div className="topbar-actions">
+            <ThemeToggle />
+            {me && (
+              <button className="who" onClick={() => setMe(null)} title="Changer de personne">
+                <span className="avatar">{me.name.charAt(0).toUpperCase()}</span>
+                <span className="who-name">{me.name}</span>
+              </button>
+            )}
+          </div>
         </div>
         <nav className="tabs">
           {tabs.map((t) => (
