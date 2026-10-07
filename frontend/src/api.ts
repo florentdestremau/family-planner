@@ -11,6 +11,7 @@ export interface Stay {
   first_meal: Meal;
   last_meal: Meal;
   separate_couples: boolean;
+  cover_image: string | null;
 }
 
 export interface StaySummary {
@@ -20,6 +21,7 @@ export interface StaySummary {
   end_date: string;
   households: number;
   persons: number;
+  cover_image: string | null;
 }
 
 export interface Household {
@@ -152,4 +154,29 @@ export async function api<T = unknown>(
     throw new ApiError(res.status, message);
   }
   return (res.status === 204 ? undefined : await res.json()) as T;
+}
+
+/** Upload un fichier (multipart/form-data) vers l'API. */
+export async function apiUpload<T = unknown>(method: string, path: string, file: File, adminKey?: string | null): Promise<T> {
+  const form = new FormData();
+  form.append("file", file);
+  const headers: Record<string, string> = {};
+  if (adminKey) headers["X-Admin-Key"] = adminKey;
+  const res = await fetch(`/api${path}`, { method, headers, body: form });
+  if (!res.ok) {
+    let message = res.statusText;
+    try {
+      const data = await res.json();
+      message = typeof data.detail === "string" ? data.detail : message;
+    } catch {
+      /* corps non JSON */
+    }
+    throw new ApiError(res.status, message);
+  }
+  return (res.status === 204 ? undefined : await res.json()) as T;
+}
+
+/** URL publique de l'image de couverture d'un séjour. */
+export function coverUrl(slug: string, filename: string | null): string | null {
+  return filename ? `/uploads/${slug}/${filename}` : null;
 }

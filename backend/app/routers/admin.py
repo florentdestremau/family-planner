@@ -1,10 +1,11 @@
 """Espace organisateur : configuration du séjour, tirage des corvées, affectations."""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, UploadFile
 from sqlalchemy import delete, select
 
 from .. import households as h
 from .. import schemas as s
+from .. import uploads as up
 from ..deps import DB, AdminStay, owned, person
 from ..lottery import build_occurrences, draw
 from ..models import Activity, Bed, ChoreAssignment, ChoreType, Household, Menu, Person, Presence, Room, Stay
@@ -42,6 +43,25 @@ def update_stay(body: s.StayUpdate, stay: AdminStay, db: DB) -> Stay:
     for a in db.scalars(select(ChoreAssignment).where(ChoreAssignment.stay_id == stay.id)):
         if a.date not in days or (a.moment != "day" and (a.date, a.moment) not in slots):
             db.delete(a)
+    db.commit()
+    return stay
+
+
+@router.post("/stay/cover", response_model=s.StayOut)
+async def upload_cover(file: UploadFile, stay: AdminStay, db: DB) -> Stay:
+    """Upload (ou remplace) l'image de couverture du séjour."""
+    filename = await up.save_cover(stay.slug, file)
+    up.delete_cover(stay.slug, stay.cover_image)
+    stay.cover_image = filename
+    db.commit()
+    return stay
+
+
+@router.delete("/stay/cover", response_model=s.StayOut)
+def remove_cover(stay: AdminStay, db: DB) -> Stay:
+    """Supprime l'image de couverture du séjour."""
+    up.delete_cover(stay.slug, stay.cover_image)
+    stay.cover_image = None
     db.commit()
     return stay
 

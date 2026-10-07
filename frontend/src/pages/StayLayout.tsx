@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { Link, NavLink, Outlet, useParams } from "react-router";
-import { ApiError } from "../api";
+import { ApiError, coverUrl } from "../api";
 import { rangeLabel } from "../lib";
 import { StayProvider, useSnapshot, useStay } from "../stay";
 import { ThemeToggle } from "../theme";
@@ -47,8 +47,11 @@ function Shell() {
   ];
   if (adminKey) tabs.push({ to: `${base}/admin`, label: "⚙️ Organisation" });
 
+  const cover = coverUrl(slug, snap.stay.cover_image);
+
   return (
     <div className="app">
+      {cover && <div className="stay-cover" style={{ backgroundImage: `url(${cover})` }} role="img" aria-label={snap.stay.name} />}
       <header className="topbar no-print">
         <div className="topbar-inner">
           <div className="topbar-title">

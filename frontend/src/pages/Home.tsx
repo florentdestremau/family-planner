@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { api, type Meal, type Stay, type StaySummary } from "../api";
+import { api, coverUrl, type Meal, type Stay, type StaySummary } from "../api";
 import { addDays, groupStays, MEALS, MOMENT_LABEL, shortRange, toIso } from "../lib";
 import { storage } from "../storage";
 import { ThemeToggle } from "../theme";
@@ -138,20 +138,26 @@ function StayList() {
           <div key={g.title} className="stay-group">
             <h3>{g.title}</h3>
             <ul className="list">
-              {g.stays.map((s) => (
-                <li key={s.slug}>
-                  <Link to={`/s/${s.slug}`} className="stay-link">
-                    <span className="stay-link-main">
-                      <strong>{s.name}</strong>
-                      {storage.adminKey(s.slug) && <span className="badge badge-accent">organisateur</span>}
-                    </span>
-                    <span className="muted small">
-                      {shortRange(s.start_date, s.end_date)} · {s.households} foyer{s.households > 1 ? "s" : ""} · {s.persons}{" "}
-                      personne{s.persons > 1 ? "s" : ""}
-                    </span>
-                  </Link>
-                </li>
-              ))}
+              {g.stays.map((s) => {
+                const cover = coverUrl(s.slug, s.cover_image);
+                return (
+                  <li key={s.slug}>
+                    <Link to={`/s/${s.slug}`} className="stay-link">
+                      {cover && <img src={cover} alt="" className="stay-thumb" loading="lazy" />}
+                      <span className="stay-link-body">
+                        <span className="stay-link-main">
+                          <strong>{s.name}</strong>
+                          {storage.adminKey(s.slug) && <span className="badge badge-accent">organisateur</span>}
+                        </span>
+                        <span className="muted small">
+                          {shortRange(s.start_date, s.end_date)} · {s.households} foyer{s.households > 1 ? "s" : ""} ·{" "}
+                          {s.persons} personne{s.persons > 1 ? "s" : ""}
+                        </span>
+                      </span>
+                    </Link>
+                  </li>
+                );
+              })}
             </ul>
           </div>
         ))}

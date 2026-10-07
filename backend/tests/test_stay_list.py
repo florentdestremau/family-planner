@@ -20,6 +20,7 @@ def test_lists_all_stays_sorted_with_counts(client) -> None:
         "end_date": "2026-11-01",
         "households": 2,
         "persons": 3,
+        "cover_image": None,
     }
     assert stays[1]["slug"] == noel.slug and stays[1]["persons"] == 0 and stays[1]["households"] == 0
 
