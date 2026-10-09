@@ -44,6 +44,9 @@ export function rangeLabel(start: string, end: string): string {
   return `du ${dayLabel(start, true).toLowerCase()} au ${dayLabel(end, true).toLowerCase()}`;
 }
 
+/** URL de l'image de couverture ; la version change à chaque envoi (cache navigateur long). */
+export const coverUrl = (slug: string, version: number) => `/api/stays/${slug}/cover?v=${version}`;
+
 export const presenceKey = (personId: number, date: string, meal: Meal) => `${personId}|${date}|${meal}`;
 export const occurrenceKey = (choreId: number, date: string, moment: Moment) => `${choreId}|${date}|${moment}`;
 

@@ -8,6 +8,7 @@ import {
   toSlots,
   buildIndex,
   countLabel,
+  coverUrl,
   dayLabel,
   llmExport,
   occurrenceKey,
@@ -158,7 +159,7 @@ describe("présences en ensembles", () => {
 });
 
 describe("groupStays", () => {
-  const stay = (name: string, start_date: string, end_date: string) => ({ slug: name, name, start_date, end_date, households: 0, persons: 0 });
+  const stay = (name: string, start_date: string, end_date: string) => ({ slug: name, name, start_date, end_date, cover_version: null, households: 0, persons: 0 });
   it("sépare en cours, à venir et passés", () => {
     const stays = [
       stay("Noël", "2026-12-24", "2026-12-26"),
@@ -178,5 +179,11 @@ describe("groupStays", () => {
   it("formate une période courte", () => {
     expect(shortRange("2026-10-30", "2026-11-01")).toBe("Ven. 30 oct. → Dim. 1 nov.");
     expect(shortRange("2026-10-30", "2026-10-30")).toBe("Ven. 30 oct.");
+  });
+});
+
+describe("couverture", () => {
+  it("met la version dans l'URL", () => {
+    expect(coverUrl("abc", 3)).toBe("/api/stays/abc/cover?v=3");
   });
 });

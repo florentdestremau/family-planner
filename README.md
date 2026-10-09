@@ -79,6 +79,8 @@ seule la clé organisateur protège la configuration.
 - un lien famille `/s/<slug>` : chacun choisit son nom dans la liste, mémorisé dans le navigateur ;
 - un lien organisateur `/s/<slug>/admin?key=<clé>` : la clé est mémorisée puis retirée de l'URL. Les routes `/api/stays/<slug>/admin/*` exigent l'en-tête `X-Admin-Key`.
 
+**Image de couverture** — l'organisateur choisit une photo (JPEG, PNG ou WebP), réduite dans le navigateur à 1600 px en JPEG avant l'envoi (`PUT …/admin/cover`, corps brut, 5 Mo au plus, format reconnu aux premiers octets). Elle est stockée dans la base SQLite (table `stay_covers`, donc sauvegardée avec elle), affichée en tête de l'onglet « Moi » et en vignette sur l'accueil, et servie par `GET /api/stays/<slug>/cover?v=<version>` avec un cache long (la version change à chaque envoi).
+
 **Foyers** — chaque personne appartient à un foyer (les personnes qui viennent ensemble) ; une nouvelle personne forme son propre foyer, un célibataire se crée donc en un geste. Tout adulte du foyer agit pour chacun : présences, inscriptions, corvées. Par défaut, « tout le foyer a les mêmes présences » : mes présences valent pour tous ; on décoche pour décaler quelqu'un. Le couple est un lien entre deux adultes du même foyer, proposé quand un célibataire ajoute un adulte. L'organisateur peut déplacer une personne, fusionner deux foyers (conjoints inscrits séparément) ou en supprimer un.
 
 **Personnes** — adulte ou enfant (portions), « participe aux corvées » (défaut : oui pour un adulte, non pour un enfant), « participe aux activités ».

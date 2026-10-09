@@ -3,7 +3,7 @@
 import secrets
 from datetime import timedelta
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
 from sqlalchemy import delete, func, select
 
 from .. import households as h
@@ -21,6 +21,7 @@ from ..models import (
     Room,
     Signup,
     Stay,
+    StayCover,
 )
 from ..slots import MAX_STAY_DAYS, stay_days, stay_slots
 
@@ -67,7 +68,15 @@ def list_stays(db: DB) -> list[dict]:
         .order_by(Stay.start_date, Stay.id)
     ).all()
     return [
-        {"slug": st.slug, "name": st.name, "start_date": st.start_date, "end_date": st.end_date, "households": h, "persons": n}
+        {
+            "slug": st.slug,
+            "name": st.name,
+            "start_date": st.start_date,
+            "end_date": st.end_date,
+            "cover_version": st.cover_version,
+            "households": h,
+            "persons": n,
+        }
         for st, h, n in rows
     ]
 
@@ -100,6 +109,16 @@ def snapshot(stay: StayDep, db: DB) -> dict:
         "signups": db.scalars(select(Signup).where(Signup.activity_id.in_([a.id for a in activities]))).all(),
         "menus": db.scalars(select(Menu).where(Menu.stay_id == stay.id)).all(),
     }
+
+
+@router.get("/stays/{slug}/cover", response_class=Response, responses={200: {"content": {"image/*": {}}}})
+def cover(stay: StayDep, db: DB) -> Response:
+    """Image de couverture ; l'URL porte `?v=<cover_version>`, d'où un cache long."""
+    found = db.get(StayCover, stay.id)
+    if found is None:
+        raise HTTPException(404, "Pas d'image de couverture")
+    headers = {"Cache-Control": "public, max-age=31536000, immutable", "X-Content-Type-Options": "nosniff"}
+    return Response(found.data, media_type=found.content_type, headers=headers)
 
 
 @router.post("/stays/{slug}/persons", response_model=s.PersonOut, status_code=201)
