@@ -16,12 +16,9 @@ export default function CoverCard() {
     if (!file) return;
     setBusy(true);
     try {
-      const image = await shrinkImage(file).catch(() => {
-        throw new Error("Image illisible : choisissez une photo JPEG, PNG ou WebP");
-      });
+      // Format que le navigateur ne sait pas décoder : envoyée telle quelle, le serveur tranche.
+      const image = await shrinkImage(file).catch(() => file);
       if (await call("PUT", "/cover", image, { admin: true })) toast("Image de couverture enregistrée 🖼️");
-    } catch (err) {
-      toast(err instanceof Error ? err.message : "Erreur", "error");
     } finally {
       setBusy(false);
     }
@@ -41,9 +38,10 @@ export default function CoverCard() {
         <p className="muted small">Une photo de la maison, du lieu ou de la famille, affichée en tête du séjour et sur l'accueil.</p>
       )}
       <div className="cover-actions">
-        <label className={`btn ${version == null ? "btn-primary" : ""}`} aria-disabled={busy}>
+        {/* Champ masqué mais focalisable : le label sert de bouton, au clavier aussi. */}
+        <label className={`btn cover-pick ${version == null ? "btn-primary" : ""}`} aria-disabled={busy}>
           {busy ? "Envoi…" : version != null ? "📷 Changer l'image" : "📷 Choisir une image"}
-          <input type="file" accept="image/jpeg,image/png,image/webp,image/*" hidden disabled={busy} onChange={pick} />
+          <input type="file" accept="image/jpeg,image/png,image/webp,image/*" disabled={busy} onChange={pick} />
         </label>
         {version != null && (
           <button className="btn btn-ghost" onClick={remove} disabled={busy}>
@@ -51,6 +49,7 @@ export default function CoverCard() {
           </button>
         )}
       </div>
+      <p className="hint cover-hint">JPEG, PNG ou WebP. Les photos sont allégées avant l'envoi.</p>
     </section>
   );
 }

@@ -13,7 +13,11 @@ test("l'organisateur ajoute, voit puis retire l'image de couverture", async ({ p
   await openAdmin(page, stay.slug, stay.key);
 
   const card = page.locator(".card").filter({ has: page.getByRole("heading", { name: /Image de couverture/ }) });
-  await card.locator('input[type="file"]').setInputFiles({ name: "maison.png", mimeType: "image/png", buffer: PNG });
+  // Le champ est atteignable au clavier, via son label.
+  const picker = card.getByLabel(/Choisir une image/);
+  await picker.focus();
+  await expect(picker).toBeFocused();
+  await picker.setInputFiles({ name: "maison.png", mimeType: "image/png", buffer: PNG });
   await expect(card.getByRole("img", { name: "Image de couverture actuelle" })).toBeVisible();
   await expect(card.getByText("Changer l'image")).toBeVisible();
 
@@ -21,6 +25,11 @@ test("l'organisateur ajoute, voit puis retire l'image de couverture", async ({ p
   expect(snap.stay.cover_version).toBe(1);
   const image = await request.get(`/api/stays/${stay.slug}/cover?v=1`);
   expect(image.headers()["content-type"]).toBe("image/jpeg");
+
+  // Un format que le navigateur ne décode pas part tel quel ; le serveur le refuse avec un message clair.
+  await card.getByLabel(/Changer l'image/).setInputFiles({ name: "photo.heic", mimeType: "image/heic", buffer: Buffer.from("ftypheic") });
+  await expect(page.getByText("Format d'image non pris en charge (JPEG, PNG ou WebP)")).toBeVisible();
+  expect((await stay.snap()).stay.cover_version).toBe(1);
 
   // En tête du séjour, avant comme après le choix de son nom.
   await page.goto(stay.url);

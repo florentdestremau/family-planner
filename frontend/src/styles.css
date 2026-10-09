@@ -1648,8 +1648,27 @@ details .chips {
   gap: 0.6rem;
   margin-top: 0.6rem;
 }
-.cover-actions label.btn {
+.cover-pick {
+  position: relative;
   cursor: pointer;
+}
+.cover-pick input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  min-height: 0;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.cover-pick:focus-within {
+  outline: 3px solid var(--primary-glow);
+  outline-offset: 2px;
+}
+.cover-hint {
+  margin-top: 0.6rem;
 }
 .cover-actions label.btn[aria-disabled="true"] {
   opacity: 0.6;
