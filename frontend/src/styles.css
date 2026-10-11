@@ -1467,23 +1467,35 @@ details .chips {
   font-weight: 700;
   font-size: 0.9rem;
 }
-.assistant-input-row {
+.assistant-compose {
   display: flex;
+  flex-direction: column;
   gap: 0.5rem;
-  align-items: center;
-  padding: 0.7rem;
+  padding: 0.75rem;
   border-top: 1px solid var(--border);
   background: var(--surface-2);
 }
-.assistant-input-row input {
-  min-height: 40px;
+.assistant-compose textarea {
+  min-height: 3.4rem;
+  max-height: 9rem;
+  field-sizing: content;
+  resize: none;
+  border-color: var(--primary);
+  background: var(--surface);
+  line-height: 1.4;
 }
-.assistant-input-row .btn {
-  min-height: 40px;
+.assistant-compose textarea::placeholder {
+  color: var(--muted);
+}
+.assistant-compose-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 .assistant-mic.on {
   background: var(--danger-soft);
-  opacity: 1;
+  border-color: var(--danger);
+  color: var(--danger);
 }
 @media (max-width: 640px) {
   .assistant-fab {

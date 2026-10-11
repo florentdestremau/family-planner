@@ -35,6 +35,7 @@ export default function AssistantFab() {
   const [recording, setRecording] = useState(false);
   const listRef = useRef<HTMLDivElement | null>(null);
   const recRef = useRef<MicRec | null>(null);
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
     assistantStatus()
@@ -48,6 +49,11 @@ export default function AssistantFab() {
   }, [messages, busy, open]);
 
   useEffect(() => () => recRef.current?.stop(), []);
+
+  // À l'ouverture, curseur dans la zone de texte (pas sur mobile : le clavier masquerait le panneau).
+  useEffect(() => {
+    if (open && window.matchMedia?.("(pointer: fine)").matches) inputRef.current?.focus();
+  }, [open]);
 
   if (!me || enabled !== true) return null;
 
@@ -187,31 +193,43 @@ export default function AssistantFab() {
             {busy && <p className="hint assistant-thinking">✨ L'assistant réfléchit…</p>}
           </div>
           <form
-            className="assistant-input-row"
+            className="assistant-compose"
             onSubmit={(e) => {
               e.preventDefault();
               void send(input);
             }}
           >
-            <input
+            <textarea
+              ref={inputRef}
+              rows={2}
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Ex. « Le foyer au dîner du vendredi »"
+              onKeyDown={(e) => {
+                // Entrée envoie, Maj+Entrée va à la ligne.
+                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                  e.preventDefault();
+                  void send(input);
+                }
+              }}
+              placeholder="Écris ou dicte ta demande…"
               aria-label="Message à l'assistant"
             />
-            {micSupported && (
-              <button
-                type="button"
-                className={`btn-icon assistant-mic${recording ? " on" : ""}`}
-                onClick={toggleMic}
-                aria-label={recording ? "Arrêter le micro" : "Dicter au micro"}
-              >
-                🎙️
+            <div className="assistant-compose-actions">
+              {micSupported && (
+                <button
+                  type="button"
+                  className={`btn btn-small assistant-mic${recording ? " on" : ""}`}
+                  onClick={toggleMic}
+                  aria-label={recording ? "Arrêter le micro" : "Dicter au micro"}
+                >
+                  {recording ? "⏹️ Arrêter" : "🎙️ Dicter"}
+                </button>
+              )}
+              <span className="spacer" />
+              <button type="submit" className="btn btn-small btn-primary" disabled={busy || !input.trim()}>
+                Envoyer
               </button>
-            )}
-            <button type="submit" className="btn btn-primary" disabled={busy || !input.trim()}>
-              Envoyer
-            </button>
+            </div>
           </form>
         </section>
       )}
