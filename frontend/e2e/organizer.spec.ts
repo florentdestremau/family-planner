@@ -65,8 +65,10 @@ test("créer un séjour puis le configurer comme organisateur", async ({ page, c
   await page.locator(".subtabs").getByRole("link", { name: "Menus" }).click();
   const dinner = page.locator(".meal").first();
   await dinner.locator("textarea").fill("Huîtres\nDinde aux marrons");
+  // Attente posée avant le clic : la réponse peut arriver avant que le test ne l'écoute.
+  const saved = page.waitForResponse((r) => r.url().endsWith("/admin/menus") && r.ok());
   await dinner.locator("input").click();
-  await page.waitForResponse((r) => r.url().endsWith("/admin/menus") && r.ok());
+  await saved;
   await page.reload();
   await expect(page.locator(".meal").first().locator("textarea")).toHaveValue("Huîtres\nDinde aux marrons");
 });
