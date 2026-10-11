@@ -1454,6 +1454,9 @@ details .chips {
   gap: 0.5rem;
   margin-top: 0.4rem;
 }
+.assistant-all {
+  align-self: flex-end;
+}
 .assistant-card {
   display: flex;
   align-items: center;

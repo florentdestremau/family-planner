@@ -80,20 +80,27 @@ export default function AssistantFab() {
   };
 
   /** Enlève la carte d'une personne (validée ou ignorée) du dernier message. */
-  const settle = (i: number, personId: number) =>
-    setMessages((ms) => ms.map((m, idx) => (idx !== i ? m : { ...m, actions: m.actions.filter((a) => a.person_id !== personId) })));
+  // Seules les cartes du dernier message restent actives, et rien pendant une réponse en cours.
+  const disabled = (i: number) => i !== messages.length - 1 || busy;
 
-  const validate = async (i: number, action: AssistantAction) => {
-    settle(i, action.person_id);
+  /** Enlève des cartes (validées ou ignorées) d'un message, ou les y remet si l'enregistrement échoue. */
+  const setActions = (i: number, update: (actions: AssistantAction[]) => AssistantAction[]) =>
+    setMessages((ms) => ms.map((m, idx) => (idx !== i ? m : { ...m, actions: update(m.actions) })));
+  const settle = (i: number, personIds: number[]) => setActions(i, (as) => as.filter((a) => !personIds.includes(a.person_id)));
+
+  /** Un seul envoi pour toutes les cartes validées ensemble : tout est enregistré, ou rien. */
+  const validate = async (i: number, actions: AssistantAction[]) => {
+    settle(i, actions.map((a) => a.person_id));
     try {
       await api("PUT", `/stays/${slug}/households/${me.household_id}/presences`, {
-        members: [{ person_id: action.person_id, slots: action.slots }],
+        members: actions.map((a) => ({ person_id: a.person_id, slots: a.slots })),
       });
-      toast(`Présences de ${action.name} enregistrées`);
+      const names = actions.map((a) => a.name);
+      toast(names.length === 1 ? `Présences de ${names[0]} enregistrées` : `Présences enregistrées pour ${names.join(", ")}`);
       await qc.invalidateQueries({ queryKey: ["stay", slug] });
     } catch (e) {
       toast(e instanceof Error ? e.message : "Impossible d'enregistrer les présences.", "error");
-      setMessages((ms) => ms.map((m, idx) => (idx !== i ? m : { ...m, actions: [...m.actions, action] })));
+      setActions(i, (as) => [...as, ...actions]);
     }
   };
 
@@ -158,34 +165,41 @@ export default function AssistantFab() {
                 <div className="assistant-bubble">{m.text}</div>
                 {m.role === "assistant" && m.actions.length > 0 && (
                   <div className="assistant-cards">
-                    {m.actions.map((a) => {
-                      const disabled = i !== messages.length - 1 || busy;
-                      return (
-                        <div key={a.person_id} className="assistant-card">
-                          <span>{actionSummary(a)}</span>
-                          <div className="actions">
-                            <button
-                              type="button"
-                              className="btn btn-small btn-primary"
-                              disabled={disabled}
-                              aria-label={`Valider ${a.name}`}
-                              onClick={() => void validate(i, a)}
-                            >
-                              Valider
-                            </button>
-                            <button
-                              type="button"
-                              className="btn btn-small"
-                              disabled={disabled}
-                              aria-label={`Ignorer ${a.name}`}
-                              onClick={() => settle(i, a.person_id)}
-                            >
-                              Ignorer
-                            </button>
-                          </div>
+                    {m.actions.map((a) => (
+                      <div key={a.person_id} className="assistant-card">
+                        <span>{actionSummary(a)}</span>
+                        <div className="actions">
+                          <button
+                            type="button"
+                            className="btn btn-small btn-primary"
+                            disabled={disabled(i)}
+                            aria-label={`Valider ${a.name}`}
+                            onClick={() => void validate(i, [a])}
+                          >
+                            Valider
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-small"
+                            disabled={disabled(i)}
+                            aria-label={`Ignorer ${a.name}`}
+                            onClick={() => settle(i, [a.person_id])}
+                          >
+                            Ignorer
+                          </button>
                         </div>
-                      );
-                    })}
+                      </div>
+                    ))}
+                    {m.actions.length > 1 && (
+                      <button
+                        type="button"
+                        className="btn btn-small btn-primary assistant-all"
+                        disabled={disabled(i)}
+                        onClick={() => void validate(i, m.actions)}
+                      >
+                        Tout valider ({m.actions.length})
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

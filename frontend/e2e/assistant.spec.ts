@@ -31,6 +31,27 @@ test("l'assistant propose les présences du foyer, on les valide ou ignore", asy
   expect((await stay.snap()).presences).toEqual([{ person_id: alice, date: "2026-10-30", meal: "dinner" }]);
 });
 
+test("« Tout valider » enregistre tout le foyer en un envoi", async ({ page, request }) => {
+  const stay = await createStay(request);
+  const alice = await stay.person("Alice");
+  const bob = await stay.person("Bob", { with: alice });
+
+  await loginAs(page, stay.url, "Alice");
+  await page.getByRole("button", { name: "Ouvrir l'assistant" }).click();
+  await page.getByLabel("Message à l'assistant").fill("On mange tous le vendredi soir ?");
+  // Entrée envoie le message.
+  await page.getByLabel("Message à l'assistant").press("Enter");
+  await expect(page.locator(".assistant-card")).toHaveCount(2);
+
+  await page.getByRole("button", { name: "Tout valider (2)" }).click();
+  await expect(page.getByText("Présences enregistrées pour Alice, Bob")).toBeVisible();
+  await expect(page.locator(".assistant-card")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Tout valider/ })).toHaveCount(0);
+
+  const presences = (await stay.snap()).presences.map((p: { person_id: number }) => p.person_id).sort();
+  expect(presences).toEqual([alice, bob].sort());
+});
+
 test("l'assistant reste hors de portée sans identité choisie", async ({ page, request }) => {
   const stay = await createStay(request);
   await stay.person("Alice");
