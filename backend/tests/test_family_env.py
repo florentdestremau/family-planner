@@ -69,6 +69,18 @@ def test_create_production_has_backups_and_no_fixtures(env) -> None:
     assert (env.home / "backups" / "production").is_dir()
 
 
+def test_server_secrets_are_passed_to_every_env(env) -> None:
+    env.home.mkdir()
+    (env.home / "secrets.env").write_text("# clé de l'assistant\nANTHROPIC_API_KEY=sk-ant-test\n\nminuscule=ignorée\nVIDE=")
+    ok(env("create", "pr-5", "--image", IMAGE))
+    ok(env("create", "production", "--image", IMAGE))
+    ok(env("update", "production", "--image", IMAGE))
+    deploys = [c for c in env.calls() if c.startswith(("deploy", "update"))]
+    assert deploys[0].endswith("--env FIXTURES=true --env ANTHROPIC_API_KEY=sk-ant-test")
+    assert deploys[1].endswith("--auto-backup --env ANTHROPIC_API_KEY=sk-ant-test")
+    assert deploys[2] == f"update family-planning.once.florent.cc --image {IMAGE} --env ANTHROPIC_API_KEY=sk-ant-test"
+
+
 def test_create_twice_is_refused(env) -> None:
     ok(env("create", "pr-1", "--image", IMAGE))
     r = env("create", "pr-1", "--image", IMAGE)

@@ -141,6 +141,21 @@ class MenuIn(In):
     notes: str = ""
 
 
+class AssistantIn(In):
+    person_id: int
+    message: str = Field(min_length=1, max_length=1000)
+    history: list[str] = Field(default_factory=list, max_length=100)
+
+    @field_validator("history")
+    @classmethod
+    def _history(cls, v: list[str]) -> list[str]:
+        if any(len(turn) > 2000 for turn in v):
+            raise ValueError("Chaque message de l'historique est limité à 2000 caractères")
+        if len(v) % 2:
+            raise ValueError("L'historique alterne message utilisateur et réponse de l'assistant (longueur paire)")
+        return v
+
+
 # --- Sorties -----------------------------------------------------------------
 
 
@@ -270,3 +285,20 @@ class DrawOut(BaseModel):
     occurrences: int
     assigned: int
     unfilled: int
+
+
+class AssistantStatus(BaseModel):
+    enabled: bool
+
+
+class AssistantAction(BaseModel):
+    """Proposition de présences pour une personne du foyer (à valider ou ignorer)."""
+
+    person_id: int
+    name: str
+    slots: list[SlotIn]
+
+
+class AssistantOut(BaseModel):
+    text: str
+    actions: list[AssistantAction]

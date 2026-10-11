@@ -23,6 +23,9 @@ FP_MAX_PR=${FP_MAX_PR:-4}
 FP_MEMORY_PRODUCTION=${FP_MEMORY_PRODUCTION:-512}
 FP_MEMORY_PR=${FP_MEMORY_PR:-256}
 ONCE=${ONCE:-once}
+# Secrets des applications (ANTHROPIC_API_KEY=…), une variable par ligne : posés à la main sur le
+# serveur (chmod 600), jamais dans le dépôt ni dans la CI.
+FP_SECRETS=${FP_SECRETS:-$FP_HOME/secrets.env}
 
 ENVS="$FP_HOME/envs"
 
@@ -61,8 +64,15 @@ container_of() {
 }
 
 # Une PR démarre sur les jeux de données (/s/demo et /s/ete, clé organisateur « demo »).
+# Production et PR reçoivent les secrets du serveur (assistant IA activé si la clé est là).
 env_args() {
   [[ $1 == pr-* ]] && printf '%s\n' --env FIXTURES=true
+  if [[ -f $FP_SECRETS ]]; then
+    local line
+    while IFS= read -r line || [[ -n $line ]]; do
+      [[ $line =~ ^[A-Z_][A-Z0-9_]*=. ]] && printf '%s\n' --env "$line"
+    done < "$FP_SECRETS"
+  fi
   return 0
 }
 

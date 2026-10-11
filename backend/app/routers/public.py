@@ -6,11 +6,13 @@ from datetime import timedelta
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import delete, func, select
 
+from .. import assistant
 from .. import households as h
 from .. import schemas as s
 from ..deps import DB, StayDep, person
 from ..models import (
     Activity,
+    AssistantCall,
     Bed,
     ChoreAssignment,
     ChoreType,
@@ -124,14 +126,7 @@ def set_presences(person_id: int, body: s.PresencesIn, stay: StayDep, db: DB) ->
 @router.put("/stays/{slug}/households/{household_id}/presences", status_code=204)
 def set_household_presences(household_id: int, body: s.HouseholdPresencesIn, stay: StayDep, db: DB) -> None:
     """Présences de plusieurs membres d'un foyer en une fois (par exemple « tout le foyer pareil »)."""
-    found = h.household(db, household_id, stay)
-    members = []
-    for member in body.members:
-        p = person(db, member.person_id, stay)
-        if p.household_id != found.id:
-            raise HTTPException(422, f"{p.name} n'appartient pas à ce foyer")
-        members.append((p, member.slots))
-    h.replace_presences(db, stay, members)
+    h.replace_presences(db, stay, h.household_members(db, stay, household_id, body))
 
 
 @router.put("/stays/{slug}/activities/{activity_id}/signups/{person_id}", status_code=204)
@@ -155,3 +150,26 @@ def sign_out(activity_id: int, person_id: int, stay: StayDep, db: DB) -> None:
     person(db, person_id, stay)
     db.execute(delete(Signup).where(Signup.activity_id == activity_id, Signup.person_id == person_id))
     db.commit()
+
+
+@router.get("/assistant", response_model=s.AssistantStatus)
+def assistant_status() -> dict:
+    """L'assistant IA est-il activé (clé API présente) ?"""
+    return {"enabled": assistant.enabled()}
+
+
+@router.post("/stays/{slug}/assistant", response_model=s.AssistantOut)
+def assistant_reply(body: s.AssistantIn, stay: StayDep, db: DB) -> s.AssistantOut:
+    """Demande à l'assistant (Claude) de proposer les présences du foyer du demandeur."""
+    if not assistant.enabled():
+        raise HTTPException(503, "L'assistant IA n'est pas activé sur ce serveur")
+    person(db, body.person_id, stay)
+    assistant.check_rate_limit(db, stay.id)
+    db.add(AssistantCall(stay_id=stay.id))
+    db.commit()
+    try:
+        return assistant.assistant_reply(db, stay, body)
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(502, "L'assistant IA a rencontré une erreur. Réessaie dans un instant.")

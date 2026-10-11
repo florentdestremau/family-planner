@@ -1,0 +1,220 @@
+import { useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
+import { api, ApiError, assistantAsk, assistantStatus, type AssistantAction } from "../api";
+import { actionSummary } from "../lib";
+import { useStay } from "../stay";
+import { toast } from "../toast";
+
+interface ChatMsg {
+  role: "user" | "assistant";
+  text: string;
+  actions: AssistantAction[];
+}
+
+interface MicRec {
+  lang: string;
+  interimResults: boolean;
+  maxAlternatives: number;
+  onresult: ((e: { results: Array<Array<{ transcript: string }>> }) => void) | null;
+  onend: (() => void) | null;
+  onerror: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+}
+type MicCtor = new () => MicRec;
+
+/** Panneau de discussion avec l'assistant : bouton flottant ✨, micro, propositions à valider. */
+export default function AssistantFab() {
+  const { slug, me } = useStay();
+  const qc = useQueryClient();
+  const [enabled, setEnabled] = useState<boolean | null>(null);
+  const [open, setOpen] = useState(false);
+  const [input, setInput] = useState("");
+  const [messages, setMessages] = useState<ChatMsg[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const recRef = useRef<MicRec | null>(null);
+
+  useEffect(() => {
+    assistantStatus()
+      .then((r) => setEnabled(r.enabled))
+      .catch(() => setEnabled(false));
+  }, []);
+
+  useEffect(() => {
+    const el = listRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages, busy, open]);
+
+  useEffect(() => () => recRef.current?.stop(), []);
+
+  if (!me || enabled !== true) return null;
+
+  const win = window as unknown as { SpeechRecognition?: MicCtor; webkitSpeechRecognition?: MicCtor };
+  const Mic = win.SpeechRecognition ?? win.webkitSpeechRecognition;
+  const micSupported = Mic !== undefined;
+
+  const send = async (text: string) => {
+    const clean = text.trim();
+    if (!clean || busy) return;
+    const history = messages.map((m) => m.text);
+    setMessages((ms) => [...ms, { role: "user", text: clean, actions: [] }]);
+    setInput("");
+    setBusy(true);
+    try {
+      const out = await assistantAsk(slug, me.id, clean, history);
+      setMessages((ms) => [...ms, { role: "assistant", text: out.text, actions: out.actions }]);
+    } catch (e) {
+      const message = e instanceof ApiError ? e.message : "Impossible de joindre l'assistant.";
+      setMessages((ms) => [...ms, { role: "assistant", text: `😔 ${message}`, actions: [] }]);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** Enlève la carte d'une personne (validée ou ignorée) du dernier message. */
+  const settle = (i: number, personId: number) =>
+    setMessages((ms) => ms.map((m, idx) => (idx !== i ? m : { ...m, actions: m.actions.filter((a) => a.person_id !== personId) })));
+
+  const validate = async (i: number, action: AssistantAction) => {
+    settle(i, action.person_id);
+    try {
+      await api("PUT", `/stays/${slug}/households/${me.household_id}/presences`, {
+        members: [{ person_id: action.person_id, slots: action.slots }],
+      });
+      toast(`Présences de ${action.name} enregistrées`);
+      await qc.invalidateQueries({ queryKey: ["stay", slug] });
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Impossible d'enregistrer les présences.", "error");
+      setMessages((ms) => ms.map((m, idx) => (idx !== i ? m : { ...m, actions: [...m.actions, action] })));
+    }
+  };
+
+  const toggleMic = () => {
+    if (recording) {
+      recRef.current?.stop();
+      setRecording(false);
+      return;
+    }
+    if (!Mic) return;
+    const rec = new Mic();
+    rec.lang = "fr-FR";
+    rec.interimResults = false;
+    rec.maxAlternatives = 1;
+    rec.onresult = (e) => {
+      const transcript = e.results?.[0]?.[0]?.transcript ?? "";
+      if (transcript) setInput((t) => (t ? `${t} ${transcript}` : transcript));
+    };
+    rec.onend = () => setRecording(false);
+    rec.onerror = () => {
+      setRecording(false);
+      toast("Le micro n'a pas pu démarrer.", "error");
+    };
+    recRef.current = rec;
+    try {
+      rec.start();
+      setRecording(true);
+    } catch {
+      setRecording(false);
+    }
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        className="assistant-fab no-print"
+        aria-label={open ? "Fermer l'assistant" : "Ouvrir l'assistant"}
+        onClick={() => setOpen((o) => !o)}
+      >
+        ✨
+      </button>
+      {open && (
+        <section className="assistant-panel no-print" aria-label="Assistant de présences">
+          <header className="assistant-head">
+            <strong>Assistant</strong>
+            <span className="hint">présences du foyer</span>
+            <span className="spacer" />
+            <button type="button" className="btn-icon" aria-label="Fermer le panneau" onClick={() => setOpen(false)}>
+              ✕
+            </button>
+          </header>
+          <div className="assistant-messages" ref={listRef}>
+            {messages.length === 0 && (
+              <p className="hint">
+                Décris ce que tu veux : « toute l'équipe au dîner du vendredi », « Léo arrive samedi matin »…
+              </p>
+            )}
+            {messages.map((m, i) => (
+              <div key={i} className={`assistant-msg${m.role === "user" ? " assistant-me" : ""}`}>
+                {m.role !== "user" && <span className="assistant-name">✨ Assistant</span>}
+                <div className="assistant-bubble">{m.text}</div>
+                {m.role === "assistant" && m.actions.length > 0 && (
+                  <div className="assistant-cards">
+                    {m.actions.map((a) => {
+                      const disabled = i !== messages.length - 1 || busy;
+                      return (
+                        <div key={a.person_id} className="assistant-card">
+                          <span>{actionSummary(a)}</span>
+                          <div className="actions">
+                            <button
+                              type="button"
+                              className="btn btn-small btn-primary"
+                              disabled={disabled}
+                              aria-label={`Valider ${a.name}`}
+                              onClick={() => void validate(i, a)}
+                            >
+                              Valider
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-small"
+                              disabled={disabled}
+                              aria-label={`Ignorer ${a.name}`}
+                              onClick={() => settle(i, a.person_id)}
+                            >
+                              Ignorer
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            ))}
+            {busy && <p className="hint assistant-thinking">✨ L'assistant réfléchit…</p>}
+          </div>
+          <form
+            className="assistant-input-row"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void send(input);
+            }}
+          >
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Ex. « Le foyer au dîner du vendredi »"
+              aria-label="Message à l'assistant"
+            />
+            {micSupported && (
+              <button
+                type="button"
+                className={`btn-icon assistant-mic${recording ? " on" : ""}`}
+                onClick={toggleMic}
+                aria-label={recording ? "Arrêter le micro" : "Dicter au micro"}
+              >
+                🎙️
+              </button>
+            )}
+            <button type="submit" className="btn btn-primary" disabled={busy || !input.trim()}>
+              Envoyer
+            </button>
+          </form>
+        </section>
+      )}
+    </>
+  );
+}

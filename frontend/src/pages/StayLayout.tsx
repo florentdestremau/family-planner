@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Link, NavLink, Outlet, useParams } from "react-router";
 import { ApiError } from "../api";
+import AssistantFab from "../components/Assistant";
 import { rangeLabel } from "../lib";
 import { StayProvider, useSnapshot, useStay } from "../stay";
 import { ThemeToggle } from "../theme";
@@ -81,6 +82,7 @@ function Shell() {
       <main className="content">
         <Outlet />
       </main>
+      <AssistantFab />
     </div>
   );
 }
