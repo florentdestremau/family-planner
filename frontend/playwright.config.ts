@@ -26,7 +26,7 @@ export default defineConfig({
     command: [
       build,
       "rm -f ../backend/e2e.db*",
-      `cd ../backend && DATABASE_URL=sqlite:///./e2e.db STATIC_DIR=../frontend/dist FIXTURES=true uv run uvicorn app.main:app --port ${PORT}`,
+      `cd ../backend && DATABASE_URL=sqlite:///./e2e.db STATIC_DIR=../frontend/dist FIXTURES=true ASSISTANT_STUB=true uv run uvicorn app.main:app --port ${PORT}`,
     ].join(" && "),
     url: `http://127.0.0.1:${PORT}/up`,
     reuseExistingServer: false,
