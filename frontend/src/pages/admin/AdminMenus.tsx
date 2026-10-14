@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Slot } from "../../api";
 import { DietSummary } from "../../components/Diets";
-import { countLabel, dayLabel, MOMENT_LABEL } from "../../lib";
+import { countLabel, dayLabel, hasDiet, MOMENT_LABEL } from "../../lib";
 import { useStay } from "../../stay";
 
 export default function AdminMenus() {
@@ -11,7 +11,7 @@ export default function AdminMenus() {
       <p className="hint">Un plat par ligne. Les menus s'enregistrent automatiquement quand vous quittez le champ.</p>
       <section className="card">
         <h2>🥗 Régimes et allergies du séjour</h2>
-        {snap.persons.some((p) => p.diets.length || p.diet_note) ? (
+        {snap.persons.some(hasDiet) ? (
           <DietSummary persons={snap.persons} expanded />
         ) : (
           <p className="hint">Aucun régime ni allergie déclaré pour l'instant : chaque foyer les indique depuis sa page « Moi ».</p>

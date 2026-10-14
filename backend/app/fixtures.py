@@ -153,7 +153,7 @@ FIXTURES = [
             # Paul et Léa se sont inscrits chacun de leur côté : deux foyers à fusionner.
             Family(["Paul"], arrive=(2, "dinner"), diets={"Paul": ["lactose_free"]}),
             Family(["Léa"], ["Rose"], arrive=(3, "lunch"),
-                   diets={"Rose": ["seafood_allergy"]}, diet_notes={"Rose": "Allergie grave : Léa a son stylo d'adrénaline"}),
+                   diets={"Rose": ["seafood_allergy"]}, diet_notes={"Rose": "Allergie grave : stylo d'adrénaline dans son sac"}),
             # Les grands-parents déjeunent chez des amis mercredi.
             Family(["Bertrand", "Odile"], no_chores=["Bertrand", "Odile"], away={"Bertrand": [(4, "lunch")], "Odile": [(4, "lunch")]}),
             Family(["Camille"], arrive=(1, "lunch"), leave=(2, "breakfast")),  # célibataire, une nuit

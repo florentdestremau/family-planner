@@ -40,7 +40,9 @@ function Dashboard({ me }: { me: Person }) {
         <HouseholdCard me={me} />
       </OfflineLock>
 
-      <DietCard me={me} />
+      <OfflineLock>
+        <DietCard me={me} />
+      </OfflineLock>
 
       <section className="card">
         <div className="card-head">

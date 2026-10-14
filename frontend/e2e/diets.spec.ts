@@ -61,7 +61,7 @@ test("un adulte déclare les régimes de son foyer, visibles à chaque repas", a
   // Repas : des nombres, les noms en dépliant.
   await page.getByRole("link", { name: "Repas" }).click();
   const meal = page.locator(".meal").first();
-  await expect(meal.locator(".diets summary")).toHaveText("🌱 1 végan · ⚠️ 1 allergie fruits de mer · 📝 1 précision");
+  await expect(meal.locator(".diets summary")).toHaveText("🌱 1 végan · ⚠️ 1 allergie poisson et fruits de mer · 📝 1 précision");
   const note = meal.getByText("Léo : Allergie grave : stylo d'adrénaline");
   await expect(note).toBeHidden();
   await meal.locator(".diets summary").click();

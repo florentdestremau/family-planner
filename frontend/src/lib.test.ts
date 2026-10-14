@@ -20,6 +20,7 @@ import {
   dietGroups,
   dietIcon,
   dietLabel,
+  hasDiet,
   toggleDiet,
   coverThumbUrl,
   coverUrl,
@@ -162,7 +163,7 @@ describe("llmExport", () => {
     const text = llmExport(snap, buildIndex(snap));
     expect(text).toContain("Régimes et allergies indiqués par repas : prévois de quoi les respecter");
     expect(text).toContain(
-      "- Ven. 30 oct., dîner — 2 adultes · 1 enfant, dont 1 végétarien, 1 végan, 1 sans gluten, 1 allergie fruits à coque : Soupe ; Gratin [Sans gluten]",
+      "- Ven. 30 oct., dîner — 2 adultes · 1 enfant, dont 1 végétarien, 1 végan, 1 sans gluten, 1 allergie arachides et fruits à coque : Soupe ; Gratin [Sans gluten]",
     );
     expect(text).toContain("- Sam. 31 oct., déjeuner — 2 adultes, dont 1 végétarien, 1 sans gluten : (menu non défini)");
     // Une même précision une seule fois ; Nina, jamais présente, n'y est pas.
@@ -205,6 +206,8 @@ describe("régimes et allergies", () => {
     expect(dietLabel(bob)).toBe("Végan · Pas de champignons");
     expect(dietLabel(mamie)).toBe("Pas de champignons");
     expect(dietLabel(makeSnapshot().persons[0])).toBe("Aucune contrainte");
+    expect(withDiets().persons.map(hasDiet)).toEqual([true, true, true, true, true]);
+    expect(makeSnapshot().persons.some(hasDiet)).toBe(false);
   });
 
   it("compte par repas les contraintes des seuls présents", () => {
@@ -220,7 +223,7 @@ describe("régimes et allergies", () => {
     ]);
     expect(dinner.notes.map((p) => p.name)).toEqual(["Bob", "Léo"]);
     expect(dietCountLabel(dinner)).toBe(
-      "🌱 1 végétarien · 🌱 1 végan · ⚠️ 1 sans gluten · ⚠️ 1 allergie fruits à coque · 📝 2 précisions",
+      "🌱 1 végétarien · 🌱 1 végan · ⚠️ 1 sans gluten · ⚠️ 1 allergie arachides et fruits à coque · 📝 2 précisions",
     );
     expect(dietCountLabel(dietGroups(idx.presentAt("2026-10-31", "lunch")))).toBe(
       "🌱 1 végétarien · ⚠️ 1 sans gluten · 📝 1 précision",
@@ -231,9 +234,9 @@ describe("régimes et allergies", () => {
   it("accorde chaque compteur au pluriel", () => {
     const people = withDiets().persons.map((p) => ({ ...p, diets: [...DIETS] }));
     expect(dietCountLabel({ byDiet: dietGroups(people).byDiet, notes: [] })).toBe(
-      "🌱 5 végétariens · 🌱 5 végans · ⚠️ 5 sans gluten · ⚠️ 5 sans lactose · ⚠️ 5 allergies fruits à coque · ⚠️ 5 allergies fruits de mer",
+      "🌱 5 végétariens · 🌱 5 végans · ⚠️ 5 sans gluten · ⚠️ 5 sans lactose · ⚠️ 5 allergies arachides et fruits à coque · ⚠️ 5 allergies poisson et fruits de mer",
     );
-    expect(dietCountLabel(dietGroups([people[1]]))).toContain("1 allergie fruits de mer");
+    expect(dietCountLabel(dietGroups([people[1]]))).toContain("1 allergie poisson et fruits de mer");
   });
 });
 

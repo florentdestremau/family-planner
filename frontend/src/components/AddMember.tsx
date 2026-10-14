@@ -7,7 +7,7 @@ import { DietInvite } from "./Diets";
  * Ajout d'un membre à un foyer. Pour un adulte, le couple est proposé (coché par défaut) quand le
  * foyer n'a qu'un adulte, sans conjoint : le célibataire qui ajoute son conjoint. Avec plusieurs
  * adultes (par exemple un couple et une grand-mère), rien n'est proposé. Une fois le membre ajouté,
- * on propose d'indiquer ses régimes et allergies.
+ * on propose au foyer d'indiquer ses régimes et allergies (l'organisateur a son bouton « Régimes »).
  */
 export default function AddMember({ householdId, admin = false }: { householdId: number; admin?: boolean }) {
   const { idx, call } = useStay();
@@ -30,7 +30,7 @@ export default function AddMember({ householdId, admin = false }: { householdId:
     if (created) {
       setName("");
       setCouple(true);
-      setAdded(created);
+      if (!admin) setAdded(created);
     }
   }
 

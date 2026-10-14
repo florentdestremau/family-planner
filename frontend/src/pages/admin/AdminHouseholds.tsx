@@ -3,7 +3,7 @@ import type { Person, PersonKind } from "../../api";
 import AddMember from "../../components/AddMember";
 import { DietEditor } from "../../components/Diets";
 import { Toggle } from "../../components/ui";
-import { dietLabel } from "../../lib";
+import { dietLabel, hasDiet } from "../../lib";
 import { useStay } from "../../stay";
 
 export default function AdminHouseholds() {
@@ -195,7 +195,7 @@ function MemberRow({ person: p, members }: { person: Person; members: Person[] }
       {diet ? (
         <DietEditor person={p} onClose={() => setDiet(false)} />
       ) : (
-        (p.diets.length > 0 || p.diet_note) && <div className="muted small">🥗 {dietLabel(p)}</div>
+        hasDiet(p) && <div className="muted small">🥗 {dietLabel(p)}</div>
       )}
     </li>
   );

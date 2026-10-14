@@ -70,10 +70,11 @@ class DietIn(In):
             raise ValueError("Végétarien et végan s'excluent : choisir l'un ou l'autre")
         return [d for d in DIETS if d in v]  # sans doublon, dans l'ordre d'affichage
 
-    @field_validator("diet_note")
+    @field_validator("diet_note", mode="before")
     @classmethod
-    def _one_line(cls, v: str) -> str:
-        return " ".join(v.split())  # une seule ligne : elle est recopiée telle quelle dans l'export
+    def _one_line(cls, v: object) -> object:
+        # Une seule ligne (recopiée telle quelle dans l'export), avant de vérifier la longueur.
+        return " ".join(v.split()) if isinstance(v, str) else v
 
 
 class HouseholdIn(In):
@@ -228,7 +229,9 @@ class PersonOut(ORM):
     @field_validator("diets", mode="before")
     @classmethod
     def _split_diets(cls, v: str) -> list[str]:
-        return [d for d in v.split(",") if d]
+        # Un code inconnu (retiré de la liste, base modifiée à la main) est ignoré plutôt que de
+        # rendre tout le séjour illisible.
+        return [d for d in v.split(",") if d in DIETS]
 
 
 class PresenceOut(ORM):

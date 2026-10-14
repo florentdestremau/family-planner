@@ -47,6 +47,7 @@ def test_duplicates_are_merged(api) -> None:
         {"diets": "vegan"},
         {"diets": ["vegetarian"] * 7},
         {"diet_note": "x" * 201},
+        {"diet_note": 5},
     ],
 )
 def test_invalid_declaration(api, body) -> None:
@@ -54,6 +55,24 @@ def test_invalid_declaration(api, body) -> None:
     api.pub("PUT", f"/persons/{alice}/diet", {"diets": ["gluten_free"]}, status=200)
     api.pub("PUT", f"/persons/{alice}/diet", body, status=422)
     assert diet_of(api, alice) == (["gluten_free"], "")
+
+
+def test_note_length_is_checked_once_on_one_line(api) -> None:
+    alice = api.person("Alice")
+    note = "Pas de champignons" + " \n" * 100  # 218 caractères saisis, 18 enregistrés
+    assert api.pub("PUT", f"/persons/{alice}/diet", {"diet_note": note}, status=200).json()["diet_note"] == "Pas de champignons"
+
+
+def test_unknown_stored_code_is_ignored(api) -> None:
+    """Un code retiré de la liste (ou écrit à la main) ne rend pas le séjour illisible."""
+    from sqlalchemy import text
+
+    from app.db import engine
+
+    alice = api.person("Alice")
+    with engine.begin() as connection:
+        connection.execute(text("UPDATE persons SET diets = 'halal,vegan' WHERE id = :id"), {"id": alice})
+    assert diet_of(api, alice) == (["vegan"], "")
 
 
 def test_unknown_person(api) -> None:

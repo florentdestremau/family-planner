@@ -32,7 +32,7 @@ export default function PrintMenu() {
         </div>
         <p className="muted small">
           Menus × couverts, prêts à coller dans ChatGPT, Claude… pour générer la liste de courses ou un panier drive.
-          Régimes et allergies y figurent en nombres, sans les noms.
+          Régimes et allergies y figurent en nombres, sans les noms ; les précisions sont recopiées telles quelles.
         </p>
         <textarea className="export" readOnly value={exportText} rows={10} onFocus={(e) => e.target.select()} />
       </section>

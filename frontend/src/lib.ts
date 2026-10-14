@@ -41,8 +41,8 @@ const DIET_COUNT: Record<Diet, (n: number) => string> = {
   vegan: (n) => `${n} végan${plural(n)}`,
   gluten_free: (n) => `${n} sans gluten`,
   lactose_free: (n) => `${n} sans lactose`,
-  nut_allergy: (n) => `${n} allergie${plural(n)} fruits à coque`,
-  seafood_allergy: (n) => `${n} allergie${plural(n)} fruits de mer`,
+  nut_allergy: (n) => `${n} allergie${plural(n)} arachides et fruits à coque`,
+  seafood_allergy: (n) => `${n} allergie${plural(n)} poisson et fruits de mer`,
 };
 
 /** Une allergie est signalée d'une alerte, un régime d'une pousse. */
@@ -54,6 +54,9 @@ export function toggleDiet(diets: Diet[], diet: Diet, on: boolean): Diet[] {
   const kept = diets.filter((d) => !excluded.includes(d));
   return DIETS.filter((d) => kept.includes(d) || (on && d === diet));
 }
+
+/** La personne a-t-elle déclaré une contrainte ou une précision ? */
+export const hasDiet = (p: Person) => p.diets.length > 0 || p.diet_note !== "";
 
 /** Contraintes déclarées par une personne, en une ligne. */
 export function dietLabel(p: Person): string {
