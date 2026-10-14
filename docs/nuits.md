@@ -148,7 +148,7 @@ l'hôtel reste donc décochée.
   sur place ». L'index du front (`buildIndex`) précalcule une fois les nuits par personne et par lit,
   et les dormeurs par lit et par nuit.
 
-## Migration `0004` (données existantes)
+## Migration `0006` (données existantes)
 
 Pour chaque personne, la nuit J est retenue si :
 
@@ -197,7 +197,7 @@ covoiturage n'écrit pas dans les présences.
 Il est complet, back et front.
 
 - **Back** :
-  - `models.Night` et la migration `0004` ;
+  - `models.Night` et la migration `0006` ;
   - `slots.stay_nights`, `night_sides` et `follow_meals` ;
   - le module `nights.py` (résolution des nuits, héritage du lit, affectation avec avertissement) ;
   - `rooms.auto_assign_nights` ;
@@ -210,15 +210,15 @@ Il est complet, back et front.
   - les impressions des présences et des chambres ;
   - le toast d'alerte.
 - **Tests** :
-  - `pytest --cov` : 329 tests, lignes et branches à 100 %. On y trouve `test_nights.py` (les trois
+  - `pytest --cov` : 366 tests (après rebase sur master), lignes et branches à 100 %. On y trouve `test_nights.py` (les trois
     cas et l'API des lits), la migration et les propriétés Hypothesis suivantes :
     - aucun lit surchargé sur aucune nuit ;
     - seules les nuits sans lit sont attribuées ;
     - min(dormeurs sans lit, places libres) par nuit ;
     - chacun garde le même lit quand tout le monde reste tout le séjour ;
     - `follow_meals` conforme à sa table et idempotente ;
-  - `npm run typecheck` sans erreur ; `npm run test:coverage` : 43 tests, 100 % ;
-  - `npm run test:e2e` : 52 tests passent (bureau et mobile), dont `e2e/nights.spec.ts` (cas 1 et 2,
+  - `npm run typecheck` sans erreur ; `npm run test:coverage` : 45 tests, 100 % ;
+  - `npm run test:e2e` : 56 tests passent (bureau et mobile), dont `e2e/nights.spec.ts` (cas 1 et 2,
     chambre partagée, sélecteur de nuit, lit plein qui ne propose plus personne). Le scénario organisateur passe désormais par la
     pré-affectation avec avertissement.
 
