@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import type { Person } from "../api";
 import AddMember from "../components/AddMember";
 import HouseholdPresences from "../components/HouseholdPresences";
+import { OfflineLock } from "../components/Pwa";
 import { Chip, Empty } from "../components/ui";
 import { BED_LABEL, coverUrl, dayLabel, MOMENT_LABEL, sortedMoments } from "../lib";
 import { useStay } from "../stay";
@@ -34,14 +35,18 @@ function Dashboard({ me }: { me: Person }) {
     <div className="stack">
       <h1 className="page-title">Bonjour {me.name} 👋</h1>
 
-      <HouseholdCard me={me} />
+      <OfflineLock>
+        <HouseholdCard me={me} />
+      </OfflineLock>
 
       <section className="card">
         <div className="card-head">
           <h2>✅ Présences</h2>
           <span className="muted small">Repas pris sur place, et nuits 🌙 où l'on dort sur place</span>
         </div>
-        <HouseholdPresences me={me} />
+        <OfflineLock>
+          <HouseholdPresences me={me} />
+        </OfflineLock>
       </section>
 
       <section className="card">

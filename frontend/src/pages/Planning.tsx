@@ -1,3 +1,4 @@
+import { OfflineLock } from "../components/Pwa";
 import { Chip, Empty, Toggle } from "../components/ui";
 import { dayLabel } from "../lib";
 import { useStay } from "../stay";
@@ -33,21 +34,23 @@ export default function Planning() {
                       {a.location && <div className="muted small">📍 {a.location}</div>}
                       {a.description && <p className="small pre">{a.description}</p>}
                       {household.length > 0 && (
-                        <div className="toggles">
-                          {household.map((p) => (
-                            <Toggle
-                              key={p.id}
-                              label={
-                                <>
-                                  {p.name}
-                                  {!idx.isPresentOnDay(p.id, a.date) && <span className="muted small"> · absent ce jour-là</span>}
-                                </>
-                              }
-                              checked={idx.signups.has(`${a.id}|${p.id}`)}
-                              onChange={(v) => call(v ? "PUT" : "DELETE", `/activities/${a.id}/signups/${p.id}`)}
-                            />
-                          ))}
-                        </div>
+                        <OfflineLock>
+                          <div className="toggles">
+                            {household.map((p) => (
+                              <Toggle
+                                key={p.id}
+                                label={
+                                  <>
+                                    {p.name}
+                                    {!idx.isPresentOnDay(p.id, a.date) && <span className="muted small"> · absent ce jour-là</span>}
+                                  </>
+                                }
+                                checked={idx.signups.has(`${a.id}|${p.id}`)}
+                                onChange={(v) => call(v ? "PUT" : "DELETE", `/activities/${a.id}/signups/${p.id}`)}
+                              />
+                            ))}
+                          </div>
+                        </OfflineLock>
                       )}
                       <details className="small">
                         <summary>

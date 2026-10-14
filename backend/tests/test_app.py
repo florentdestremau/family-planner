@@ -17,6 +17,8 @@ def static(tmp_path: Path) -> Path:
     (tmp_path / "index.html").write_text("<div id=root>INDEX</div>")
     (tmp_path / "assets" / "app.js").write_text("console.log(1)")
     (tmp_path / "favicon.svg").write_text("<svg/>")
+    (tmp_path / "sw.js").write_text("self.skipWaiting()")
+    (tmp_path / "manifest.webmanifest").write_text('{"name": "Week-end"}')
     (tmp_path.parent / "secret.txt").write_text("SECRET")
     return tmp_path
 
@@ -41,6 +43,24 @@ def test_static_files_are_served(spa) -> None:
     assert spa.get("/assets/app.js").text == "console.log(1)"
     assert spa.get("/favicon.svg").text == "<svg/>"
     assert spa.get("/assets/absent.js").status_code == 404
+
+
+def test_pwa_files(spa) -> None:
+    sw = spa.get("/sw.js")
+    assert sw.text == "self.skipWaiting()" and "javascript" in sw.headers["content-type"]
+    manifest = spa.get("/manifest.webmanifest")
+    assert manifest.json() == {"name": "Week-end"}
+    assert manifest.headers["content-type"] == "application/manifest+json"
+
+
+@pytest.mark.parametrize("path", ["/", "/s/abc", "/sw.js", "/manifest.webmanifest"])
+def test_app_shell_is_always_revalidated(spa, path) -> None:
+    """Sinon l'appli installée resterait sur une ancienne version."""
+    assert spa.get(path).headers["cache-control"] == "no-cache"
+
+
+def test_hashed_assets_are_immutable(spa) -> None:
+    assert "immutable" in spa.get("/assets/app.js").headers["cache-control"]
 
 
 @pytest.mark.parametrize("path", ["/../secret.txt", "/%2e%2e/secret.txt", "/..%2fsecret.txt", "/assets/../../secret.txt"])

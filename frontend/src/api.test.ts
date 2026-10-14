@@ -60,6 +60,31 @@ describe("api", () => {
   });
 });
 
+describe("api hors ligne", () => {
+  it("refuse les modifications sans appeler le serveur", async () => {
+    const fetchMock = mockFetch(200, {});
+    vi.stubGlobal("navigator", { onLine: false });
+    const error = (await api("PUT", "/x", {}).catch((e: unknown) => e)) as ApiError;
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error.status).toBe(0);
+    expect(error.message).toBe("Hors ligne : modification impossible.");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("laisse passer les lectures (le cache prend le relais)", async () => {
+    mockFetch(200, { ok: 1 });
+    vi.stubGlobal("navigator", { onLine: false });
+    await expect(api("GET", "/x")).resolves.toEqual({ ok: 1 });
+  });
+
+  it("réseau injoignable : message clair plutôt que « Failed to fetch »", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => Promise.reject(new TypeError("Failed to fetch"))));
+    const error = (await api("PUT", "/x").catch((e: unknown) => e)) as ApiError;
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error.message).toBe("Connexion impossible, réessayez.");
+  });
+});
+
 describe("assistant", () => {
   it("interroge l'état de l'assistant", async () => {
     const fetchMock = mockFetch(200, { enabled: true });

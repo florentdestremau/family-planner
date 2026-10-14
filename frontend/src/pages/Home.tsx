@@ -1,6 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
+import { useIsRestoring, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
+import { InstallButton, OfflineBanner, useOnline } from "../components/Pwa";
 import { api, type Meal, type Stay, type StaySummary } from "../api";
 import { addDays, coverThumbUrl, groupStays, MEALS, MOMENT_LABEL, shortRange, toIso } from "../lib";
 import { storage } from "../storage";
@@ -20,6 +21,7 @@ export default function Home() {
     return { name: "", start_date: start, end_date: addDays(start, 2), first_meal: "dinner" as Meal, last_meal: "lunch" as Meal };
   });
   const [busy, setBusy] = useState(false);
+  const isOnline = useOnline();
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -38,6 +40,7 @@ export default function Home() {
   return (
     <main className="home">
       <div className="home-topbar">
+        <InstallButton />
         <ThemeToggle />
       </div>
       <header className="home-hero">
@@ -103,9 +106,10 @@ export default function Home() {
               </select>
             </label>
           </div>
-          <button className="btn btn-primary" disabled={busy}>
+          <button className="btn btn-primary" disabled={busy || !isOnline}>
             🚀 Créer le séjour
           </button>
+          {!isOnline && <p className="hint">📴 Hors ligne : la création d'un séjour attendra le retour du réseau.</p>}
           <p className="hint">
             🎁 Vous obtiendrez un lien à partager avec la famille et un lien organisateur, à garder pour vous.
           </p>
@@ -116,18 +120,23 @@ export default function Home() {
 }
 
 function StayList() {
-  const { data, isPending, error } = useQuery({
+  const { data, isPending, isError, dataUpdatedAt } = useQuery({
     queryKey: ["stays"],
     queryFn: () => api<StaySummary[]>("GET", "/stays"),
   });
+  const isOnline = useOnline();
+  const restoring = useIsRestoring();
+  if (isPending && !isOnline && !restoring)
+    return <p className="muted center-text">📴 Hors ligne : la liste des séjours n'est pas encore sur cet appareil.</p>;
   if (isPending) return <p className="muted center-text">Chargement des séjours…</p>;
-  if (error) return <p className="warn center-text">Impossible de charger les séjours.</p>;
+  if (!data) return <p className="warn center-text">Impossible de charger les séjours.</p>;
   if (!data.length) return null;
 
   const { current, upcoming, past } = groupStays(data, toIso(new Date()));
   return (
     <section className="card">
       <h2>🏡 Séjours</h2>
+      <OfflineBanner savedAt={dataUpdatedAt} failed={isError} />
       {[
         { title: "🔥 En cours", stays: current },
         { title: "📅 À venir", stays: upcoming },
