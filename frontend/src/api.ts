@@ -15,6 +15,13 @@ export interface Stay {
   separate_couples: boolean;
   /** Incrémenté à chaque nouvelle image de couverture ; null : pas d'image. */
   cover_version: number | null;
+  /** Lieu et infos pratiques ; chaînes vides : non renseignés. */
+  address: string;
+  /** Lien Google Maps collé par l'organisateur ; vide : tiré de l'adresse. */
+  map_url: string;
+  practical_info: string;
+  /** Dernier changement du lieu ou des consignes (ISO, UTC) ; null : jamais renseignés. */
+  info_updated_at: string | null;
 }
 
 export interface StaySummary {

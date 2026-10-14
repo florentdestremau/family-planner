@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Meal } from "../../api";
 import CoverCard from "../../components/CoverCard";
+import PlaceCard from "../../components/PlaceCard";
 import { CopyButton, Toggle } from "../../components/ui";
 import { MEALS, MOMENT_LABEL } from "../../lib";
 import { useStay } from "../../stay";
@@ -73,6 +74,8 @@ export default function AdminStay() {
       </section>
 
       <CoverCard />
+
+      <PlaceCard />
 
       <section className="card">
         <h2>Dates du séjour</h2>

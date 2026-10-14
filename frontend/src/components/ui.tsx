@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { Person } from "../api";
+import { linkify } from "../lib";
 import { toast } from "../toast";
 
 export function Chip({
@@ -70,6 +71,23 @@ export function CopyButton({ text, label = "Copier" }: { text: string; label?: s
     >
       {done ? "Copié ✓" : label}
     </button>
+  );
+}
+
+/** Texte libre avec les liens et les numéros de téléphone cliquables (retours à la ligne gardés par `.pre`). */
+export function Linkified({ text }: { text: string }) {
+  return linkify(text).map((part, i) =>
+    part.href?.startsWith("tel:") ? (
+      <a key={i} href={part.href}>
+        {part.text}
+      </a>
+    ) : part.href ? (
+      <a key={i} href={part.href} target="_blank" rel="noopener noreferrer">
+        {part.text}
+      </a>
+    ) : (
+      part.text
+    ),
   );
 }
 

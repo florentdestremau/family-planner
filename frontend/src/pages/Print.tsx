@@ -1,4 +1,5 @@
 import { Link, useParams } from "react-router";
+import { Linkified } from "../components/ui";
 import { BED_LABEL, countLabel, dayLabel, MOMENT_LABEL, MOMENTS, rangeLabel, sortedMoments } from "../lib";
 import { DietSummary } from "../components/Diets";
 import { useStay } from "../stay";
@@ -10,6 +11,7 @@ const TITLES: Record<string, string> = {
   menus: "Menus",
   chambres: "Chambres",
   activites: "Activités",
+  infos: "Infos pratiques",
 };
 
 export default function Print() {
@@ -36,6 +38,7 @@ export default function Print() {
       {kind === "menus" && <MenusPrint />}
       {kind === "chambres" && <RoomsPrint />}
       {kind === "activites" && <ActivitiesPrint />}
+      {kind === "infos" && <InfoPrint />}
     </div>
   );
 }
@@ -190,5 +193,23 @@ function ActivitiesPrint() {
         );
       })}
     </>
+  );
+}
+
+/** Fiche à afficher à l'entrée : l'adresse en clair, le lien collé par l'organisateur s'il y en a un, les consignes. */
+function InfoPrint() {
+  const { snap } = useStay();
+  const { address, map_url, practical_info } = snap.stay;
+  if (!address && !map_url && !practical_info) return <p className="muted">Aucune info pratique pour l'instant.</p>;
+  return (
+    <section className="print-block print-info">
+      {address && <p className="print-address">📍 {address}</p>}
+      {map_url && <p className="small print-url">Carte : {map_url}</p>}
+      {practical_info && (
+        <p className="pre">
+          <Linkified text={practical_info} />
+        </p>
+      )}
+    </section>
   );
 }

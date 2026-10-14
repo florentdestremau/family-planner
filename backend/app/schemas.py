@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime, timezone
 from typing import Literal, get_args
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -41,6 +41,10 @@ class StayUpdate(In):
     first_meal: Meal | None = None
     last_meal: Meal | None = None
     separate_couples: bool | None = None
+    # Lieu et infos pratiques ; une chaîne vide efface.
+    address: str | None = Field(default=None, max_length=300)
+    map_url: str | None = Field(default=None, max_length=500)  # Google Maps seulement (vérifié par la route)
+    practical_info: str | None = Field(default=None, max_length=2000)
 
 
 class PersonCreate(In):
@@ -195,6 +199,16 @@ class StayOut(ORM):
     last_meal: Meal
     separate_couples: bool
     cover_version: int | None
+    address: str
+    map_url: str
+    practical_info: str
+    info_updated_at: datetime | None
+
+    @field_validator("info_updated_at")
+    @classmethod
+    def _utc(cls, v: datetime | None) -> datetime | None:
+        # SQLite rend l'heure sans fuseau : c'est de l'UTC, à dire au front.
+        return v and v.replace(tzinfo=timezone.utc)
 
 
 class StaySummary(BaseModel):
