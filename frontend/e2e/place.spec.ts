@@ -75,3 +75,23 @@ test("une fiche sans infos pratiques le dit", async ({ page, request }) => {
   await page.goto(`${stay.url}/imprimer/infos`);
   await expect(page.getByText("Aucune info pratique pour l'instant.")).toBeVisible();
 });
+
+test("enregistrer un formulaire du séjour ne vide pas la saisie en cours de l'autre", async ({ page, request }) => {
+  const stay = await createStay(request, "Brouillons e2e");
+  await openAdmin(page, stay.slug, stay.key);
+  const place = page.locator(".card").filter({ has: page.getByRole("heading", { name: /Lieu et infos pratiques/ }) });
+  const dates = page.locator(".card").filter({ has: page.getByRole("heading", { name: "Dates du séjour" }) });
+
+  // Consignes en cours de saisie, puis le nom du séjour enregistré à côté.
+  await place.getByLabel("Infos pratiques").fill("Portail : code 1984");
+  await dates.getByLabel("Nom").fill("Toussaint renommée");
+  await dates.getByRole("button", { name: "Enregistrer" }).click();
+  await expect(page.locator(".stay-name")).toHaveText("Toussaint renommée");
+  await expect(place.getByLabel("Infos pratiques")).toHaveValue("Portail : code 1984");
+
+  // Et l'inverse : le nom en cours de saisie survit à l'enregistrement du lieu.
+  await dates.getByLabel("Nom").fill("Nom pas encore enregistré");
+  await place.getByRole("button", { name: "Enregistrer" }).click();
+  await expect(page.getByText("Infos pratiques enregistrées 📍")).toBeVisible();
+  await expect(dates.getByLabel("Nom")).toHaveValue("Nom pas encore enregistré");
+});

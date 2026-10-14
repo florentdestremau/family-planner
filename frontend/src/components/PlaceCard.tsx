@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import type { Stay } from "../api";
-import { MAX_PRACTICAL_INFO } from "../lib";
+import { MAX_ADDRESS, MAX_MAP_URL, MAX_PRACTICAL_INFO } from "../lib";
 import { useStay } from "../stay";
 import { toast } from "../toast";
 
@@ -11,13 +10,13 @@ Arrivée conseillée : à partir de 17 h
 Wifi : MaisonInvites / motdepasse
 Clés chez le voisin : 06 12 34 56 78`;
 
-const pick = ({ address, map_url, practical_info }: Stay) => ({ address, map_url, practical_info });
-
 /** Organisateur : adresse, lien Google Maps et consignes pratiques du séjour. */
 export default function PlaceCard() {
   const { snap, call } = useStay();
-  const [form, setForm] = useState(() => pick(snap.stay));
-  useEffect(() => setForm(pick(snap.stay)), [snap.stay]);
+  const { address, map_url, practical_info } = snap.stay;
+  const [form, setForm] = useState({ address, map_url, practical_info });
+  // Repris du serveur seulement quand le lieu change : un autre formulaire enregistré ne vide pas la saisie en cours.
+  useEffect(() => setForm({ address, map_url, practical_info }), [address, map_url, practical_info]);
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
@@ -35,7 +34,7 @@ export default function PlaceCard() {
           Adresse
           <input
             value={form.address}
-            maxLength={300}
+            maxLength={MAX_ADDRESS}
             placeholder="12 chemin des Vignes, 26110 Nyons"
             onChange={(e) => setForm({ ...form, address: e.target.value })}
           />
@@ -45,7 +44,7 @@ export default function PlaceCard() {
           <input
             type="url"
             value={form.map_url}
-            maxLength={500}
+            maxLength={MAX_MAP_URL}
             placeholder="https://maps.app.goo.gl/…"
             onChange={(e) => setForm({ ...form, map_url: e.target.value })}
           />

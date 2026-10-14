@@ -40,6 +40,8 @@ router = APIRouter(prefix="/api/stays/{slug}/admin")
 
 # Leur changement date la mention « Mis à jour le … » des infos pratiques.
 PLACE_FIELDS = {"address", "map_url", "practical_info"}
+# Leur changement déclenche la vérification des dates et le nettoyage hors période.
+PERIOD_FIELDS = {"start_date", "end_date", "first_meal", "last_meal"}
 
 
 @router.get("", status_code=204)
@@ -59,6 +61,9 @@ def update_stay(body: s.StayUpdate, stay: AdminStay, db: DB) -> Stay:
             if key in PLACE_FIELDS and value != getattr(stay, key):
                 stay.info_updated_at = datetime.now(timezone.utc)
             setattr(stay, key, value)
+    if not body.model_fields_set & PERIOD_FIELDS:  # nom, règles, lieu : la période ne bouge pas
+        db.commit()
+        return stay
     validate_dates(stay.start_date, stay.end_date, stay.first_meal, stay.last_meal)
     # Nettoyage des données sorties de la nouvelle période.
     slots = set(stay_slots(stay.start_date, stay.end_date, stay.first_meal, stay.last_meal))

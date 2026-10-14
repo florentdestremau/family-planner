@@ -9,8 +9,13 @@ import { toast } from "../../toast";
 
 export default function AdminStay() {
   const { slug, snap, adminKey, call } = useStay();
-  const [form, setForm] = useState(snap.stay);
-  useEffect(() => setForm(snap.stay), [snap.stay]);
+  const { name, start_date, end_date, first_meal, last_meal } = snap.stay;
+  const [form, setForm] = useState({ name, start_date, end_date, first_meal, last_meal });
+  // Repris du serveur seulement quand ces champs changent : enregistrer le lieu ne vide pas la saisie en cours.
+  useEffect(
+    () => setForm({ name, start_date, end_date, first_meal, last_meal }),
+    [name, start_date, end_date, first_meal, last_meal],
+  );
 
   const origin = window.location.origin;
   const publicLink = `${origin}/s/${slug}`;

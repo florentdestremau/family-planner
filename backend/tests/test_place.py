@@ -41,6 +41,16 @@ def test_update_date_moves_only_when_place_changes(api) -> None:
     assert api.snap()["stay"]["info_updated_at"] > first
 
 
+def test_place_change_leaves_the_period_alone(api) -> None:
+    """Le lieu seul ne touche pas aux présences ; un changement de dates nettoie toujours."""
+    pid = api.person("Alice")
+    api.present(pid)
+    api.adm("PATCH", "/stay", INFO, status=200)
+    assert len(api.snap()["presences"]) == 6
+    api.adm("PATCH", "/stay", {**INFO, "last_meal": "breakfast"}, status=200)
+    assert len(api.snap()["presences"]) == 5
+
+
 def test_empty_strings_clear_the_place(api) -> None:
     api.adm("PATCH", "/stay", INFO, status=200)
     api.adm("PATCH", "/stay", {"address": "", "map_url": "", "practical_info": ""}, status=200)
@@ -62,6 +72,7 @@ def test_map_link_without_address_is_accepted(api) -> None:
         "https://www.google.com/maps/place/Nyons/@44.36,5.14,14z",
         "https://google.fr/maps?q=Nyons",
         "https://www.google.co.uk/maps/search/?api=1&query=Nyons",
+        "https://www.google.com.br/maps/place/Rio",
         "https://maps.google.com/?q=44.36,5.14",
         "https://MAPS.APP.GOO.GL/AbC",
     ],
@@ -81,6 +92,9 @@ def test_google_maps_links_are_accepted(url) -> None:
         "https://waze.com/ul?q=Nyons",
         "https://maps.apple.com/?q=Nyons",
         "https://www.google.com.evil.fr/maps",
+        "https://google.fun/maps/x",  # extension générique : pas forcément à Google
+        "https://maps.google.vip/",
+        "https://www.google.org.uk/maps",
         "https://google.com@evil.fr/maps",  # identifiants : on irait sur evil.fr
         "https://user@maps.app.goo.gl/AbC",
         "maps.app.goo.gl/AbC",
