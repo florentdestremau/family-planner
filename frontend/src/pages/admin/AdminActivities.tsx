@@ -54,8 +54,8 @@ export default function AdminActivities() {
           )}
         </div>
         <p className="hint">
-          Chacun s'inscrit depuis le planning. « Inscrire tout le monde » inscrit d'un coup les personnes présentes ce jour-là ; chacun peut
-          ensuite se retirer.
+          Chacun s'inscrit depuis le planning ; × retire un inscrit. « Inscrire tout le monde » inscrit d'un coup les personnes présentes ce
+          jour-là ; chacun peut ensuite se retirer.
         </p>
         {editing !== null && (
           <form className="form" onSubmit={save}>
@@ -131,7 +131,7 @@ export default function AdminActivities() {
                       </summary>
                       <div className="chips">
                         {participants.map((p) => (
-                          <Chip key={p.id} person={p} />
+                          <Chip key={p.id} person={p} onRemove={() => call("DELETE", `/activities/${a.id}/signups/${p.id}`)} />
                         ))}
                       </div>
                     </details>

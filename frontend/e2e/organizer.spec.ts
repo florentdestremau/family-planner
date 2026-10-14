@@ -89,7 +89,7 @@ test("l'organisateur inscrit tout le monde, chacun peut se retirer", async ({ pa
   const row = page.locator(".list-row").filter({ hasText: "Pétanque" });
   await expect(row.getByText("2 inscrits")).toBeVisible();
   await row.getByText("2 inscrits").click();
-  await expect(row.locator(".chip")).toHaveText(["Alice", "Bob"]);
+  await expect(row.locator(".chip")).toHaveText([/^Alice/, /^Bob/]);
 
   // Bob se retire, Camille arrive : le bouton n'inscrit que Camille.
   const { activities } = await stay.snap();
@@ -100,9 +100,17 @@ test("l'organisateur inscrit tout le monde, chacun peut se retirer", async ({ pa
   await row.getByRole("button", { name: "Inscrire tout le monde" }).click();
   await expect(page.locator(".toast")).toContainText("1 personne inscrite à « Pétanque »");
   await row.getByText("2 inscrits").click();
-  await expect(row.locator(".chip")).toHaveText(["Alice", "Camille"]);
+  await expect(row.locator(".chip")).toHaveText([/^Alice/, /^Camille/]);
   await row.getByRole("button", { name: "Inscrire tout le monde" }).click();
   await expect(page.locator(".toast").last()).toContainText("déjà inscrits");
+
+  // L'organisateur retire Camille d'un clic ; « inscrire tout le monde » ne la réinscrit pas.
+  await row.getByRole("button", { name: "Retirer Camille" }).click();
+  await expect(row.getByText("1 inscrit")).toBeVisible();
+  await expect(row.locator(".chip")).toHaveText([/^Alice/]);
+  await row.getByRole("button", { name: "Inscrire tout le monde" }).click();
+  await expect(page.locator(".toast").last()).toContainText("déjà inscrits");
+  await expect(row.locator(".chip")).toHaveText([/^Alice/]);
 });
 
 test("l'espace organisateur exige la clé", async ({ page, request }) => {
