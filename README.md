@@ -110,4 +110,4 @@ seule la clé organisateur protège la configuration.
 
 - Migrations Alembic (`backend/migrations`), appliquées au démarrage ; une base créée avant Alembic est reconnue comme `0001`. Pas de retour arrière : restaurer une sauvegarde once. Nouvelle migration : `cd backend && uv run alembic revision -m "…"` (un test vérifie que modèles et migrations ne divergent pas).
 - Couchage fixe pour tout le séjour (pas de lit par nuit).
-- Hors périmètre : covoiturage, notifications push, génération intégrée de la liste de courses par LLM.
+- Hors périmètre : notifications push, génération intégrée de la liste de courses par LLM, covoiturage (étudié en octobre 2026 : trop lourd pour le gain, le besoin se limitant aux voitures d'arrivée et de départ).
