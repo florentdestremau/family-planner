@@ -66,6 +66,8 @@ export interface AutoAssignResult {
   assigned: number;
   /** Nuitées encore sans lit. */
   unassigned: number;
+  /** Personnes sans aucune nuit déclarée, donc pas couchées. */
+  undeclared: number;
 }
 
 export interface Bed {
@@ -127,6 +129,8 @@ export interface AssistantAction {
   slots: Slot[];
   /** Nuits sur place (date du soir). */
   nights: string[];
+  /** Nuits données par Claude ; sinon on ne les renvoie pas, le serveur les déduit à la validation. */
+  nights_explicit: boolean;
 }
 
 export interface AssistantReply {

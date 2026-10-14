@@ -153,7 +153,7 @@ def test_auto_assign_night_by_night(api, room) -> None:
     api.couple(c, d)
     for x, night in ((a, FRI), (b, FRI), (c, SAT), (d, SAT)):
         api.pub("PUT", f"/persons/{x}/presences", {"slots": [], "nights": [night]}, status=204)
-    assert api.adm("POST", "/rooms/auto-assign", status=200).json() == {"assigned": 4, "unassigned": 0}
+    assert api.adm("POST", "/rooms/auto-assign", status=200).json() == {"assigned": 4, "unassigned": 0, "undeclared": 0}
     assert {bed_ for x in (a, b, c, d) for bed_ in api.beds_of(x)} == {double}
 
 

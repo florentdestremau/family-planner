@@ -69,10 +69,11 @@ def test_auto_assign_only_places_unassigned_and_respects_capacity(api, room) -> 
     assert api.beds_of(c) == {double}, "une affectation existante n'est jamais déplacée"
     # Le double n'a plus qu'une place : le couple ne peut pas y dormir ensemble, et chacun garde
     # le même lit les deux nuits.
-    assert r == {"assigned": 4, "unassigned": 0}
+    assert r == {"assigned": 4, "unassigned": 0, "undeclared": 0}
     assert sorted(bed for x in (a, b) for bed in api.beds_of(x)) == sorted([single, double])
 
 
 def test_auto_assign_without_beds(api) -> None:
     api.present(api.person("Alice"))
-    assert api.adm("POST", "/rooms/auto-assign", status=200).json() == {"assigned": 0, "unassigned": 2}
+    api.person("Bob")  # aucune nuit déclarée : signalé, pas couché
+    assert api.adm("POST", "/rooms/auto-assign", status=200).json() == {"assigned": 0, "unassigned": 2, "undeclared": 1}

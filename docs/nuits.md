@@ -92,7 +92,12 @@ l'hôtel reste donc décochée.
     après le dîner » veut dire dormir sur place, et que « dîner puis rentrer » veut dire ne pas y dormir ;
   - sans `nights`, la règle s'applique ;
   - chaque proposition renvoie ses nuits résolues, et le résumé les affiche
-    (« Alice : ven. dîner → dim. déjeuner · nuits : ven., sam. »).
+    (« Alice : ven. dîner → dim. déjeuner · nuits : ven. 30, sam. 31 ») ;
+  - à la validation, le front ne renvoie les nuits que si Claude les a données explicitement
+    (`nights_explicit`). Sinon le serveur les déduit des repas du moment, et une nuit décochée dans la
+    grille entre-temps n'est pas écrasée par une liste périmée ;
+  - le mode démo (`ASSISTANT_STUB`) déduit lui aussi les nuits au lieu de proposer « aucune », ce qui
+    effaçait les lits du foyer à la validation.
 - **Impression des présences** : une colonne « Nuit » (☾) par jour. La dernière ligne devient
   « Couverts · couchages » et compte les dormeurs pour les colonnes de nuit.
 
@@ -120,22 +125,28 @@ l'hôtel reste donc décochée.
      lit double, enfants dans la chambre de leur foyer, adultes seuls en lit simple d'abord.
 
   Elle ne touche jamais aux nuits déjà attribuées, et ne traite que les nuits déclarées (personne
-  n'est inventé). La réponse compte des **nuitées** : `{assigned, unassigned}`.
+  n'est inventé). La réponse compte des **nuitées** (`assigned`, `unassigned`) et les personnes sans
+  aucune nuit déclarée (`undeclared`), que le toast signale en alerte.
 - **Écran Chambres de l'organisateur** :
   - un sélecteur « Toutes les nuits | 🌙 Ven. 30 oct. | 🌙 Sam. 31 oct. », affiché dès qu'il y a au
     moins deux nuits ;
   - en vue « toutes » :
     - chaque lit liste ses occupants, avec leurs nuits quand elles ne couvrent pas tout le séjour
-      (« Alice ven. · Chloé sam. ») ;
+      (« Alice ven. 30 · Chloé sam. 31 », avec le jour du mois pour qu'un long séjour reste lisible) ;
     - la charge affichée est le maximum sur les nuits (« 2/2 au plus ») ;
-    - une affectation vaut pour toutes les nuits de la personne ;
-    - les personnes sans aucune nuit apparaissent dans « Nuits non déclarées » et restent proposées,
-      avec l'avertissement décrit plus haut ;
+    - la liste d'un lit ne propose que les personnes dont les nuits **sans lit** tiennent toutes dans
+      ce lit. Seules ces nuits sont envoyées : les nuits déjà couchées ailleurs ne bougent pas, et
+      aucun choix ne mène à un 409 ;
+    - les personnes sans aucune nuit apparaissent dans « Nuits non déclarées ». Elles restent
+      proposées pour un lit libre toutes les nuits, avec l'avertissement décrit plus haut ;
+    - le message de fin dit « Toutes les nuits déclarées ont un lit. » et non « Tout le monde a un
+      lit. » tant que quelqu'un n'a rien déclaré ;
   - en vue d'une nuit, on ne voit et ne change que cette nuit-là : c'est là qu'on règle le cas 3 à la
     main.
 - **Chambres (pour tous), Moi, impression des chambres** : même affichage annoté. Dans « Moi », par
-  exemple : « Chambre verte — Lit simple (ven.) · Pas encore attribué (sam.) », ou « Ne dort pas sur
-  place ».
+  exemple : « Chambre verte — Lit simple (ven. 16) · Pas encore attribué (sam. 17) », ou « Ne dort pas
+  sur place ». L'index du front (`buildIndex`) précalcule une fois les nuits par personne et par lit,
+  et les dormeurs par lit et par nuit.
 
 ## Migration `0004` (données existantes)
 
@@ -213,9 +224,9 @@ Il est complet, back et front.
     - min(dormeurs sans lit, places libres) par nuit ;
     - chacun garde le même lit quand tout le monde reste tout le séjour ;
     - `follow_meals` conforme à sa table et idempotente ;
-  - `npm run typecheck` sans erreur ; `npm run test:coverage` : 42 tests, 100 % ;
+  - `npm run typecheck` sans erreur ; `npm run test:coverage` : 43 tests, 100 % ;
   - `npm run test:e2e` : 52 tests passent (bureau et mobile), dont `e2e/nights.spec.ts` (cas 1 et 2,
-    chambre partagée, sélecteur de nuit). Le scénario organisateur passe désormais par la
+    chambre partagée, sélecteur de nuit, lit plein qui ne propose plus personne). Le scénario organisateur passe désormais par la
     pré-affectation avec avertissement.
 
 **Taille** : environ +720/−80 lignes côté back (dont environ 450 de tests) et +520/−130 côté front

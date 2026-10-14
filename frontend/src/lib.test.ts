@@ -185,7 +185,9 @@ describe("nuits", () => {
 
   it("libelle les nuits", () => {
     expect(FRI).toBe("2026-10-30|night");
-    expect(nightsLabel(["2026-10-31", "2026-10-30"])).toBe("ven., sam.");
+    expect(nightsLabel(["2026-10-31", "2026-10-30"])).toBe("ven. 30, sam. 31");
+    // Deux vendredis d'un long séjour restent distincts.
+    expect(nightsLabel(["2026-10-30", "2026-11-06"])).toBe("ven. 30, ven. 6");
     expect(nightsLabel([])).toBe("");
   });
 
@@ -237,11 +239,23 @@ describe("couchages", () => {
     expect(idx.unbedded("2026-10-31")).toEqual([]);
     expect(idx.bedLoad(10)).toBe(2);
     expect(idx.bedLoad(99)).toBe(0);
+    expect(idx.bedCount(10, "2026-10-30")).toBe(2);
+    expect(idx.occupants(99, null)).toEqual([]);
+  });
+
+  it("place libre d'un lit sur des nuits données", () => {
+    const roomy = buildIndex(makeSnapshot({ person_nights: [{ person_id: 1, date: "2026-10-30", bed_id: 10 }] }));
+    expect(roomy.hasRoom(10, ["2026-10-30", "2026-10-31"])).toBe(true);
+    expect(idx.hasRoom(10, ["2026-10-31"])).toBe(false);
+    expect(idx.hasRoom(99, ["2026-10-31"])).toBe(false);
   });
 
   it("précise les nuits seulement quand elles ne couvrent pas le séjour", () => {
     expect(idx.nightsNote(["2026-10-30", "2026-10-31"])).toBe("");
-    expect(idx.nightsNote(["2026-10-31"])).toBe("sam.");
+    expect(idx.nightsNote(["2026-10-31"])).toBe("sam. 31");
+    expect(idx.nightsSuffix(["2026-10-31"])).toBe(" (sam. 31)");
+    expect(idx.nightsSuffix(["2026-10-30", "2026-10-31"])).toBe("");
+    expect(idx.nightsSuffix(["2026-10-30", "2026-10-31"], true)).toBe(" (ven. 30, sam. 31)");
   });
 
   it("plan de couchage d'une personne, lit par lit", () => {
@@ -292,7 +306,7 @@ describe("couverture", () => {
 });
 
 describe("résumés de l'assistant", () => {
-  const action = (name: string, slots: Slot[], nights: string[] = []) => ({ person_id: 1, name, slots, nights });
+  const action = (name: string, slots: Slot[], nights: string[] = []) => ({ person_id: 1, name, slots, nights, nights_explicit: false });
 
   it("formate un créneau court", () => {
     expect(slotShortLabel({ date: "2026-10-30", meal: "dinner" })).toBe("ven. dîner");
@@ -329,7 +343,7 @@ describe("résumés de l'assistant", () => {
     ] as const;
     expect(actionSummary(action("Marie", [...full]))).toBe("Marie : ven. dîner → dim. déjeuner, sauf sam. dîner · aucune nuit sur place");
     expect(actionSummary(action("Marie", [...full, { date: "2026-10-31", meal: "dinner" }], ["2026-10-31", "2026-10-30"]))).toBe(
-      "Marie : ven. dîner → dim. déjeuner · nuits : ven., sam.",
+      "Marie : ven. dîner → dim. déjeuner · nuits : ven. 30, sam. 31",
     );
   });
 });

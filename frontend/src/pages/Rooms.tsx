@@ -1,5 +1,5 @@
 import { Chip, Empty } from "../components/ui";
-import { BED_LABEL, BED_PLACES, nightsLabel } from "../lib";
+import { BED_LABEL, BED_PLACES } from "../lib";
 import { useStay } from "../stay";
 
 /** Chambres pour tous : occupants de chaque lit, avec leurs nuits quand ils ne restent pas tout le séjour. */
@@ -14,7 +14,7 @@ export default function Rooms() {
         {snap.rooms.map((room) => {
           const capacity = room.beds.reduce((n, b) => n + BED_PLACES[b.kind], 0);
           // La nuit la plus chargée de la chambre.
-          const load = Math.max(0, ...snap.nights.map((d) => room.beds.reduce((n, b) => n + idx.occupants(b.id, d).length, 0)));
+          const load = Math.max(0, ...snap.nights.map((d) => room.beds.reduce((n, b) => n + idx.bedCount(b.id, d), 0)));
           return (
             <section key={room.id} className="card">
               <div className="card-head">
@@ -43,7 +43,7 @@ export default function Rooms() {
       {unbedded.length > 0 && (
         <p className="muted small">
           Pas encore de lit :{" "}
-          {unbedded.map(({ person, nights }) => `${person.name}${idx.nightsNote(nights) ? ` (${nightsLabel(nights)})` : ""}`).join(", ")}
+          {unbedded.map(({ person, nights }) => person.name + idx.nightsSuffix(nights)).join(", ")}
         </p>
       )}
     </div>

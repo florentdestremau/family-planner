@@ -28,15 +28,20 @@ test("une chambre double sert à un couple vendredi et à un autre samedi", asyn
   await stay.adm("PUT", `/persons/${c}/partner`, { partner_id: d });
   for (const id of [a, b]) await stay.pub("PUT", `/persons/${id}/presences`, { slots: SLOTS.slice(0, 2), nights: ["2026-10-30"] });
   for (const id of [c, d]) await stay.pub("PUT", `/persons/${id}/presences`, { slots: SLOTS.slice(3), nights: ["2026-10-31"] });
+  const eve = await stay.person("Eve");
+  await stay.pub("PUT", `/persons/${eve}/presences`, { slots: [], nights: ["2026-10-30", "2026-10-31"] });
   const room = await stay.adm("POST", "/rooms", { name: "Chambre d'amis" });
   await stay.adm("POST", `/rooms/${room.id}/beds`, { kind: "double" });
 
   await openAdmin(page, stay.slug, stay.key, "Chambres");
-  await expect(page.locator("p", { hasText: "Sans lit :" })).toContainText("Alice (ven.)");
+  await expect(page.locator("p", { hasText: "Sans lit :" })).toContainText("Alice (ven. 30)");
   await page.getByRole("button", { name: /Proposer une répartition/ }).click();
-  await expect(page.getByText("Tout le monde a un lit.")).toBeVisible();
+  await expect(page.getByText("4 nuitée(s) attribuée(s)")).toBeVisible();
   const bed = page.locator(".bed").first();
-  for (const name of ["Alice ven.", "Bob ven.", "Chloé sam.", "David sam."]) await expect(bed).toContainText(name);
+  for (const name of ["Alice ven. 30", "Bob ven. 30", "Chloé sam. 31", "David sam. 31"]) await expect(bed).toContainText(name);
+  // Eve dort là les deux nuits : le lit, plein chaque nuit, ne la propose pas (plus de 409 à la clé).
+  await expect(page.locator("p", { hasText: "Sans lit :" })).toContainText("Eve");
+  await expect(bed.locator(".add-select")).toHaveCount(0);
 
   // Nuit du vendredi seule : le premier couple.
   await page.getByRole("group", { name: "Nuit" }).getByRole("button", { name: "🌙 Ven. 30 oct." }).click();

@@ -1,7 +1,7 @@
 import { useState } from "react";
-import type { AutoAssignResult, BedAssignResult, BedKind, Room } from "../../api";
+import type { AutoAssignResult, BedAssignResult, BedKind, Person, Room } from "../../api";
 import { AddPersonSelect, Chip } from "../../components/ui";
-import { BED_LABEL, BED_PLACES, dayLabel, nightsLabel } from "../../lib";
+import { BED_LABEL, BED_PLACES, dayLabel } from "../../lib";
 import { useStay } from "../../stay";
 import { toast } from "../../toast";
 
@@ -36,7 +36,11 @@ export default function AdminRooms() {
 
   async function autoAssign() {
     const r = await call<AutoAssignResult>("POST", "/rooms/auto-assign", undefined, { admin: true });
-    if (r) toast(`${r.assigned} nuitée(s) attribuée(s)${r.unassigned ? `, ${r.unassigned} encore sans lit` : ""}`);
+    if (r) {
+      const left = r.unassigned ? `, ${r.unassigned} encore sans lit` : "";
+      const undeclared = r.undeclared ? ` ; ${r.undeclared} personne(s) sans nuit déclarée, pas couchée(s)` : "";
+      toast(`${r.assigned} nuitée(s) attribuée(s)${left}${undeclared}`, r.undeclared ? "warn" : "ok");
+    }
   }
 
   return (
@@ -64,9 +68,7 @@ export default function AdminRooms() {
           <>
             <p className="small">
               <strong>Sans lit{night ? " cette nuit" : ""} :</strong>{" "}
-              {unbedded
-                .map(({ person, nights }) => `${person.name}${!night && idx.nightsNote(nights) ? ` (${nightsLabel(nights)})` : ""}`)
-                .join(", ")}
+              {unbedded.map(({ person, nights }) => person.name + (night ? "" : idx.nightsSuffix(nights))).join(", ")}
             </p>
             <button className="btn" onClick={autoAssign} disabled={!snap.rooms.length}>
               ✨ Proposer une répartition pour les non-logés
@@ -77,7 +79,11 @@ export default function AdminRooms() {
             </p>
           </>
         ) : (
-          nights.length > 0 && <p className="muted small">Tout le monde a un lit{night ? " cette nuit" : ""}.</p>
+          nights.length > 0 && (
+            <p className="muted small">
+              {night ? "Tout le monde a un lit cette nuit." : undeclared.length ? "Toutes les nuits déclarées ont un lit." : "Tout le monde a un lit."}
+            </p>
+          )
         )}
         {!night && undeclared.length > 0 && (
           <p className="hint">
@@ -99,18 +105,30 @@ export default function AdminRooms() {
   );
 }
 
+/** Personne qu'on peut coucher dans un lit, et les nuits à envoyer (absent : toutes celles du séjour). */
+interface Candidate {
+  person: Person;
+  dates?: string[];
+  hint: string;
+}
+
 function RoomCard({ room, night }: { room: Room; night: string | null }) {
   const { snap, idx, call } = useStay();
   const assign = useAssignBed();
   const [name, setName] = useState(room.name);
   const [notes, setNotes] = useState(room.notes);
   const [bedKind, setBedKind] = useState<BedKind>("double");
-  // Candidats : sans lit cette nuit-là ; toutes nuits confondues, aussi ceux qui n'ont déclaré aucune nuit.
-  const candidates = [...idx.unbedded(night).map((l) => l.person), ...(night ? [] : idx.withoutNights())];
-  const hint = (p: { id: number }) => {
-    if (night) return "";
-    const own = idx.nightsOf(p.id).map((n) => n.date);
-    return own.length === 0 ? "nuits non déclarées" : idx.nightsNote(own);
+  // Candidats d'un lit : ses nuits sans lit (cette nuit-là, ou toutes), à condition que le lit ait de
+  // la place chacune de ces nuits ; on n'envoie que ces nuits-là, les nuits déjà couchées ailleurs ne
+  // bougent pas. Toutes nuits confondues, aussi ceux qui n'ont déclaré aucune nuit (le serveur les
+  // fait dormir tout le séjour, avec un avertissement).
+  const candidates = (bedId: number) => {
+    const waiting = idx
+      .unbedded(night)
+      .filter((l) => idx.hasRoom(bedId, l.nights))
+      .map(({ person, nights }): Candidate => ({ person, dates: nights, hint: night ? "" : idx.nightsNote(nights) }));
+    const undeclared = night || !idx.hasRoom(bedId, snap.nights) ? [] : idx.withoutNights();
+    return [...waiting, ...undeclared.map((person): Candidate => ({ person, hint: "nuits non déclarées" }))];
   };
   const save = () =>
     (name !== room.name || notes !== room.notes) && name.trim() && call("PATCH", `/rooms/${room.id}`, { name: name.trim(), notes }, { admin: true });
@@ -132,8 +150,7 @@ function RoomCard({ room, night }: { room: Room; night: string | null }) {
           const places = BED_PLACES[bed.kind];
           const occupants = idx.occupants(bed.id, night);
           const load = night ? occupants.length : idx.bedLoad(bed.id);
-          // Toutes nuits confondues, le lit accepte encore quelqu'un s'il reste une place une nuit au moins.
-          const full = night ? load >= places : snap.nights.every((d) => idx.occupants(bed.id, d).length >= places);
+          const options = candidates(bed.id);
           return (
             <li key={bed.id} className="bed">
               <div className="bed-head">
@@ -157,13 +174,11 @@ function RoomCard({ room, night }: { room: Room; night: string | null }) {
                     onRemove={() => assign(person.id, null, nights)}
                   />
                 ))}
-                {!full && (
-                  <AddPersonSelect
-                    people={candidates}
-                    hint={night ? undefined : hint}
-                    onPick={(id) => assign(id, bed.id, night ? [night] : undefined)}
-                  />
-                )}
+                <AddPersonSelect
+                  people={options.map((o) => o.person)}
+                  hint={(p) => options.find((o) => o.person.id === p.id)?.hint ?? ""}
+                  onPick={(id) => assign(id, bed.id, options.find((o) => o.person.id === id)?.dates)}
+                />
               </div>
             </li>
           );

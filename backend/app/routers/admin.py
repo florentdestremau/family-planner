@@ -243,7 +243,12 @@ def rooms_auto_assign(stay: AdminStay, db: DB) -> dict:
     for x in nights:
         x.bed_id = proposal.get((x.person_id, x.date), x.bed_id)
     db.commit()
-    return {"assigned": len(proposal), "unassigned": sum(1 for x in nights if x.bed_id is None)}
+    sleeping = {x.person_id for x in nights}
+    return {
+        "assigned": len(proposal),
+        "unassigned": sum(1 for x in nights if x.bed_id is None),
+        "undeclared": sum(1 for p in people if p.id not in sleeping),
+    }
 
 
 # --- Corvées -----------------------------------------------------------------

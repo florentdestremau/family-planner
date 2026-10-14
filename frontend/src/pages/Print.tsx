@@ -1,5 +1,5 @@
 import { Link, useParams } from "react-router";
-import { BED_LABEL, countLabel, dayLabel, MOMENT_LABEL, MOMENTS, nightsLabel, rangeLabel, sortedMoments } from "../lib";
+import { BED_LABEL, countLabel, dayLabel, MOMENT_LABEL, MOMENTS, rangeLabel, sortedMoments } from "../lib";
 import { useStay } from "../stay";
 import { PresenceTable } from "./Presences";
 
@@ -142,7 +142,7 @@ function RoomsPrint() {
                   <span className="muted">{bed.label || BED_LABEL[bed.kind]} :</span>{" "}
                   {idx
                     .occupants(bed.id, null)
-                    .map(({ person, nights }) => `${person.name}${idx.nightsNote(nights) ? ` (nuit de ${nightsLabel(nights)})` : ""}`)
+                    .map(({ person, nights }) => person.name + idx.nightsSuffix(nights))
                     .join(", ") || "—"}
                 </li>
               ))}
@@ -153,7 +153,7 @@ function RoomsPrint() {
       {unbedded.length > 0 && (
         <p className="small">
           <strong>Sans lit :</strong>{" "}
-          {unbedded.map(({ person, nights }) => `${person.name}${idx.nightsNote(nights) ? ` (${nightsLabel(nights)})` : ""}`).join(", ")}
+          {unbedded.map(({ person, nights }) => person.name + idx.nightsSuffix(nights)).join(", ")}
         </p>
       )}
     </>

@@ -173,10 +173,17 @@ def _validate_and_feedback(
         members = h.household_members(db, stay, household_id, body)
     except HTTPException as exc:
         return [], str(exc.detail)
-    return [
-        s.AssistantAction(person_id=m.person.id, name=m.person.name, slots=m.slots, nights=sorted(h.resolved_nights(db, stay, m)))
-        for m in members
-    ], None
+    return [_action(db, stay, m) for m in members], None
+
+
+def _action(db: Session, stay: Stay, m: h.Member) -> s.AssistantAction:
+    return s.AssistantAction(
+        person_id=m.person.id,
+        name=m.person.name,
+        slots=m.slots,
+        nights=sorted(h.resolved_nights(db, stay, m)),
+        nights_explicit=m.nights is not None,
+    )
 
 
 def _fallback_text(actions: list[s.AssistantAction]) -> str:
@@ -200,7 +207,8 @@ def _stub_reply(db: Session, stay: Stay, req: s.AssistantIn) -> s.AssistantOut:
     )
     d, meal = stay_slots(stay.start_date, stay.end_date, stay.first_meal, stay.last_meal)[0]
     slot = s.SlotIn(date=d, meal=meal)
-    actions = [s.AssistantAction(person_id=m.id, name=m.name, slots=[slot], nights=[]) for m in members]
+    # Nuits non précisées : déduites des repas, comme pour Claude (rien n'est effacé à la validation).
+    actions = [_action(db, stay, h.Member(m, [slot])) for m in members]
     text = f"Voici ma proposition : je suggère que {', '.join(m.name for m in members)} se retrouvent au premier repas du séjour."
     return s.AssistantOut(text=text, actions=actions)
 

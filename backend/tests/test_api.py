@@ -54,7 +54,7 @@ def test_full_flow(client, stay) -> None:
     double = client.post(f"{base}/admin/rooms/{room['id']}/beds", json={"kind": "double"}, headers=admin).json()
     client.post(f"{base}/admin/rooms/{room['id']}/beds", json={"kind": "bunk"}, headers=admin)
     # Six personnes, deux nuits, quatre places : quatre nuitées attribuées chaque nuit.
-    assert client.post(f"{base}/admin/rooms/auto-assign", headers=admin).json() == {"assigned": 8, "unassigned": 4}
+    assert client.post(f"{base}/admin/rooms/auto-assign", headers=admin).json() == {"assigned": 8, "unassigned": 4, "undeclared": 0}
     beds = {(n["person_id"], n["date"]): n["bed_id"] for n in client.get(base).json()["person_nights"]}
     assert {beds[(p["id"], night)] for p in (alice, bob) for night in ("2026-10-30", "2026-10-31")} == {double["id"]}
     r = client.put(f"{base}/admin/persons/{others[2]['id']}/bed", json={"bed_id": double["id"]}, headers=admin)

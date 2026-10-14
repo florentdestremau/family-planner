@@ -221,6 +221,7 @@ class BedAssignOut(BaseModel):
 class AutoAssignOut(BaseModel):
     assigned: int  # nuitées attribuées
     unassigned: int  # nuitées encore sans lit
+    undeclared: int  # personnes sans aucune nuit déclarée, donc pas couchées
 
 
 class BedOut(ORM):
@@ -321,7 +322,10 @@ class AssistantAction(BaseModel):
     person_id: int
     name: str
     slots: list[SlotIn]
-    nights: list[date]
+    nights: list[date]  # nuits qui en résultent, pour l'affichage
+    # Nuits données par Claude ; sinon le front ne les renvoie pas, et le serveur les déduit des
+    # repas au moment de la validation (pas d'une liste périmée).
+    nights_explicit: bool
 
 
 class AssistantOut(BaseModel):

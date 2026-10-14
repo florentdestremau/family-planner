@@ -57,13 +57,19 @@ export const nightKey = (date: string) => `${date}|night`;
 
 const WEEKDAYS = ["dim.", "lun.", "mar.", "mer.", "jeu.", "ven.", "sam."];
 
-/** Nuits courtes, triées : « ven., sam. ». */
+/** Nuits courtes, triées, avec le jour du mois (sans ambiguïté sur un long séjour) : « ven. 30, sam. 31 ». */
 export function nightsLabel(dates: string[]): string {
   return [...dates]
     .sort()
-    .map((d) => WEEKDAYS[asDate(d).getDay()])
+    .map((d) => `${WEEKDAYS[asDate(d).getDay()]} ${asDate(d).getDate()}`)
     .join(", ");
 }
+
+const push = <K, V>(map: Map<K, V[]>, key: K, value: V) => {
+  const list = map.get(key);
+  if (list) list.push(value);
+  else map.set(key, [value]);
+};
 
 /**
  * Nuits qui suivent les repas, sans ambiguïté (même règle que le serveur). Seules les nuits dont un
@@ -109,8 +115,18 @@ export function buildIndex(snap: Snapshot) {
   const bedById = new Map(snap.rooms.flatMap((r) => r.beds.map((b) => [b.id, { ...b, room: r }] as const)));
   const signups = new Set(snap.signups.map((s) => `${s.activity_id}|${s.person_id}`));
   const menuBySlot = new Map(snap.menus.map((m) => [`${m.date}|${m.meal}`, m]));
+  // Nuits indexées une fois, dans l'ordre chronologique : par personne, par lit (null : sans lit)
+  // puis par personne, et nombre de dormeurs par lit et par nuit.
   const nightsByPerson = new Map<number, PersonNight[]>();
-  for (const n of snap.person_nights) nightsByPerson.set(n.person_id, [...(nightsByPerson.get(n.person_id) ?? []), n]);
+  const byBed = new Map<number | null, Map<number, string[]>>();
+  const perBedNight = new Map<string, number>();
+  for (const n of [...snap.person_nights].sort((a, b) => a.date.localeCompare(b.date))) {
+    push(nightsByPerson, n.person_id, n);
+    const persons = byBed.get(n.bed_id) ?? new Map<number, string[]>();
+    byBed.set(n.bed_id, persons);
+    push(persons, n.person_id, n.date);
+    perBedNight.set(`${n.bed_id}|${n.date}`, (perBedNight.get(`${n.bed_id}|${n.date}`) ?? 0) + 1);
+  }
   const nightsOf = (personId: number): PersonNight[] => nightsByPerson.get(personId) ?? [];
 
   const occurrences = new Map<string, number[]>();
@@ -138,32 +154,40 @@ export function buildIndex(snap: Snapshot) {
   /** Personnes qui dorment sur place cette nuit-là (couchages). */
   const nightCount = (date: string) => count((p) => sleepsOn(p.id, date));
 
-  /** Personnes regroupées avec leurs nuits retenues par `keep` (une nuit donnée, ou toutes si `night` est nul). */
-  const lodgings = (keep: (n: PersonNight) => boolean, night: string | null): Lodging[] =>
-    snap.persons
-      .map((person) => ({
-        person,
-        nights: nightsOf(person.id)
-          .filter((n) => (night === null || n.date === night) && keep(n))
-          .map((n) => n.date)
-          .sort(),
-      }))
-      .filter((l) => l.nights.length > 0);
+  /** Personnes d'un lit (null : sans lit) avec leurs nuits, une nuit donnée ou toutes si `night` est nul. */
+  const lodgings = (bedId: number | null, night: string | null): Lodging[] => {
+    const persons = byBed.get(bedId);
+    if (!persons) return [];
+    return snap.persons.flatMap((person) => {
+      const nights = (persons.get(person.id) ?? []).filter((d) => night === null || d === night);
+      return nights.length ? [{ person, nights }] : [];
+    });
+  };
   /** Occupants d'un lit, une nuit donnée ou toutes nuits confondues. */
-  const occupants = (bedId: number, night: string | null) => lodgings((n) => n.bed_id === bedId, night);
+  const occupants = (bedId: number, night: string | null) => lodgings(bedId, night);
   /** Personnes qui dorment sur place sans lit, une nuit donnée ou toutes nuits confondues. */
-  const unbedded = (night: string | null) => lodgings((n) => n.bed_id === null, night);
+  const unbedded = (night: string | null) => lodgings(null, night);
+  /** Nombre de dormeurs dans un lit une nuit donnée. */
+  const bedCount = (bedId: number, night: string) => perBedNight.get(`${bedId}|${night}`) ?? 0;
   /** Occupation la plus forte d'un lit sur l'ensemble des nuits. */
-  const bedLoad = (bedId: number) => Math.max(0, ...snap.nights.map((d) => occupants(bedId, d).length));
-  /** Nuits à préciser quand elles ne couvrent pas tout le séjour : « ven. », sinon rien. */
+  const bedLoad = (bedId: number) => Math.max(0, ...snap.nights.map((d) => bedCount(bedId, d)));
+  /** Le lit a-t-il une place libre chacune de ces nuits ? */
+  const hasRoom = (bedId: number, nights: string[]) => {
+    const bed = bedById.get(bedId);
+    return bed !== undefined && nights.every((d) => bedCount(bedId, d) < BED_PLACES[bed.kind]);
+  };
+  /** Nuits à préciser quand elles ne couvrent pas tout le séjour : « ven. 30 », sinon rien. */
   const nightsNote = (nights: string[]) => (nights.length === snap.nights.length ? "" : nightsLabel(nights));
-  /** Couchage d'une personne : ses lits (null : sans lit), chacun avec ses nuits. */
+  /** « (ven. 30) » après un nom quand les nuits ne couvrent pas le séjour (ou toujours si `always`). */
+  const nightsSuffix = (nights: string[], always = false) => {
+    const label = always ? nightsLabel(nights) : nightsNote(nights);
+    return label ? ` (${label})` : "";
+  };
+  /** Couchage d'une personne : ses lits (undefined : sans lit), chacun avec ses nuits, dans l'ordre. */
   const bedPlan = (personId: number) => {
-    const byBed = new Map<number | null, string[]>();
-    for (const n of [...nightsOf(personId)].sort((a, b) => a.date.localeCompare(b.date))) {
-      byBed.set(n.bed_id, [...(byBed.get(n.bed_id) ?? []), n.date]);
-    }
-    return [...byBed].map(([bedId, nights]) => ({ bed: bedId === null ? undefined : bedById.get(bedId), nights }));
+    const plan = new Map<number | null, string[]>();
+    for (const n of nightsOf(personId)) push(plan, n.bed_id, n.date);
+    return [...plan].map(([bedId, nights]) => ({ bed: bedId === null ? undefined : bedById.get(bedId), nights }));
   };
 
   /** Inscrits à une activité (toutes les activités sont sur inscription). */
@@ -209,8 +233,11 @@ export function buildIndex(snap: Snapshot) {
     sleepsOn,
     occupants,
     unbedded,
+    bedCount,
     bedLoad,
+    hasRoom,
     nightsNote,
+    nightsSuffix,
     bedPlan,
     /** Personnes qui n'ont déclaré aucune nuit. */
     withoutNights: () => snap.persons.filter((p) => nightsOf(p.id).length === 0),

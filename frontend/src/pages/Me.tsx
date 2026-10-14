@@ -4,7 +4,7 @@ import type { Person } from "../api";
 import AddMember from "../components/AddMember";
 import HouseholdPresences from "../components/HouseholdPresences";
 import { Chip, Empty } from "../components/ui";
-import { BED_LABEL, coverUrl, dayLabel, MOMENT_LABEL, nightsLabel, sortedMoments } from "../lib";
+import { BED_LABEL, coverUrl, dayLabel, MOMENT_LABEL, sortedMoments } from "../lib";
 import { useStay } from "../stay";
 import WhoAmI from "./WhoAmI";
 
@@ -125,8 +125,7 @@ function Dashboard({ me }: { me: Person }) {
                     : plan
                         .map(({ bed, nights }) => {
                           const where = bed ? `${bed.room.name} — ${bed.label || BED_LABEL[bed.kind]}` : "Pas encore attribué";
-                          const note = plan.length > 1 || idx.nightsNote(nights) ? ` (${nightsLabel(nights)})` : "";
-                          return where + note;
+                          return where + idx.nightsSuffix(nights, plan.length > 1);
                         })
                         .join(" · ")}
                 </span>

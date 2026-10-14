@@ -146,6 +146,7 @@ def test_nights_explicit_or_following_meals(db) -> None:
     fake = FakeClient([answer(tool_block(members=late), text_block("Noté."))] + [answer(text_block("Noté."))])
     out = mod.assistant_reply(db, stay, sc.AssistantIn(person_id=alice.id, message="On arrive après le dîner"), fake)
     assert {a.name: a.nights for a in out.actions} == {"Alice": [date(2026, 10, 30), date(2026, 10, 31)], "Bob": [date(2026, 10, 30)]}
+    assert {a.name: a.nights_explicit for a in out.actions} == {"Alice": True, "Bob": False}
     assert "nuits : nuit du sam. 31/10 (2026-10-31)" in fake.calls[0]["system"]
     assert mod.PROPOSE_TOOL["input_schema"]["properties"]["members"]["items"]["properties"]["nights"]["type"] == "array"
 
@@ -269,10 +270,14 @@ def test_stub_mode_is_deterministic(db, monkeypatch) -> None:
     monkeypatch.setenv("ASSISTANT_STUB", "true")
     assert mod.enabled() is True
     stay, _home, alice, bob = make_stay(db)
+    db.add_all(Night(person_id=alice.id, date=date(2026, 10, d)) for d in (30, 31))
+    db.commit()
     out = mod.assistant_reply(db, stay, sc.AssistantIn(person_id=alice.id, message="On mange ?"))
     assert out.text.startswith("Voici ma proposition")
     assert [a.name for a in out.actions] == ["Alice", "Bob"]
     assert all(a.slots == [sc.SlotIn(date=date(2026, 10, 30), meal="dinner")] for a in out.actions)
+    # Nuits non précisées : déduites, jamais effacées (un lit perdu à la validation sinon).
+    assert [(a.nights, a.nights_explicit) for a in out.actions] == [([date(2026, 10, 30), date(2026, 10, 31)], False), ([], False)]
 
 
 def _stub_reply(client, api, monkeypatch, new_value) -> None:
