@@ -11,6 +11,7 @@ import {
   toSlots,
   buildIndex,
   countLabel,
+  coverThumbUrl,
   coverUrl,
   dayLabel,
   llmExport,
@@ -188,6 +189,7 @@ describe("groupStays", () => {
 describe("couverture", () => {
   it("met la version dans l'URL", () => {
     expect(coverUrl("abc", 3)).toBe("/api/stays/abc/cover?v=3");
+    expect(coverThumbUrl("abc", 3)).toBe("/api/stays/abc/cover/thumb?v=3");
   });
 });
 

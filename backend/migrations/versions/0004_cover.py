@@ -21,6 +21,7 @@ def upgrade() -> None:
         sa.Column("stay_id", sa.Integer(), nullable=False),
         sa.Column("content_type", sa.String(length=32), nullable=False),
         sa.Column("data", sa.LargeBinary(), nullable=False),
+        sa.Column("thumb", sa.LargeBinary(), nullable=False),
         sa.ForeignKeyConstraint(["stay_id"], ["stays.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("stay_id"),
     )

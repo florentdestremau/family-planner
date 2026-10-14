@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { shrinkImage } from "../image";
-import { coverUrl } from "../lib";
+import { coverUrl, MAX_COVER_BYTES } from "../lib";
 import { useStay } from "../stay";
 import { toast } from "../toast";
 
@@ -18,6 +18,11 @@ export default function CoverCard() {
     try {
       // Format que le navigateur ne sait pas décoder : envoyée telle quelle, le serveur tranche.
       const image = await shrinkImage(file).catch(() => file);
+      if (image.size > MAX_COVER_BYTES) {
+        // Inutile d'envoyer un fichier que le serveur refusera.
+        toast(`Image trop lourde (au plus ${MAX_COVER_BYTES / 1_000_000} Mo)`, "error");
+        return;
+      }
       if (await call("PUT", "/cover", image, { admin: true })) toast("Image de couverture enregistrée 🖼️");
     } finally {
       setBusy(false);

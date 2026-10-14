@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { api, type Meal, type Stay, type StaySummary } from "../api";
-import { addDays, coverUrl, groupStays, MEALS, MOMENT_LABEL, shortRange, toIso } from "../lib";
+import { addDays, coverThumbUrl, groupStays, MEALS, MOMENT_LABEL, shortRange, toIso } from "../lib";
 import { storage } from "../storage";
 import { ThemeToggle } from "../theme";
 import { toast } from "../toast";
@@ -142,7 +142,7 @@ function StayList() {
                 <li key={s.slug}>
                   <Link to={`/s/${s.slug}`} className="stay-link">
                     {s.cover_version != null && (
-                      <img className="stay-thumb" src={coverUrl(s.slug, s.cover_version)} alt="" loading="lazy" />
+                      <img className="stay-thumb" src={coverThumbUrl(s.slug, s.cover_version)} alt="" loading="lazy" />
                     )}
                     <span className="stay-link-text">
                       <span className="stay-link-main">
