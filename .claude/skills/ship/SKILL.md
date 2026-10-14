@@ -1,5 +1,5 @@
 ---
-name: livrer-pr
+name: ship
 description: Livre la branche courante de family-planner. Ouvre la PR, attend l'environnement éphémère family-planning-pr-<n>, y lance des tests e2e de recette, puis fusionne et suit le déploiement en production si tout est vert et que la fusion est autorisée.
 argument-hint: "[--merge]"
 when_to_use: "Quand on demande d'ouvrir la PR, de tester sur l'environnement de PR ou de livrer en production."
