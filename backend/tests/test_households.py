@@ -33,7 +33,7 @@ def test_add_members_to_a_household(api) -> None:
     assert households(api) == {hid: ["Florent", "Claire", "Léo"]}
     p = api.persons()
     assert p[me["id"]]["partner_id"] == claire["id"] and p[claire["id"]]["partner_id"] == me["id"]
-    assert leo["does_chores"] is False and leo["does_activities"] is True
+    assert leo["does_chores"] is False and "does_activities" not in leo
     assert p[me["id"]]["does_chores"] is True
 
 
@@ -120,10 +120,10 @@ def test_patch_updates_only_given_fields(api) -> None:
     a = api.person("Alice")
     api.adm("PATCH", f"/persons/{a}", {"does_chores": False}, status=200)
     p = api.persons()[a]
-    assert p["name"] == "Alice" and p["does_chores"] is False and p["does_activities"] is True
-    api.adm("PATCH", f"/persons/{a}", {"name": "Alicia", "does_activities": False}, status=200)
+    assert p["name"] == "Alice" and p["does_chores"] is False and p["kind"] == "adult"
+    api.adm("PATCH", f"/persons/{a}", {"name": "Alicia"}, status=200)
     p = api.persons()[a]
-    assert p["name"] == "Alicia" and p["does_chores"] is False and p["does_activities"] is False
+    assert p["name"] == "Alicia" and p["does_chores"] is False
 
 
 def test_partner_link_is_symmetric_and_exclusive(api) -> None:
@@ -216,7 +216,7 @@ def test_delete_person_cascades_and_drops_empty_household(api) -> None:
     a = api.person("Alice")
     b = api.person("Bob", with_=a, partner_id=a)
     api.present(a)
-    act = api.adm("POST", "/activities", {"name": "Rando", "date": "2026-10-31", "optional": True}, status=201).json()
+    act = api.adm("POST", "/activities", {"name": "Rando", "date": "2026-10-31"}, status=201).json()
     api.pub("PUT", f"/activities/{act['id']}/signups/{a}", status=204)
     chore = api.snap()["chore_types"][0]["id"]
     api.adm("PUT", "/chores/occurrence", {"chore_type_id": chore, "date": "2026-10-31", "moment": "day", "person_ids": [a, b]}, status=204)

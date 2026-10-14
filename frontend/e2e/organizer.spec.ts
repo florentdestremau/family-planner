@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { openAdmin } from "./helpers";
+import { createStay, openAdmin } from "./helpers";
 
 test("créer un séjour puis le configurer comme organisateur", async ({ page, context }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
@@ -51,15 +51,15 @@ test("créer un séjour puis le configurer comme organisateur", async ({ page, c
   await expect(room.locator(".bed").first()).toContainText("Claire");
   await expect(room.locator(".bed").nth(1)).toContainText("Léo");
 
-  // Activité facultative.
+  // Activité sur inscription (sans inscrire tout le monde).
   await page.locator(".subtabs").getByRole("link", { name: "Activités" }).click();
   await page.getByRole("button", { name: "+ Activité" }).click();
   await page.getByLabel("Nom").fill("Messe de minuit");
   await page.getByLabel("Début").fill("23:30");
-  await page.getByText("Facultative (inscription individuelle)").click();
+  await page.getByText("Inscrire tout le monde (présents ce jour-là)").click();
   await page.getByRole("button", { name: "Enregistrer" }).click();
   await expect(page.getByText("Messe de minuit")).toBeVisible();
-  await expect(page.locator(".badge-accent")).toHaveText("facultatif");
+  await expect(page.locator(".list-row").filter({ hasText: "Messe de minuit" }).getByText("0 inscrit")).toBeVisible();
 
   // Menu, enregistré en quittant le champ.
   await page.locator(".subtabs").getByRole("link", { name: "Menus" }).click();
@@ -71,6 +71,38 @@ test("créer un séjour puis le configurer comme organisateur", async ({ page, c
   await saved;
   await page.reload();
   await expect(page.locator(".meal").first().locator("textarea")).toHaveValue("Huîtres\nDinde aux marrons");
+});
+
+test("l'organisateur inscrit tout le monde, chacun peut se retirer", async ({ page, request }) => {
+  const stay = await createStay(request);
+  const alice = await stay.person("Alice");
+  const bob = await stay.person("Bob");
+  await stay.person("Absent");
+  await stay.present(alice);
+  await stay.present(bob);
+
+  await openAdmin(page, stay.slug, stay.key, "Activités");
+  await page.getByRole("button", { name: "+ Activité" }).click();
+  await page.getByLabel("Nom").fill("Pétanque");
+  await expect(page.getByRole("checkbox", { name: "Inscrire tout le monde (présents ce jour-là)" })).toBeChecked();
+  await page.getByRole("button", { name: "Enregistrer" }).click();
+  const row = page.locator(".list-row").filter({ hasText: "Pétanque" });
+  await expect(row.getByText("2 inscrits")).toBeVisible();
+  await row.getByText("2 inscrits").click();
+  await expect(row.locator(".chip")).toHaveText(["Alice", "Bob"]);
+
+  // Bob se retire, Camille arrive : le bouton n'inscrit que Camille.
+  const { activities } = await stay.snap();
+  await stay.pub("DELETE", `/activities/${activities[0].id}/signups/${bob}`);
+  const camille = await stay.person("Camille");
+  await stay.present(camille);
+  await page.reload();
+  await row.getByRole("button", { name: "Inscrire tout le monde" }).click();
+  await expect(page.locator(".toast")).toContainText("1 personne inscrite à « Pétanque »");
+  await row.getByText("2 inscrits").click();
+  await expect(row.locator(".chip")).toHaveText(["Alice", "Camille"]);
+  await row.getByRole("button", { name: "Inscrire tout le monde" }).click();
+  await expect(page.locator(".toast").last()).toContainText("déjà inscrits");
 });
 
 test("l'espace organisateur exige la clé", async ({ page, request }) => {

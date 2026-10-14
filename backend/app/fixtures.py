@@ -54,7 +54,7 @@ class Fixture:
     last_meal: str
     families: list[Family]
     rooms: list[tuple[str, list[str]]]
-    activities: list[dict]  # day (index), name, start_time…, optional, signups
+    activities: list[dict]  # day (index), name, start_time…, signups (absent : tous les présents)
     menus: list[tuple[int, str, str, str]]  # (jour, repas, plats, notes)
 
 
@@ -96,15 +96,15 @@ FIXTURES = [
         ],
         activities=[
             dict(day=0, name="Apéro d'arrivée", start_time="19:30", location="Terrasse"),
-            dict(day=1, name="Marché du village", start_time="09:30", end_time="11:30", optional=True,
+            dict(day=1, name="Marché du village", start_time="09:30", end_time="11:30",
                  signups=["Mamie", "Sophie", "Emma"]),
             dict(day=1, name="Construction de cabanes", start_time="15:00", end_time="17:30", location="Bois derrière la maison",
                  description="Prévoir des vêtements qui ne craignent rien"),
-            dict(day=1, name="Loup-garou", start_time="21:00", optional=True, signups=["Florent", "Claire", "Hugo", "Léo", "Marc"]),
-            dict(day=2, name="Rando au lac", start_time="09:30", end_time="13:00", location="Lac", optional=True,
+            dict(day=1, name="Loup-garou", start_time="21:00", signups=["Florent", "Claire", "Hugo", "Léo", "Marc"]),
+            dict(day=2, name="Rando au lac", start_time="09:30", end_time="13:00", location="Lac",
                  signups=["Florent", "Léo", "Julien", "Hugo", "Thomas"]),
             dict(day=2, name="Grand jeu dans le jardin", start_time="15:30"),
-            dict(day=3, name="Balade au village", start_time="10:30", optional=True, signups=["Mamie", "Julien", "Emma"]),
+            dict(day=3, name="Balade au village", start_time="10:30", signups=["Mamie", "Julien", "Emma"]),
             dict(day=3, name="Photo de famille", start_time="14:30", location="Devant la maison"),
         ],
         menus=[
@@ -157,9 +157,9 @@ FIXTURES = [
         ],
         activities=[
             dict(day=1, name="Plage & châteaux de sable", start_time="10:00", location="Plage du centre"),
-            dict(day=2, name="Sortie en kayak", start_time="14:00", end_time="17:00", optional=True,
+            dict(day=2, name="Sortie en kayak", start_time="14:00", end_time="17:00",
                  signups=["Florent", "Julien", "Zoé", "Jules (16 ans)", "Hugo"]),
-            dict(day=3, name="Marché du village", start_time="09:00", optional=True, signups=["Odile", "Claire", "Emma"]),
+            dict(day=3, name="Marché du village", start_time="09:00", signups=["Odile", "Claire", "Emma"]),
             dict(day=4, name="Tournoi de pétanque", start_time="17:00"),
             dict(day=5, name="Phare et pique-nique", start_time="11:00", location="Pointe du phare",
                  description="Prévoir chaussures de marche et gourdes"),
@@ -220,10 +220,10 @@ def load(db: Session, fx: Fixture) -> Stay:
 
     for a in fx.activities:
         a = dict(a)
-        signups = a.pop("signups", [])
+        signups = a.pop("signups", None)
         a["date"] = start + timedelta(days=a.pop("day"))
-        activity = admin.create_activity(s.ActivityIn(**a), stay, db)
-        for name in signups:
+        activity = admin.create_activity(s.ActivityCreate(**a, invite_all=signups is None), stay, db)
+        for name in signups or []:
             public.sign_up(activity.id, ids[name], stay, db)
     for day, meal, dishes, notes in fx.menus:
         admin.set_menu(s.MenuIn(date=start + timedelta(days=day), meal=meal, dishes=dishes, notes=notes), stay, db)

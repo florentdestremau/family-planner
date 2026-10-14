@@ -59,10 +59,10 @@ def test_full_flow(client, stay) -> None:
     r = client.put(f"{base}/admin/persons/{others[2]['id']}/bed", json={"bed_id": double["id"]}, headers=admin)
     assert r.status_code == 409
 
-    # Activités facultatives.
+    # Activités (sur inscription).
     act = client.post(
         f"{base}/admin/activities",
-        json={"name": "Rando", "date": "2026-10-31", "start_time": "10:00", "optional": True},
+        json={"name": "Rando", "date": "2026-10-31", "start_time": "10:00"},
         headers=admin,
     ).json()
     assert client.put(f"{base}/activities/{act['id']}/signups/{kid['id']}").status_code == 204

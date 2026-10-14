@@ -16,7 +16,8 @@ from app.models import Base
 V1 = importlib.import_module("migrations.versions.0001_initial")
 
 # Données au format v1 (avant les foyers) : un couple avec deux enfants, un enfant rattaché à un
-# adulte seul, un enfant sans référent, un célibataire ; présences, inscriptions, corvée, lit.
+# adulte seul, un enfant sans référent (qui ne participe pas aux activités), un célibataire ;
+# présences, une activité facultative et deux « tout le monde », inscriptions, corvée, lit.
 LEGACY_DATA = """
 INSERT INTO stays VALUES (1, 'slug1', 'key1', 'Toussaint', '2026-10-30', '2026-11-01', 'dinner', 'lunch', 1, '2026-10-05 10:00:00');
 INSERT INTO stays VALUES (2, 'slug2', 'key2', 'Noël', '2026-12-24', '2026-12-26', 'dinner', 'lunch', 1, '2026-10-05 10:00:00');
@@ -28,14 +29,20 @@ INSERT INTO persons VALUES (3, 1, 'Léo', 'child', 0, 1, 1, NULL, NULL);
 INSERT INTO persons VALUES (4, 1, 'Emma', 'child', 0, 1, 2, NULL, NULL);
 INSERT INTO persons VALUES (5, 1, 'Sarah', 'adult', 1, 1, NULL, NULL, NULL);
 INSERT INTO persons VALUES (6, 1, 'Tom', 'child', 0, 1, 5, NULL, NULL);
-INSERT INTO persons VALUES (7, 1, 'Orphelin', 'child', 0, 1, NULL, NULL, NULL);
+INSERT INTO persons VALUES (7, 1, 'Orphelin', 'child', 0, 0, NULL, NULL, NULL);
 INSERT INTO persons VALUES (8, 2, 'Camille', 'adult', 1, 1, NULL, NULL, NULL);
 INSERT INTO presences VALUES (1, 1, '2026-10-30', 'dinner');
 INSERT INTO presences VALUES (2, 3, '2026-10-30', 'dinner');
 INSERT INTO presences VALUES (3, 6, '2026-10-31', 'lunch');
 INSERT INTO presences VALUES (4, 8, '2026-12-24', 'dinner');
+INSERT INTO presences VALUES (5, 6, '2026-10-31', 'dinner');
+INSERT INTO presences VALUES (6, 7, '2026-10-31', 'lunch');
+INSERT INTO presences VALUES (7, 8, '2026-10-31', 'lunch');
 INSERT INTO activities VALUES (1, 1, 'Rando', '', '', '2026-10-31', '10:00', '', 1);
+INSERT INTO activities VALUES (2, 1, 'Jeux', '', '', '2026-10-31', '15:00', '', 0);
+INSERT INTO activities VALUES (3, 1, 'Apéro', '', '', '2026-10-30', '19:00', '', 0);
 INSERT INTO signups VALUES (1, 1, 3);
+INSERT INTO signups VALUES (2, 3, 3);
 INSERT INTO chore_types VALUES (1, 1, 'Cuisine', 'dinner', 2, 1);
 INSERT INTO chore_assignments VALUES (1, 1, 1, '2026-10-30', 'dinner', 2);
 INSERT INTO menus VALUES (1, 1, '2026-10-30', 'dinner', 'Soupe', '');
@@ -67,7 +74,7 @@ def test_fresh_database_matches_models(tmp_path) -> None:
         diff = compare_metadata(MigrationContext.configure(connection), Base.metadata)
     engine.dispose()
     assert diff == [], "les modèles et les migrations divergent : écrire une migration"
-    assert query(tmp_path / "new.db", "SELECT version_num FROM alembic_version") == [("0003",)]
+    assert query(tmp_path / "new.db", "SELECT version_num FROM alembic_version") == [("0004",)]
 
 
 def test_legacy_database_is_converted_without_loss(tmp_path) -> None:
@@ -78,7 +85,9 @@ def test_legacy_database_is_converted_without_loss(tmp_path) -> None:
     migrate(engine=engine)
     engine.dispose()
 
-    assert counts(path) == before, "aucune ligne perdue (pas de cascade pendant la migration)"
+    after = counts(path)
+    assert after.pop("signups") == before.pop("signups") + 2
+    assert after == before, "aucune ligne perdue (pas de cascade pendant la migration)"
     members = query(
         path,
         "SELECT h.stay_id, group_concat(p.name, ',') FROM households h JOIN persons p ON p.household_id = h.id "
@@ -94,7 +103,24 @@ def test_legacy_database_is_converted_without_loss(tmp_path) -> None:
     assert "guardian_id" not in columns and "household_id" in columns
     assert query(path, "SELECT partner_id, bed_id FROM persons WHERE id IN (1, 2) ORDER BY id") == [(2, 1), (1, 1)]
     assert query(path, "PRAGMA foreign_key_check") == []
-    assert query(path, "SELECT version_num FROM alembic_version") == [("0003",)]
+    assert query(path, "SELECT version_num FROM alembic_version") == [("0004",)]
+
+
+def test_everyone_activities_become_signups(tmp_path) -> None:
+    """Une activité « tout le monde » inscrit qui y participait : « activités », présent ce jour-là."""
+    path = tmp_path / "legacy.db"
+    engine = create_engine(legacy_db(path))
+    migrate(engine=engine)
+    engine.dispose()
+
+    assert query(path, "SELECT activity_id, person_id FROM signups ORDER BY activity_id, person_id") == [
+        (1, 3),  # facultative : inscriptions inchangées
+        (2, 6),  # Tom, présent deux fois ce jour-là, une seule inscription ; pas Orphelin ni Camille (autre séjour)
+        (3, 1),  # Florent, présent ce jour-là
+        (3, 3),  # Léo, déjà inscrit : pas de doublon
+    ]
+    assert "optional" not in [row[1] for row in query(path, "PRAGMA table_info(activities)")]
+    assert "does_activities" not in [row[1] for row in query(path, "PRAGMA table_info(persons)")]
 
 
 def test_broken_foreign_keys_abort_the_migration(tmp_path) -> None:

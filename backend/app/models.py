@@ -46,7 +46,6 @@ class Person(Base):
     name: Mapped[str] = mapped_column(String(100))
     kind: Mapped[str] = mapped_column(String(16), default="adult")  # adult | child
     does_chores: Mapped[bool] = mapped_column(default=True)
-    does_activities: Mapped[bool] = mapped_column(default=True)
     household_id: Mapped[int] = mapped_column(
         ForeignKey("households.id", ondelete="CASCADE", name="fk_persons_household_id"), index=True
     )
@@ -131,11 +130,23 @@ class Activity(Base):
     date: Mapped[date]
     start_time: Mapped[str] = mapped_column(String(5), default="")  # HH:MM
     end_time: Mapped[str] = mapped_column(String(5), default="")
-    optional: Mapped[bool] = mapped_column(default=False)
 
 
 class Signup(Base):
+    """Inscription d'une personne à une activité (toutes les activités sont sur inscription)."""
+
     __tablename__ = "signups"
+    __table_args__ = (UniqueConstraint("activity_id", "person_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    activity_id: Mapped[int] = mapped_column(ForeignKey("activities.id", ondelete="CASCADE"), index=True)
+    person_id: Mapped[int] = mapped_column(ForeignKey("persons.id", ondelete="CASCADE"))
+
+
+class Decline(Base):
+    """Désistement : la personne s'est retirée d'une activité ; « inscrire tout le monde » la laisse de côté."""
+
+    __tablename__ = "activity_declines"
     __table_args__ = (UniqueConstraint("activity_id", "person_id"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
