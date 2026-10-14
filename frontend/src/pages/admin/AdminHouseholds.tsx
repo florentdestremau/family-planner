@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import type { Person, PersonKind } from "../../api";
 import AddMember from "../../components/AddMember";
+import { DietEditor } from "../../components/Diets";
 import { Toggle } from "../../components/ui";
+import { dietLabel } from "../../lib";
 import { useStay } from "../../stay";
 
 export default function AdminHouseholds() {
@@ -122,6 +124,7 @@ function HouseholdCard({ id, members }: { id: number; members: Person[] }) {
 function MemberRow({ person: p, members }: { person: Person; members: Person[] }) {
   const { idx, call } = useStay();
   const [name, setName] = useState(p.name);
+  const [diet, setDiet] = useState(false);
   const patch = (body: Partial<Person>) => call("PATCH", `/persons/${p.id}`, body, { admin: true });
   const adults = members.filter((m) => m.kind === "adult" && m.id !== p.id);
   const others = idx.households().filter((h) => h.id !== p.household_id);
@@ -161,6 +164,9 @@ function MemberRow({ person: p, members }: { person: Person; members: Person[] }
       </div>
       <div className="person-admin-flags">
         <Toggle label="Corvées" checked={p.does_chores} onChange={(v) => patch({ does_chores: v })} />
+        <button className="btn btn-small" onClick={() => setDiet(!diet)} aria-label={`Régimes et allergies de ${p.name}`}>
+          🥗 Régimes
+        </button>
         <select
           className="add-select"
           value=""
@@ -186,6 +192,11 @@ function MemberRow({ person: p, members }: { person: Person; members: Person[] }
           Supprimer
         </button>
       </div>
+      {diet ? (
+        <DietEditor person={p} onClose={() => setDiet(false)} />
+      ) : (
+        (p.diets.length > 0 || p.diet_note) && <div className="muted small">🥗 {dietLabel(p)}</div>
+      )}
     </li>
   );
 }

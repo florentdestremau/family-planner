@@ -2,6 +2,8 @@ export type Meal = "breakfast" | "lunch" | "dinner";
 export type Moment = Meal | "day";
 export type PersonKind = "adult" | "child";
 export type BedKind = "double" | "single" | "bunk" | "extra";
+/** Régimes (végétarien ou végan) puis allergies et intolérances. */
+export type Diet = "vegetarian" | "vegan" | "gluten_free" | "lactose_free" | "nut_allergy" | "seafood_allergy";
 
 export interface Stay {
   slug: string;
@@ -39,6 +41,10 @@ export interface Person {
   household_id: number;
   partner_id: number | null;
   bed_id: number | null;
+  /** Dans l'ordre d'affichage ; vide : aucune contrainte. */
+  diets: Diet[];
+  /** Précision libre, affichée mais non comptée. */
+  diet_note: string;
 }
 
 export interface Slot {

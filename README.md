@@ -90,6 +90,8 @@ seule la clé organisateur protège la configuration.
 
 **Personnes** — adulte ou enfant (portions), « participe aux corvées » (défaut : oui pour un adulte, non pour un enfant).
 
+**Régimes et allergies** — chaque adulte les déclare pour les membres de son foyer, depuis la carte « Régimes et allergies » de la page « Moi » (proposé aussi juste après l'ajout d'un membre) ; l'organisateur peut corriger depuis « Foyers ». Une courte liste comptée — végétarien ou végan (l'un ou l'autre), sans gluten, sans lactose, allergie arachides et fruits à coque, allergie poisson et fruits de mer — plus une précision libre, affichée mais non comptée (gravité, autre aliment, préférence). Chaque repas affiche les contraintes de ses présents en nombres (« 🌱 2 végétariens · ⚠️ 1 sans gluten »), dépliables sur les noms : page « Repas », corvées de repas de la page « Moi », menus de l'organisateur (avec un récapitulatif du séjour). La fiche menus imprimée donne les noms en entier ; l'export LLM, des nombres et les précisions, jamais de noms. Visibles par tous les participants (même modèle d'accès que le reste) ; l'application informe, elle ne vérifie pas les menus. Voir `docs/pitches/contraintes-alimentaires.md`.
+
 **Présences** — par repas (petit-déj, déjeuner, dîner) entre le premier repas du premier jour et le dernier repas du dernier jour. Présent sur place = présent au repas ; les couverts sont comptés adultes / enfants.
 
 **Assistant (formulaires conversationnels)** — un bouton ✨ ouvre un panneau de discussion ; on décrit les présences du foyer en langue naturelle (« toute l'équipe au dîner du vendredi ») ou à la voix (micro, si le navigateur le permet). L'assistant (modèle `claude-sonnet-5-5`, effort bas) propose des présences, vérifiées par les règles du foyer, et chaque proposition se valide ou s'ignore d'un clic — ce qui met à jour les présences comme la grille habituelle. Le panneau exige d'avoir choisi « qui je suis ». Limite : 30 demandes par séjour et par jour.
@@ -104,7 +106,7 @@ seule la clé organisateur protège la configuration.
 
 **Activités** — toutes sur inscription. Depuis le planning, chacun inscrit ou retire les membres de son foyer, activité par activité (inscription possible même absent ce jour-là, avec un avertissement) ; l'accueil résume les activités du foyer. L'organisateur peut « inscrire tout le monde » : à la création (coché par défaut) ou plus tard d'un bouton, les personnes présentes ce jour-là qui manquent sont inscrites ; celles qui se sont retirées ne sont pas réinscrites. L'organisateur voit les inscrits de chaque activité et peut en retirer un d'un clic. Retirer une présence ou déplacer une activité ne touche pas aux inscriptions.
 
-**Impressions** — présences, corvées par personne et jour par jour, menus avec couverts, chambres, activités. Export texte menus × couverts à coller dans un LLM pour générer la liste de courses.
+**Impressions** — présences, corvées par personne et jour par jour, menus avec couverts, régimes et allergies, chambres, activités. Export texte menus × couverts (avec les régimes et allergies en nombres) à coller dans un LLM pour générer la liste de courses.
 
 ## Limites v1 / pistes
 

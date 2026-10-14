@@ -1,5 +1,6 @@
 import { Link, useParams } from "react-router";
 import { BED_LABEL, countLabel, dayLabel, MOMENT_LABEL, MOMENTS, rangeLabel, sortedMoments } from "../lib";
+import { DietSummary } from "../components/Diets";
 import { useStay } from "../stay";
 import { PresenceTable } from "./Presences";
 
@@ -109,6 +110,7 @@ function MenusPrint() {
             <div className="covers-big">
               🍽 {count.total} couverts <span className="muted">({countLabel(count)})</span>
             </div>
+            <DietSummary persons={idx.presentAt(s.date, s.meal)} expanded />
             <ul className="dishes">
               {(menu?.dishes.split("\n").filter((d) => d.trim()) ?? []).map((d, i) => (
                 <li key={i}>{d}</li>

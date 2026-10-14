@@ -30,6 +30,7 @@ def two(client):
 
 CASES = [
     ("pub", "PUT", "/persons/{adult}/presences", {"slots": []}),
+    ("pub", "PUT", "/persons/{adult}/diet", {"diets": ["vegan"]}),
     ("pub", "PUT", "/activities/{activity}/signups/{b_adult}", None),
     ("pub", "PUT", "/activities/{b_activity}/signups/{adult}", None),
     ("pub", "DELETE", "/activities/{b_activity}/signups/{adult}", None),

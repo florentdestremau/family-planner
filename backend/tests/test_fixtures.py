@@ -12,6 +12,7 @@ def test_fixtures_are_complete_and_idempotent(client) -> None:
         snap = client.get(f"/api/stays/{fx.slug}").json()
         assert all(p["bed_id"] for p in snap["persons"]), f"{fx.slug} : quelqu'un n'a pas de lit"
         assert snap["chore_assignments"] and snap["activities"] and snap["menus"]
+        assert any(p["diets"] for p in snap["persons"]) and any(p["diet_note"] for p in snap["persons"])
         persons = {p["id"]: p for p in snap["persons"]}
         team: dict = {}
         for a in snap["chore_assignments"]:

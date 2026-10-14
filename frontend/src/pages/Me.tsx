@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import type { Person } from "../api";
 import AddMember from "../components/AddMember";
+import { DietCard, DietSummary } from "../components/Diets";
 import HouseholdPresences from "../components/HouseholdPresences";
 import { Chip, Empty } from "../components/ui";
 import { BED_LABEL, coverUrl, dayLabel, MOMENT_LABEL, sortedMoments } from "../lib";
@@ -36,6 +37,8 @@ function Dashboard({ me }: { me: Person }) {
 
       <HouseholdCard me={me} />
 
+      <DietCard me={me} />
+
       <section className="card">
         <div className="card-head">
           <h2>✅ Présences</h2>
@@ -60,6 +63,7 @@ function Dashboard({ me }: { me: Person }) {
                       {dayLabel(a.date)} · {MOMENT_LABEL[a.moment]}
                       {household.length > 1 && ` · ${idx.name(a.person_id)}`}
                     </div>
+                    {a.moment !== "day" && <DietSummary persons={idx.presentAt(a.date, a.moment)} />}
                   </div>
                   <div className="chips">
                     {team

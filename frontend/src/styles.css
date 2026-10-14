@@ -1820,3 +1820,41 @@ details .chips {
   opacity: 0.6;
   pointer-events: none;
 }
+
+/* --- Régimes et allergies ----------------------------------------------- */
+
+.diets summary {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.diet-list {
+  list-style: none;
+  margin: 0.35rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.875rem;
+}
+.diet-row > .list-row {
+  padding: 0.7rem 0 0.4rem;
+}
+.diet-editor {
+  padding: 0.75rem;
+  margin: 0.25rem 0 0.7rem;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.diet-editor fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+.diet-invite {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}

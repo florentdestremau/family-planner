@@ -6,7 +6,7 @@ import { useStay } from "../stay";
 const PRINTS = [
   { kind: "presences", title: "Planning de présence", text: "Qui est là à chaque repas, avec les couverts adultes / enfants." },
   { kind: "corvees", title: "Corvées par personne", text: "Une fiche par personne, plus le tableau jour par jour." },
-  { kind: "menus", title: "Menus pour l'équipe cuisine", text: "Chaque repas avec ses plats et son nombre de couverts." },
+  { kind: "menus", title: "Menus pour l'équipe cuisine", text: "Chaque repas avec ses plats, ses couverts, régimes et allergies." },
   { kind: "chambres", title: "Répartition des chambres", text: "Qui dort où." },
   { kind: "activites", title: "Planning des activités", text: "Le programme jour par jour avec les inscrits." },
 ];
@@ -32,6 +32,7 @@ export default function PrintMenu() {
         </div>
         <p className="muted small">
           Menus × couverts, prêts à coller dans ChatGPT, Claude… pour générer la liste de courses ou un panier drive.
+          Régimes et allergies y figurent en nombres, sans les noms.
         </p>
         <textarea className="export" readOnly value={exportText} rows={10} onFocus={(e) => e.target.select()} />
       </section>

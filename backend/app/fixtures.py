@@ -42,6 +42,8 @@ class Family:
     away: dict[str, list[Meal]] = field(default_factory=dict)
     teens: list[str] = field(default_factory=list)  # enfants qui participent aux corvées
     no_chores: list[str] = field(default_factory=list)
+    diets: dict[str, list[str]] = field(default_factory=dict)  # régimes et allergies
+    diet_notes: dict[str, str] = field(default_factory=dict)  # précisions libres
 
 
 @dataclass
@@ -82,9 +84,11 @@ FIXTURES = [
                 teens=["Zoé (15 ans)"],
                 no_chores=["Mamie"],
                 members={"Julien": ((1, "dinner"), None), "Zoé (15 ans)": ((2, "lunch"), None)},
+                diet_notes={"Hugo": "N'aime pas les champignons"},
             ),
-            Family(["Marc", "Anne"], ["Lina"], arrive=(1, "lunch"), leave=(2, "breakfast")),  # aller-retour
-            Family(["Thomas"], arrive=(2, "lunch"), leave=(3, "breakfast")),
+            Family(["Marc", "Anne"], ["Lina"], arrive=(1, "lunch"), leave=(2, "breakfast"),  # aller-retour
+                   diets={"Anne": ["gluten_free"]}, diet_notes={"Anne": "Cœliaque : pas même une miette de pain"}),
+            Family(["Thomas"], arrive=(2, "lunch"), leave=(3, "breakfast"), diets={"Thomas": ["vegetarian"]}),
             Family(["Camille"], arrive=(2, "dinner"), leave=(3, "breakfast")),  # célibataire, pour la soirée
         ],
         rooms=[
@@ -110,7 +114,7 @@ FIXTURES = [
         menus=[
             (0, "dinner", "Soupe de potiron\nQuiche lorraine\nSalade verte", ""),
             (1, "lunch", "Taboulé\nPoulet froid", ""),
-            (1, "dinner", "Raclette\nCharcuterie\nSalade", "Sans gluten pour Anne"),
+            (1, "dinner", "Raclette\nCharcuterie\nSalade", "Pommes de terre sans gluten, pain à part"),
             (2, "lunch", "Pique-nique de la rando : sandwiches, fruits", "Les autres : restes de raclette"),
             (2, "dinner", "Pâtes bolognaise\nCompote", "Soirée des enfants"),
             (3, "lunch", "Gigot\nFlageolets\nTarte aux pommes", ""),
@@ -126,7 +130,8 @@ FIXTURES = [
         families=[
             # Montée en charge : grands-parents et Florent d'abord, pic en milieu de semaine, départs étalés.
             Family(["Florent", "Claire"], ["Léo", "Emma"], leave=(6, "lunch")),
-            Family(["Julien", "Sophie"], ["Hugo", "Zoé"], teens=["Zoé"], arrive=(1, "dinner"), leave=(5, "breakfast")),
+            Family(["Julien", "Sophie"], ["Hugo", "Zoé"], teens=["Zoé"], arrive=(1, "dinner"), leave=(5, "breakfast"),
+                   diets={"Sophie": ["vegetarian"]}),
             # Jules part en colonie avant le reste de sa famille.
             Family(
                 ["Marc", "Anne"],
@@ -137,14 +142,16 @@ FIXTURES = [
                 members={"Jules (16 ans)": (None, (2, "lunch"))},
             ),
             # Paul et Léa se sont inscrits chacun de leur côté : deux foyers à fusionner.
-            Family(["Paul"], arrive=(2, "dinner")),
-            Family(["Léa"], ["Rose"], arrive=(3, "lunch")),
+            Family(["Paul"], arrive=(2, "dinner"), diets={"Paul": ["lactose_free"]}),
+            Family(["Léa"], ["Rose"], arrive=(3, "lunch"),
+                   diets={"Rose": ["seafood_allergy"]}, diet_notes={"Rose": "Allergie grave : Léa a son stylo d'adrénaline"}),
             # Les grands-parents déjeunent chez des amis mercredi.
             Family(["Bertrand", "Odile"], no_chores=["Bertrand", "Odile"], away={"Bertrand": [(4, "lunch")], "Odile": [(4, "lunch")]}),
             Family(["Camille"], arrive=(1, "lunch"), leave=(2, "breakfast")),  # célibataire, une nuit
             Family(["Sarah"], ["Tom", "Jade"], arrive=(2, "lunch"), leave=(5, "lunch")),  # parent seul
             # Nicolas arrive le soir, Inès le lendemain midi.
-            Family(["Nicolas", "Inès"], ["Adam", "Louise"], arrive=(3, "dinner"), members={"Inès": ((4, "lunch"), None)}),
+            Family(["Nicolas", "Inès"], ["Adam", "Louise"], arrive=(3, "dinner"), members={"Inès": ((4, "lunch"), None)},
+                   diets={"Inès": ["vegan"], "Adam": ["nut_allergy"]}),
         ],
         rooms=[
             ("Chambre des grands-parents", ["double"]),
@@ -168,7 +175,7 @@ FIXTURES = [
         menus=[
             (0, "dinner", "Pizzas maison\nSalade", ""),
             (1, "lunch", "Taboulé\nBrochettes\nPastèque", ""),
-            (1, "dinner", "Moules-frites", "Allergie fruits de mer : Rose → jambon-frites"),
+            (1, "dinner", "Moules-frites", "Jambon-frites pour Rose"),
             (2, "lunch", "Pique-nique : sandwiches, chips, fruits", ""),
             (3, "dinner", "Barbecue\nSalade de pommes de terre\nGlaces", ""),
             (5, "dinner", "Paella", ""),
@@ -210,6 +217,9 @@ def load(db: Session, fx: Fixture) -> Stay:
             away = {(start + timedelta(days=day), meal) for day, meal in fam.away.get(name, [])}
             present = [s.SlotIn(date=d, meal=m) for d, m in slots[first : last + 1] if (d, m) not in away]
             public.set_presences(ids[name], s.PresencesIn(slots=present), stay, db)
+            if name in fam.diets or name in fam.diet_notes:
+                body = s.DietIn(diets=fam.diets.get(name, []), diet_note=fam.diet_notes.get(name, ""))
+                public.set_diet(ids[name], body, stay, db)
 
     for room_name, beds in fx.rooms:
         room = admin.create_room(s.RoomIn(name=room_name), stay, db)
