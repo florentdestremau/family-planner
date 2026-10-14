@@ -6,15 +6,19 @@ export function Chip({
   person,
   highlight,
   onRemove,
+  note,
 }: {
   person: Person | undefined;
   highlight?: boolean;
   onRemove?: () => void;
+  /** Précision après le nom, par exemple les nuits quand elles ne couvrent pas tout le séjour. */
+  note?: string;
 }) {
   if (!person) return null;
   return (
     <span className={`chip ${highlight ? "chip-me" : ""} ${person.kind === "child" ? "chip-child" : ""}`}>
       {person.name}
+      {note && <span className="chip-note"> {note}</span>}
       {onRemove && (
         <button className="chip-x" onClick={onRemove} aria-label={`Retirer ${person.name}`}>
           ×
@@ -96,7 +100,7 @@ export function AddPersonSelect({
         <option key={p.id} value={p.id}>
           {p.name}
           {p.kind === "child" ? " (enfant)" : ""}
-          {hint ? ` — ${hint(p)}` : ""}
+          {hint?.(p) ? ` — ${hint(p)}` : ""}
         </option>
       ))}
     </select>

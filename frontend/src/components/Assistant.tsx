@@ -2,6 +2,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { api, ApiError, assistantAsk, assistantStatus, type AssistantAction } from "../api";
 import { actionSummary } from "../lib";
+import { useOnline } from "./Pwa";
 import { useStay } from "../stay";
 import { toast } from "../toast";
 
@@ -36,12 +37,15 @@ export default function AssistantFab() {
   const listRef = useRef<HTMLDivElement | null>(null);
   const recRef = useRef<MicRec | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  const isOnline = useOnline();
 
+  // Hors ligne au chargement : on redemande au retour du réseau.
   useEffect(() => {
+    if (!isOnline || enabled !== null) return;
     assistantStatus()
       .then((r) => setEnabled(r.enabled))
       .catch(() => setEnabled(false));
-  }, []);
+  }, [isOnline, enabled]);
 
   useEffect(() => {
     const el = listRef.current;
@@ -55,7 +59,7 @@ export default function AssistantFab() {
     if (open && window.matchMedia?.("(pointer: fine)").matches) inputRef.current?.focus();
   }, [open]);
 
-  if (!me || enabled !== true) return null;
+  if (!me || enabled !== true || !isOnline) return null;
 
   const win = window as unknown as { SpeechRecognition?: MicCtor; webkitSpeechRecognition?: MicCtor };
   const Mic = win.SpeechRecognition ?? win.webkitSpeechRecognition;
@@ -93,7 +97,7 @@ export default function AssistantFab() {
     settle(i, actions.map((a) => a.person_id));
     try {
       await api("PUT", `/stays/${slug}/households/${me.household_id}/presences`, {
-        members: actions.map((a) => ({ person_id: a.person_id, slots: a.slots })),
+        members: actions.map((a) => ({ person_id: a.person_id, slots: a.slots, nights: a.nights_explicit ? a.nights : undefined })),
       });
       const names = actions.map((a) => a.name);
       toast(names.length === 1 ? `Présences de ${names[0]} enregistrées` : `Présences enregistrées pour ${names.join(", ")}`);
@@ -156,7 +160,7 @@ export default function AssistantFab() {
           <div className="assistant-messages" ref={listRef}>
             {messages.length === 0 && (
               <p className="hint">
-                Décris ce que tu veux : « toute l'équipe au dîner du vendredi », « Léo arrive samedi matin »…
+                Décris ce que tu veux : « toute l'équipe au dîner du vendredi », « on arrive vendredi après le dîner », « Léo dort chez un copain samedi »…
               </p>
             )}
             {messages.map((m, i) => (

@@ -1,3 +1,5 @@
+import { NUDGE_START, type NudgeState } from "./pwa";
+
 /** Petites préférences locales (identité, clé organisateur). */
 
 function read<T>(key: string, fallback: T): T {
@@ -27,4 +29,6 @@ export const storage = {
   setAdminKey: (slug: string, key: string | null) => write(`fp:admin:${slug}`, key),
   theme: () => read<Theme>("fp:theme", "system"),
   setTheme: (theme: Theme) => write("fp:theme", theme),
+  installNudge: () => ({ ...NUDGE_START, ...read<Partial<NudgeState>>("fp:install-nudge", {}) }),
+  setInstallNudge: (state: NudgeState) => write("fp:install-nudge", state),
 };

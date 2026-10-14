@@ -40,7 +40,6 @@ export interface Person {
   does_chores: boolean;
   household_id: number;
   partner_id: number | null;
-  bed_id: number | null;
   /** Dans l'ordre d'affichage ; vide : aucune contrainte. */
   diets: Diet[];
   /** Précision libre, affichée mais non comptée. */
@@ -54,6 +53,27 @@ export interface Slot {
 
 export interface Presence extends Slot {
   person_id: number;
+}
+
+/** Nuit passée sur place (nuit du jour `date`, de `date` au lendemain) et lit occupé cette nuit-là. */
+export interface PersonNight {
+  person_id: number;
+  date: string;
+  bed_id: number | null;
+}
+
+export interface BedAssignResult {
+  /** Nuits que la personne n'avait pas déclarées, ajoutées par l'affectation. */
+  warning: string | null;
+}
+
+export interface AutoAssignResult {
+  /** Nuitées attribuées. */
+  assigned: number;
+  /** Nuitées encore sans lit. */
+  unassigned: number;
+  /** Personnes sans aucune nuit déclarée, donc pas couchées. */
+  undeclared: number;
 }
 
 export interface Bed {
@@ -113,6 +133,10 @@ export interface AssistantAction {
   person_id: number;
   name: string;
   slots: Slot[];
+  /** Nuits sur place (date du soir). */
+  nights: string[];
+  /** Nuits données par Claude ; sinon on ne les renvoie pas, le serveur les déduit à la validation. */
+  nights_explicit: boolean;
 }
 
 export interface AssistantReply {
@@ -124,9 +148,12 @@ export interface Snapshot {
   stay: Stay;
   days: string[];
   slots: Slot[];
+  /** Nuits du séjour (date du soir), sans le dernier jour. */
+  nights: string[];
   households: Household[];
   persons: Person[];
   presences: Presence[];
+  person_nights: PersonNight[];
   rooms: Room[];
   chore_types: ChoreType[];
   chore_assignments: ChoreAssignment[];
@@ -150,16 +177,23 @@ export async function api<T = unknown>(
   body?: unknown,
   adminKey?: string | null,
 ): Promise<T> {
+  // Hors ligne, l'appli reste consultable (données en cache) mais rien ne s'enregistre.
+  if (method !== "GET" && !navigator.onLine) throw new ApiError(0, "Hors ligne : modification impossible.");
   // Un Blob (image) part tel quel, avec son propre type ; le reste en JSON.
   const raw = body instanceof Blob;
   const headers: Record<string, string> = {};
   if (body !== undefined && !raw) headers["Content-Type"] = "application/json";
   if (adminKey) headers["X-Admin-Key"] = adminKey;
-  const res = await fetch(`/api${path}`, {
-    method,
-    headers,
-    body: body === undefined ? undefined : raw ? body : JSON.stringify(body),
-  });
+  let res: Response;
+  try {
+    res = await fetch(`/api${path}`, {
+      method,
+      headers,
+      body: body === undefined ? undefined : raw ? body : JSON.stringify(body),
+    });
+  } catch {
+    throw new ApiError(0, "Connexion impossible, réessayez.");
+  }
   if (!res.ok) {
     let message = res.statusText;
     try {

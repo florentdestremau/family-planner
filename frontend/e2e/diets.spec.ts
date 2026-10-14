@@ -123,10 +123,10 @@ test("l'organisateur voit les contraintes du séjour, les corrige, les imprime e
   await expect(first.getByText("Sans gluten : Anne")).toBeVisible();
   await expect(first.getByText("Sans lactose : Paul")).toBeVisible();
 
-  // Export LLM : des nombres et la précision, aucun nom.
+  // Export LLM : des nombres et la précision, aucun nom (le cache hors ligne peut s'afficher d'abord).
   await page.goto(`${stay.url}/imprimer`);
-  const exported = await page.locator("textarea.export").inputValue();
-  expect(exported).toContain("Ven. 30 oct., dîner — 2 adultes, dont 1 sans gluten, 1 sans lactose : Raclette");
-  expect(exported).toContain("Autres précisions alimentaires : Cœliaque");
-  expect(exported).not.toMatch(/Anne|Paul/);
+  const exported = page.locator("textarea.export");
+  await expect(exported).toHaveValue(/Ven\. 30 oct\., dîner — 2 adultes, dont 1 sans gluten, 1 sans lactose : Raclette/);
+  await expect(exported).toHaveValue(/Autres précisions alimentaires : Cœliaque$/);
+  expect(await exported.inputValue()).not.toMatch(/Anne|Paul/);
 });

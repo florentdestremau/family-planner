@@ -4,6 +4,7 @@ import type { Person } from "../api";
 import AddMember from "../components/AddMember";
 import { DietCard, DietSummary } from "../components/Diets";
 import HouseholdPresences from "../components/HouseholdPresences";
+import { OfflineLock } from "../components/Pwa";
 import { Chip, Empty } from "../components/ui";
 import { BED_LABEL, coverUrl, dayLabel, MOMENT_LABEL, sortedMoments } from "../lib";
 import { useStay } from "../stay";
@@ -35,16 +36,20 @@ function Dashboard({ me }: { me: Person }) {
     <div className="stack">
       <h1 className="page-title">Bonjour {me.name} 👋</h1>
 
-      <HouseholdCard me={me} />
+      <OfflineLock>
+        <HouseholdCard me={me} />
+      </OfflineLock>
 
       <DietCard me={me} />
 
       <section className="card">
         <div className="card-head">
           <h2>✅ Présences</h2>
-          <span className="muted small">Présent sur place = présent au repas</span>
+          <span className="muted small">Repas pris sur place, et nuits 🌙 où l'on dort sur place</span>
         </div>
-        <HouseholdPresences me={me} />
+        <OfflineLock>
+          <HouseholdPresences me={me} />
+        </OfflineLock>
       </section>
 
       <section className="card">
@@ -119,12 +124,19 @@ function Dashboard({ me }: { me: Person }) {
         <h2>🛏️ Couchage</h2>
         <ul className="list">
           {household.map((p) => {
-            const bed = p.bed_id != null ? idx.bedById.get(p.bed_id) : undefined;
+            const plan = idx.bedPlan(p.id);
             return (
               <li key={p.id} className="list-row">
                 <strong>{p.name}</strong>
                 <span className="muted">
-                  {bed ? `${bed.room.name} — ${bed.label || BED_LABEL[bed.kind]}` : "Pas encore attribué"}
+                  {plan.length === 0
+                    ? "Ne dort pas sur place"
+                    : plan
+                        .map(({ bed, nights }) => {
+                          const where = bed ? `${bed.room.name} — ${bed.label || BED_LABEL[bed.kind]}` : "Pas encore attribué";
+                          return where + idx.nightsSuffix(nights, plan.length > 1);
+                        })
+                        .join(" · ")}
                 </span>
               </li>
             );

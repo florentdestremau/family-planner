@@ -16,6 +16,7 @@ import Print from "./pages/Print";
 import PrintMenu from "./pages/PrintMenu";
 import Rooms from "./pages/Rooms";
 import StayLayout from "./pages/StayLayout";
+import { InstallNudge, UpdatePrompt } from "./components/Pwa";
 import { Toaster } from "./toast";
 
 export default function App() {
@@ -44,6 +45,8 @@ export default function App() {
         <Route path="*" element={<Home />} />
       </Routes>
       <Toaster />
+      <UpdatePrompt />
+      <InstallNudge />
     </>
   );
 }

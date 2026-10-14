@@ -7,8 +7,8 @@ from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 from app.lottery import build_occurrences, draw
-from app.rooms import auto_assign
-from app.slots import BED_PLACES, MEALS, MOMENTS, stay_days, stay_slots
+from app.rooms import auto_assign, auto_assign_nights
+from app.slots import BED_PLACES, MEALS, MOMENTS, follow_meals, night_sides, stay_days, stay_nights, stay_slots
 
 START = date(2026, 10, 30)
 
@@ -162,3 +162,83 @@ def test_auto_assign_invariants(case) -> None:
     free = sum(BED_PLACES[b["kind"]] for b in beds) - len(already)
     unassigned = len(people) - len(already)
     assert len(result) == min(unassigned, free), "toute place libre est utilisée"
+
+
+@st.composite
+def night_lodging(draw_):
+    """Famille, lits, et pour chaque personne des nuits (certaines déjà avec un lit, sans surcharge)."""
+    people, beds = draw_(lodging())
+    nights = stay_nights(START, date.fromordinal(START.toordinal() + draw_(st.integers(1, 5))))
+    occupied: Counter = Counter()
+    rows = []
+    for p in people:
+        p.pop("bed_id")
+        for night in nights:
+            if draw_(st.floats(0, 1)) < 0.7:
+                bed = None
+                if beds and draw_(st.floats(0, 1)) < 0.25:
+                    candidate = draw_(st.sampled_from(beds))
+                    if occupied[(candidate["id"], night)] < BED_PLACES[candidate["kind"]]:
+                        bed = candidate["id"]
+                        occupied[(bed, night)] += 1
+                rows.append({"person_id": p["id"], "date": night, "bed_id": bed})
+    return people, beds, rows
+
+
+@settings(max_examples=300, deadline=None)
+@given(night_lodging())
+def test_auto_assign_nights_invariants(case) -> None:
+    people, beds, rows = case
+    result = auto_assign_nights(people, beds, rows)
+    already = {(r["person_id"], r["date"]): r["bed_id"] for r in rows if r["bed_id"] is not None}
+    sleepers = {(r["person_id"], r["date"]) for r in rows}
+    assert set(result) <= sleepers - set(already), "seules les nuits sans lit sont attribuées"
+    kinds = {b["id"]: b["kind"] for b in beds}
+    occupancy = Counter((bed, night) for (_, night), bed in [*already.items(), *result.items()])
+    assert all(n <= BED_PLACES[kinds[bed]] for (bed, _), n in occupancy.items()), "lit surchargé une nuit"
+    for night in {r["date"] for r in rows}:
+        free = sum(BED_PLACES[k] for k in kinds.values()) - sum(1 for (_, d) in already if d == night)
+        waiting = sum(1 for (p, d) in sleepers - set(already) if d == night)
+        assert sum(1 for (_, d) in result if d == night) == min(waiting, free), "toute place libre est utilisée"
+
+
+@settings(max_examples=200, deadline=None)
+@given(lodging(), st.integers(1, 5))
+def test_whole_stay_keeps_the_same_bed(case, n_nights) -> None:
+    """Lits vides, tout le monde dort toutes les nuits : chacun a le même lit (ou aucun) tout le séjour."""
+    people, beds = case
+    for p in people:
+        p.pop("bed_id")
+    nights = stay_nights(START, date.fromordinal(START.toordinal() + n_nights))
+    result = auto_assign_nights(people, beds, [{"person_id": p["id"], "date": d, "bed_id": None} for p in people for d in nights])
+    for p in people:
+        beds_of = {result.get((p["id"], d)) for d in nights}
+        assert len(beds_of) == 1, (p, beds_of)
+
+
+@st.composite
+def meals_change(draw_):
+    days = draw_(st.integers(1, 5))
+    end = date.fromordinal(START.toordinal() + days - 1)
+    slots = stay_slots(START, end, draw_(st.sampled_from(MEALS)), "dinner")
+    nights = stay_nights(START, end)
+    subset = lambda: {s for s in slots if draw_(st.booleans())}
+    return nights, subset(), subset(), {n for n in nights if draw_(st.booleans())}
+
+
+@settings(max_examples=300, deadline=None)
+@given(meals_change())
+def test_follow_meals_rule(case) -> None:
+    nights, old, new, old_nights = case
+    result = follow_meals(nights, old, new, old_nights)
+    for night in nights:
+        sides = night_sides(night)
+        if all((s in old) == (s in new) for s in sides):
+            assert (night in result) == (night in old_nights), "repas voisins inchangés : nuit inchangée"
+        elif all(s in new for s in sides):
+            assert night in result
+        elif not any(s in new for s in sides):
+            assert night not in result
+        else:
+            assert (night in result) == (night in old_nights), "un seul repas voisin : on ne devine pas"
+    assert follow_meals(nights, new, new, result) == result, "idempotente"

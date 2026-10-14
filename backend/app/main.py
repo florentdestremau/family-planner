@@ -1,15 +1,30 @@
 import os
 from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.responses import Response
 
 from .migrate import migrate
 from .routers import admin, public
 
 # Le front (build Vite) est servi par le même conteneur.
 STATIC_DIR = Path(os.environ.get("STATIC_DIR", Path(__file__).parent.parent / "static"))
+
+# index.html, service worker, manifest : toujours revalidés, sinon l'appli installée ne voit pas
+# les nouvelles versions.
+NO_CACHE = {"Cache-Control": "no-cache"}
+
+
+class ImmutableFiles(StaticFiles):
+    """Fichiers du build à empreinte (/assets) : un nom donné ne change jamais de contenu."""
+
+    def file_response(self, *args: Any, **kwargs: Any) -> Response:
+        response = super().file_response(*args, **kwargs)
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return response
 
 
 def bootstrap() -> None:
@@ -34,7 +49,7 @@ def create_app(static_dir: Path = STATIC_DIR) -> FastAPI:
     if static_dir.is_dir():
         root = static_dir.resolve()
         if (root / "assets").is_dir():
-            app.mount("/assets", StaticFiles(directory=root / "assets"), name="assets")
+            app.mount("/assets", ImmutableFiles(directory=root / "assets"), name="assets")
 
         @app.get("/{path:path}", include_in_schema=False)
         def spa(path: str) -> FileResponse:
@@ -42,8 +57,8 @@ def create_app(static_dir: Path = STATIC_DIR) -> FastAPI:
                 raise HTTPException(404)
             candidate = (root / path).resolve()
             if path and candidate.is_file() and candidate.is_relative_to(root):
-                return FileResponse(candidate)
-            return FileResponse(root / "index.html")
+                return FileResponse(candidate, headers=NO_CACHE)
+            return FileResponse(root / "index.html", headers=NO_CACHE)
 
     return app
 

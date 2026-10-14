@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { Person } from "../api";
+import { OfflineLock } from "../components/Pwa";
 import { useStay } from "../stay";
 
 /** Sélection de son identité, mémorisée localement (pas de compte). */
@@ -33,10 +34,12 @@ export default function WhoAmI() {
           ))}
         </div>
       )}
-      <form onSubmit={add} className="inline-form">
-        <input placeholder="Je ne suis pas dans la liste : mon prénom" value={name} onChange={(e) => setName(e.target.value)} required />
-        <button className="btn btn-primary">M'ajouter</button>
-      </form>
+      <OfflineLock>
+        <form onSubmit={add} className="inline-form">
+          <input placeholder="Je ne suis pas dans la liste : mon prénom" value={name} onChange={(e) => setName(e.target.value)} required />
+          <button className="btn btn-primary">M'ajouter</button>
+        </form>
+      </OfflineLock>
     </section>
   );
 }

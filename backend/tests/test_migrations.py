@@ -18,6 +18,8 @@ V1 = importlib.import_module("migrations.versions.0001_initial")
 # Données au format v1 (avant les foyers) : un couple avec deux enfants, un enfant rattaché à un
 # adulte seul, un enfant sans référent (qui ne participe pas aux activités), un célibataire ;
 # présences, une activité facultative et deux « tout le monde », inscriptions, corvée, lit.
+# Nuits à déduire : Florent (lit) dîne vendredi seulement, Claire (lit) n'a rien saisi, Sarah (sans
+# lit) dîne vendredi et prend tous les repas de samedi sauf… le petit-déjeuner de dimanche.
 LEGACY_DATA = """
 INSERT INTO stays VALUES (1, 'slug1', 'key1', 'Toussaint', '2026-10-30', '2026-11-01', 'dinner', 'lunch', 1, '2026-10-05 10:00:00');
 INSERT INTO stays VALUES (2, 'slug2', 'key2', 'Noël', '2026-12-24', '2026-12-26', 'dinner', 'lunch', 1, '2026-10-05 10:00:00');
@@ -38,6 +40,10 @@ INSERT INTO presences VALUES (4, 8, '2026-12-24', 'dinner');
 INSERT INTO presences VALUES (5, 6, '2026-10-31', 'dinner');
 INSERT INTO presences VALUES (6, 7, '2026-10-31', 'lunch');
 INSERT INTO presences VALUES (7, 8, '2026-10-31', 'lunch');
+INSERT INTO presences VALUES (8, 5, '2026-10-30', 'dinner');
+INSERT INTO presences VALUES (9, 5, '2026-10-31', 'breakfast');
+INSERT INTO presences VALUES (10, 5, '2026-10-31', 'lunch');
+INSERT INTO presences VALUES (11, 5, '2026-10-31', 'dinner');
 INSERT INTO activities VALUES (1, 1, 'Rando', '', '', '2026-10-31', '10:00', '', 1);
 INSERT INTO activities VALUES (2, 1, 'Jeux', '', '', '2026-10-31', '15:00', '', 0);
 INSERT INTO activities VALUES (3, 1, 'Apéro', '', '', '2026-10-30', '19:00', '', 0);
@@ -74,7 +80,7 @@ def test_fresh_database_matches_models(tmp_path) -> None:
         diff = compare_metadata(MigrationContext.configure(connection), Base.metadata)
     engine.dispose()
     assert diff == [], "les modèles et les migrations divergent : écrire une migration"
-    assert query(tmp_path / "new.db", "SELECT version_num FROM alembic_version") == [("0006",)]
+    assert query(tmp_path / "new.db", "SELECT version_num FROM alembic_version") == [("0007",)]
 
 
 def test_legacy_database_is_converted_without_loss(tmp_path) -> None:
@@ -86,7 +92,7 @@ def test_legacy_database_is_converted_without_loss(tmp_path) -> None:
     engine.dispose()
 
     after = counts(path)
-    assert after.pop("signups") == before.pop("signups") + 2
+    assert after.pop("signups") == before.pop("signups") + 4
     assert after == before, "aucune ligne perdue (pas de cascade pendant la migration)"
     members = query(
         path,
@@ -100,11 +106,17 @@ def test_legacy_database_is_converted_without_loss(tmp_path) -> None:
         (2, "Camille"),  # chaque séjour garde ses foyers
     ]
     columns = [row[1] for row in query(path, "PRAGMA table_info(persons)")]
-    assert "guardian_id" not in columns and "household_id" in columns
-    assert query(path, "SELECT partner_id, bed_id FROM persons WHERE id IN (1, 2) ORDER BY id") == [(2, 1), (1, 1)]
+    assert "guardian_id" not in columns and "bed_id" not in columns and "household_id" in columns
+    assert query(path, "SELECT partner_id FROM persons WHERE id IN (1, 2) ORDER BY id") == [(2,), (1,)]
+    assert query(path, "SELECT person_id, date, bed_id FROM nights ORDER BY person_id, date") == [
+        (1, "2026-10-30", 1),  # lit + dîner du vendredi : arrivé, il dort là
+        (2, "2026-10-30", 1),  # lit sans aucun repas saisi : toutes les nuits, le lit n'est pas perdu
+        (2, "2026-10-31", 1),
+        (5, "2026-10-30", None),  # dîner et petit-déjeuner du lendemain ; pas de petit-déj dimanche
+    ]  # Léo, Tom, Camille : un repas isolé et pas de lit, aucune nuit
     assert query(path, "SELECT DISTINCT diets, diet_note FROM persons") == [("", "")], "aucune contrainte par défaut"
     assert query(path, "PRAGMA foreign_key_check") == []
-    assert query(path, "SELECT version_num FROM alembic_version") == [("0006",)]
+    assert query(path, "SELECT version_num FROM alembic_version") == [("0007",)]
 
 
 def test_everyone_activities_become_signups(tmp_path) -> None:
@@ -116,9 +128,11 @@ def test_everyone_activities_become_signups(tmp_path) -> None:
 
     assert query(path, "SELECT activity_id, person_id FROM signups ORDER BY activity_id, person_id") == [
         (1, 3),  # facultative : inscriptions inchangées
+        (2, 5),  # Sarah, présente toute la journée
         (2, 6),  # Tom, présent deux fois ce jour-là, une seule inscription ; pas Orphelin ni Camille (autre séjour)
         (3, 1),  # Florent, présent ce jour-là
         (3, 3),  # Léo, déjà inscrit : pas de doublon
+        (3, 5),  # Sarah, au dîner du vendredi
     ]
     assert "optional" not in [row[1] for row in query(path, "PRAGMA table_info(activities)")]
     assert "does_activities" not in [row[1] for row in query(path, "PRAGMA table_info(persons)")]

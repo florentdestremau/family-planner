@@ -65,7 +65,6 @@ class Person(Base):
     )
     # Lien de couple entre deux adultes du même foyer (symétrique, maintenu des deux côtés).
     partner_id: Mapped[int | None] = mapped_column(ForeignKey("persons.id", ondelete="SET NULL"))
-    bed_id: Mapped[int | None] = mapped_column(ForeignKey("beds.id", ondelete="SET NULL"))
     # Régimes et allergies : codes séparés par des virgules (voir schemas.Diet) ; vide : aucun.
     diets: Mapped[str] = mapped_column(String(128), default="")
     diet_note: Mapped[str] = mapped_column(String(200), default="")  # précision libre, non comptée
@@ -81,6 +80,18 @@ class Presence(Base):
     person_id: Mapped[int] = mapped_column(ForeignKey("persons.id", ondelete="CASCADE"), index=True)
     date: Mapped[date]
     meal: Mapped[str] = mapped_column(String(16))
+
+
+class Night(Base):
+    """Nuit passée sur place (nuit du jour J, de J à J+1) et lit occupé cette nuit-là."""
+
+    __tablename__ = "nights"
+    __table_args__ = (UniqueConstraint("person_id", "date"), Index("ix_nights_bed_date", "bed_id", "date"))
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    person_id: Mapped[int] = mapped_column(ForeignKey("persons.id", ondelete="CASCADE"), index=True)
+    date: Mapped[date]
+    bed_id: Mapped[int | None] = mapped_column(ForeignKey("beds.id", ondelete="SET NULL"))
 
 
 class Menu(Base):

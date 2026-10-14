@@ -24,7 +24,7 @@ Sans clé (`ANTHROPIC_API_KEY` dans `backend/.env`, ignoré par git), l'assistan
 | --- | --- |
 | `cd backend && uv run pytest --cov` | API (droits sur chaque route organisateur, isolation entre séjours, validations, règles métier), propriétés du tirage et des couchages (Hypothesis), service du front, fixtures, script serveur `family-env` (faux `once`). Couverture lignes + branches exigée : 100 %. |
 | `cd frontend && npm run typecheck` | Types TypeScript. |
-| `cd frontend && npm run test:coverage` | Logique du front (`lib`, `storage`, `api`) avec vitest, couverture 100 %. |
+| `cd frontend && npm run test:coverage` | Logique du front (`lib`, `storage`, `api`, `pwa`) avec vitest, couverture 100 %. |
 | `cd frontend && npm run test:e2e` | Parcours complets dans Chromium, bureau et mobile, contre le vrai back (base jetable, fixtures). |
 
 ### Fixtures
@@ -92,9 +92,9 @@ seule la clé organisateur protège la configuration.
 
 **Régimes et allergies** — chaque adulte les déclare pour les membres de son foyer, depuis la carte « Régimes et allergies » de la page « Moi » (proposé aussi juste après l'ajout d'un membre) ; l'organisateur peut corriger depuis « Foyers ». Une courte liste comptée — végétarien ou végan (l'un ou l'autre), sans gluten, sans lactose, allergie arachides et fruits à coque, allergie poisson et fruits de mer — plus une précision libre, affichée mais non comptée (gravité, autre aliment, préférence). Chaque repas affiche les contraintes de ses présents en nombres (« 🌱 2 végétariens · ⚠️ 1 sans gluten »), dépliables sur les noms : page « Repas », corvées de repas de la page « Moi », menus de l'organisateur (avec un récapitulatif du séjour). La fiche menus imprimée donne les noms en entier ; l'export LLM, des nombres et les précisions, jamais de noms. Visibles par tous les participants (même modèle d'accès que le reste) ; l'application informe, elle ne vérifie pas les menus. Voir `docs/pitches/contraintes-alimentaires.md`.
 
-**Présences** — par repas (petit-déj, déjeuner, dîner) entre le premier repas du premier jour et le dernier repas du dernier jour. Présent sur place = présent au repas ; les couverts sont comptés adultes / enfants.
+**Présences** — par repas (petit-déj, déjeuner, dîner) entre le premier repas du premier jour et le dernier repas du dernier jour, et par nuit (nuit du jour J, de J à J+1 ; pas de nuit le dernier jour). Les couverts sont comptés adultes / enfants, les couchages par nuit. Les nuits suivent les repas sans deviner : dîner et petit-déj du lendemain → nuit cochée, ni l'un ni l'autre → décochée, un seul (arrivée après le dîner, nuit ailleurs) → on garde la case telle quelle. Détails : `docs/nuits.md`.
 
-**Assistant (formulaires conversationnels)** — un bouton ✨ ouvre un panneau de discussion ; on décrit les présences du foyer en langue naturelle (« toute l'équipe au dîner du vendredi ») ou à la voix (micro, si le navigateur le permet). L'assistant (modèle `claude-sonnet-5-5`, effort bas) propose des présences, vérifiées par les règles du foyer, et chaque proposition se valide ou s'ignore d'un clic — ce qui met à jour les présences comme la grille habituelle. Le panneau exige d'avoir choisi « qui je suis ». Limite : 30 demandes par séjour et par jour.
+**Assistant (formulaires conversationnels)** — un bouton ✨ ouvre un panneau de discussion ; on décrit les présences du foyer en langue naturelle (« toute l'équipe au dîner du vendredi », « on arrive après le dîner ») ou à la voix (micro, si le navigateur le permet). L'assistant (modèle `claude-sonnet-5-5`, effort bas) propose des présences, vérifiées par les règles du foyer, et chaque proposition se valide ou s'ignore d'un clic — ce qui met à jour les présences comme la grille habituelle. Le panneau exige d'avoir choisi « qui je suis ». Limite : 30 demandes par séjour et par jour.
 
 **Corvées** — chaque type a des moments (un ou plusieurs repas, ou « journée »), un nombre de personnes et un rythme (tous les N jours). Le tirage (`POST …/admin/chores/draw`) :
 - ne retient que les personnes « corvées » présentes au créneau ;
@@ -102,14 +102,20 @@ seule la clé organisateur protège la configuration.
 - équilibre la charge proportionnellement au temps de présence, évite deux corvées au même moment et varie les binômes ;
 - garde le meilleur de 150 tirages aléatoires. « Re-répartir » écrase les ajustements manuels.
 
-**Chambres** — lits doubles (2 places), simples (1), superposés (2), d'appoint (1). Affectation manuelle, ou proposition automatique pour les non-logés (couples en lit double, enfants près de leur adulte référent).
+**Chambres** — lits doubles (2 places), simples (1), superposés (2), d'appoint (1). Le lit se choisit nuit par nuit (capacité vérifiée chaque nuit) : par défaut pour toutes les nuits de la personne, ou pour une nuit précise (une chambre qui sert à deux familles des nuits différentes). Une nuit ajoutée reprend le lit voisin. Coucher quelqu'un une nuit qu'il n'a pas déclarée l'ajoute, avec un avertissement. Proposition automatique nuit par nuit pour les non-logés (chacun garde son lit d'une nuit à l'autre, couples en lit double, enfants près de leur adulte référent).
 
 **Activités** — toutes sur inscription. Depuis le planning, chacun inscrit ou retire les membres de son foyer, activité par activité (inscription possible même absent ce jour-là, avec un avertissement) ; l'accueil résume les activités du foyer. L'organisateur peut « inscrire tout le monde » : à la création (coché par défaut) ou plus tard d'un bouton, les personnes présentes ce jour-là qui manquent sont inscrites ; celles qui se sont retirées ne sont pas réinscrites. L'organisateur voit les inscrits de chaque activité et peut en retirer un d'un clic. Retirer une présence ou déplacer une activité ne touche pas aux inscriptions.
 
 **Impressions** — présences, corvées par personne et jour par jour, menus avec couverts, régimes et allergies, chambres, activités. Export texte menus × couverts (avec les régimes et allergies en nombres) à coller dans un LLM pour générer la liste de courses.
 
+**Appli installable et hors ligne (PWA)** — un bouton 📲 « Installer l'appli » apparaît quand le navigateur le permet (Chrome, Edge, Android) ; sur iPhone et iPad, il explique l'ajout depuis Safari (Partager → Sur l'écran d'accueil). Sur mobile, un bandeau discret le suggère à partir de la 3ᵉ page vue ; « Plus tard » le masque (retour au plus tôt 14 jours et 3 pages après, 3 refus au plus). Hors ligne, **consultation seule** :
+- l'interface est servie par un service worker (`vite-plugin-pwa`, cache de `index.html` et `/assets`) ;
+- les données (liste des séjours, séjours déjà ouverts sur l'appareil) viennent du cache de React Query, sauvegardé dans le navigateur une semaine et vidé à chaque nouvelle version du front ;
+- un bandeau indique l'heure des données ; inscriptions, présences, création de séjour et espace organisateur sont désactivés, l'assistant est masqué ; rien n'est mis en file pour plus tard.
+
+Une nouvelle version déployée est proposée par « ✨ Nouvelle version disponible — Recharger » (vérification toutes les heures). Le back sert `index.html`, `sw.js` et le manifest en `no-cache`, `/assets` en `immutable`. Icônes : `cd frontend && node scripts/icons.mjs` les régénère dans `public/`.
+
 ## Limites v1 / pistes
 
 - Migrations Alembic (`backend/migrations`), appliquées au démarrage ; une base créée avant Alembic est reconnue comme `0001`. Pas de retour arrière : restaurer une sauvegarde once. Nouvelle migration : `cd backend && uv run alembic revision -m "…"` (un test vérifie que modèles et migrations ne divergent pas).
-- Couchage fixe pour tout le séjour (pas de lit par nuit).
-- Hors périmètre : notifications push, génération intégrée de la liste de courses par LLM, covoiturage (étudié en octobre 2026 : trop lourd pour le gain, le besoin se limitant aux voitures d'arrivée et de départ).
+- Hors périmètre : notifications push, modifications hors ligne synchronisées au retour du réseau, génération intégrée de la liste de courses par LLM, covoiturage (étudié en octobre 2026 : trop lourd pour le gain, le besoin se limitant aux voitures d'arrivée et de départ).

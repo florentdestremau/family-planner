@@ -4,7 +4,7 @@ test("l'accueil liste tous les séjours, par période", async ({ page }) => {
   await page.goto("/");
   const list = page.locator(".card").filter({ has: page.getByRole("heading", { name: /Séjours/ }) });
   const upcoming = list.locator(".stay-group").filter({ has: page.getByRole("heading", { name: /À venir/ }) });
-  await expect(upcoming.getByRole("link", { name: /Grand week-end chez Mamie/ })).toContainText(/5 foyers · 14 personnes/);
+  await expect(upcoming.getByRole("link", { name: /Grand week-end chez Mamie/ })).toContainText(/7 foyers · 17 personnes/);
   await expect(upcoming.getByRole("link", { name: /Semaine des cousins à la mer/ })).toBeVisible();
 
   await upcoming.getByRole("link", { name: /Grand week-end chez Mamie/ }).click();

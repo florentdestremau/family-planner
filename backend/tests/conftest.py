@@ -38,6 +38,7 @@ SLOTS = [
     {"date": "2026-11-01", "meal": "breakfast"},
     {"date": "2026-11-01", "meal": "lunch"},
 ]
+NIGHTS = ["2026-10-30", "2026-10-31"]  # nuits de vendredi et de samedi
 
 
 @dataclass
@@ -89,6 +90,17 @@ class StayApi:
 
     def persons(self) -> dict[int, dict]:
         return {p["id"]: p for p in self.snap()["persons"]}
+
+    def nights(self) -> dict[int, dict[str, int | None]]:
+        """Nuits de chacun, avec le lit de chaque nuit : {person_id: {date: bed_id}}."""
+        result: dict[int, dict[str, int | None]] = {}
+        for n in self.snap()["person_nights"]:
+            result.setdefault(n["person_id"], {})[n["date"]] = n["bed_id"]
+        return result
+
+    def beds_of(self, person_id: int) -> set[int | None]:
+        """Lits occupés par une personne sur l'ensemble de ses nuits."""
+        return set(self.nights().get(person_id, {}).values())
 
 
 def make_stay(client: TestClient, **overrides) -> StayApi:

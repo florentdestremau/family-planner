@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 import type { Slot } from "./api";
 import {
   actionSummary,
+  followMeals,
+  nightKey,
+  nightsLabel,
+  toNights,
   addDays,
   groupStays,
   shortRange,
@@ -236,9 +240,11 @@ describe("régimes et allergies", () => {
 describe("présences en ensembles", () => {
   const snap = makeSnapshot();
   it("lit, compare et reconvertit les présences", () => {
-    expect(slotsOf(snap, 1)).toEqual(new Set(["2026-10-30|dinner", "2026-10-31|lunch"]));
+    expect(slotsOf(snap, 1)).toEqual(new Set(["2026-10-30|dinner", "2026-10-31|lunch", "2026-10-30|night", "2026-10-31|night"]));
     expect(slotsOf(snap, 5)).toEqual(new Set());
-    expect(sameSets([slotsOf(snap, 1), new Set(["2026-10-31|lunch", "2026-10-30|dinner"])])).toBe(true);
+    expect(sameSets([slotsOf(snap, 1), new Set(["2026-10-31|night", "2026-10-30|night", "2026-10-31|lunch", "2026-10-30|dinner"])])).toBe(
+      true,
+    );
     expect(sameSets([slotsOf(snap, 1), slotsOf(snap, 2)])).toBe(false);
     expect(sameSets([new Set(["a"]), new Set(["b"])])).toBe(false);
     expect(sameSets([new Set(), new Set()])).toBe(true);
@@ -246,6 +252,112 @@ describe("présences en ensembles", () => {
       { date: "2026-10-30", meal: "dinner" },
       { date: "2026-10-31", meal: "lunch" },
     ]);
+    expect(toNights(snap, new Set(["2026-10-31|night", "2026-10-30|dinner", "2026-11-01|night", "2026-10-30|night"]))).toEqual([
+      "2026-10-30",
+      "2026-10-31",
+    ]);
+  });
+});
+
+describe("nuits", () => {
+  const nights = ["2026-10-30", "2026-10-31"];
+  const FRI_DINNER = "2026-10-30|dinner";
+  const SAT_BREAKFAST = "2026-10-31|breakfast";
+  const SAT_LUNCH = "2026-10-31|lunch";
+  const SAT_DINNER = "2026-10-31|dinner";
+  const SUN_BREAKFAST = "2026-11-01|breakfast";
+  const FRI = nightKey("2026-10-30");
+  const SAT = nightKey("2026-10-31");
+  const follow = (before: string[], after: string[]) => [...followMeals(nights, new Set(before), new Set(after))].sort();
+
+  it("libelle les nuits", () => {
+    expect(FRI).toBe("2026-10-30|night");
+    expect(nightsLabel(["2026-10-31", "2026-10-30"])).toBe("ven. 30, sam. 31");
+    // Deux vendredis d'un long séjour restent distincts.
+    expect(nightsLabel(["2026-10-30", "2026-11-06"])).toBe("ven. 30, ven. 6");
+    expect(nightsLabel([])).toBe("");
+  });
+
+  it("coche la nuit quand le dîner et le petit-déj du lendemain sont là", () => {
+    expect(follow([FRI_DINNER], [FRI_DINNER, SAT_BREAKFAST])).toEqual([FRI_DINNER, FRI, SAT_BREAKFAST].sort());
+  });
+
+  it("décoche la nuit quand ni l'un ni l'autre ne sont là", () => {
+    expect(follow([FRI_DINNER, FRI], [FRI])).toEqual([]);
+  });
+
+  it("garde la nuit quand un seul repas l'encadre (arrivée après le dîner, nuit ailleurs)", () => {
+    // Cas 1 : tout le séjour, puis plus de dîner vendredi.
+    expect(follow([FRI_DINNER, SAT_BREAKFAST, FRI], [SAT_BREAKFAST, FRI])).toEqual([FRI, SAT_BREAKFAST].sort());
+    // Cas 2 : plus de dîner samedi, la nuit du samedi reste à décocher à la main.
+    expect(follow([SAT_DINNER, SUN_BREAKFAST, SAT], [SUN_BREAKFAST, SAT])).toEqual([SAT, SUN_BREAKFAST].sort());
+    expect(follow([SUN_BREAKFAST], [SAT_DINNER, SUN_BREAKFAST])).toEqual([SAT, SAT_DINNER, SUN_BREAKFAST].sort());
+  });
+
+  it("ne touche pas aux nuits dont les repas voisins n'ont pas changé", () => {
+    expect(follow([FRI_DINNER, SAT_BREAKFAST], [FRI_DINNER, SAT_BREAKFAST, SAT_LUNCH])).toEqual(
+      [FRI_DINNER, SAT_BREAKFAST, SAT_LUNCH].sort(),
+    );
+    expect(follow([SAT], [SAT, SAT_LUNCH])).toEqual([SAT, SAT_LUNCH].sort());
+  });
+});
+
+describe("couchages", () => {
+  const idx = buildIndex(makeSnapshot());
+  const alice = idx.personById.get(1);
+  const leo = idx.personById.get(3);
+
+  it("compte les dormeurs par nuit", () => {
+    expect(idx.nightCount("2026-10-30")).toEqual({ adults: 2, children: 1, total: 3 });
+    expect(idx.nightCount("2026-10-31")).toEqual({ adults: 2, children: 0, total: 2 });
+    expect(idx.sleepsOn(3, "2026-10-30")).toBe(true);
+    expect(idx.sleepsOn(3, "2026-10-31")).toBe(false);
+    expect(idx.nightsOf(4)).toEqual([]);
+    expect(idx.withoutNights().map((p) => p.name)).toEqual(["Mamie", "Nina"]);
+  });
+
+  it("occupants d'un lit et personnes sans lit, une nuit ou toutes", () => {
+    expect(idx.occupants(10, null)).toEqual([
+      { person: alice, nights: ["2026-10-30", "2026-10-31"] },
+      { person: idx.personById.get(2), nights: ["2026-10-30", "2026-10-31"] },
+    ]);
+    expect(idx.occupants(10, "2026-10-31")).toHaveLength(2);
+    expect(idx.unbedded(null)).toEqual([{ person: leo, nights: ["2026-10-30"] }]);
+    expect(idx.unbedded("2026-10-31")).toEqual([]);
+    expect(idx.bedLoad(10)).toBe(2);
+    expect(idx.bedLoad(99)).toBe(0);
+    expect(idx.bedCount(10, "2026-10-30")).toBe(2);
+    expect(idx.occupants(99, null)).toEqual([]);
+  });
+
+  it("place libre d'un lit sur des nuits données", () => {
+    const roomy = buildIndex(makeSnapshot({ person_nights: [{ person_id: 1, date: "2026-10-30", bed_id: 10 }] }));
+    expect(roomy.hasRoom(10, ["2026-10-30", "2026-10-31"])).toBe(true);
+    expect(idx.hasRoom(10, ["2026-10-31"])).toBe(false);
+    expect(idx.hasRoom(99, ["2026-10-31"])).toBe(false);
+  });
+
+  it("précise les nuits seulement quand elles ne couvrent pas le séjour", () => {
+    expect(idx.nightsNote(["2026-10-30", "2026-10-31"])).toBe("");
+    expect(idx.nightsNote(["2026-10-31"])).toBe("sam. 31");
+    expect(idx.nightsSuffix(["2026-10-31"])).toBe(" (sam. 31)");
+    expect(idx.nightsSuffix(["2026-10-30", "2026-10-31"])).toBe("");
+    expect(idx.nightsSuffix(["2026-10-30", "2026-10-31"], true)).toBe(" (ven. 30, sam. 31)");
+  });
+
+  it("plan de couchage d'une personne, lit par lit", () => {
+    expect(idx.bedPlan(1)).toEqual([{ bed: idx.bedById.get(10), nights: ["2026-10-30", "2026-10-31"] }]);
+    expect(idx.bedPlan(3)).toEqual([{ bed: undefined, nights: ["2026-10-30"] }]);
+    expect(idx.bedPlan(4)).toEqual([]);
+    const split = buildIndex(
+      makeSnapshot({
+        person_nights: [
+          { person_id: 1, date: "2026-10-31", bed_id: null },
+          { person_id: 1, date: "2026-10-30", bed_id: 10 },
+        ],
+      }),
+    );
+    expect(split.bedPlan(1).map((x) => x.nights)).toEqual([["2026-10-30"], ["2026-10-31"]]);
   });
 });
 
@@ -281,7 +393,7 @@ describe("couverture", () => {
 });
 
 describe("résumés de l'assistant", () => {
-  const action = (name: string, slots: Slot[]) => ({ person_id: 1, name, slots });
+  const action = (name: string, slots: Slot[], nights: string[] = []) => ({ person_id: 1, name, slots, nights, nights_explicit: false });
 
   it("formate un créneau court", () => {
     expect(slotShortLabel({ date: "2026-10-30", meal: "dinner" })).toBe("ven. dîner");
@@ -290,8 +402,8 @@ describe("résumés de l'assistant", () => {
   });
 
   it("résume une proposition en fourchette, triée chronologiquement", () => {
-    expect(actionSummary(action("Alice", []))).toBe("Alice : aucun repas");
-    expect(actionSummary(action("Alice", [{ date: "2026-10-30", meal: "dinner" }]))).toBe("Alice : ven. dîner");
+    expect(actionSummary(action("Alice", []))).toBe("Alice : aucun repas · aucune nuit sur place");
+    expect(actionSummary(action("Alice", [{ date: "2026-10-30", meal: "dinner" }]))).toBe("Alice : ven. dîner · aucune nuit sur place");
     expect(
       actionSummary(
         action("Alice", [
@@ -300,7 +412,7 @@ describe("résumés de l'assistant", () => {
           { date: "2026-10-30", meal: "dinner" },
         ]),
       ),
-    ).toBe("Alice : ven. dîner → dim. petit-déj, sauf sam. petit-déj, sam. dîner");
+    ).toBe("Alice : ven. dîner → dim. petit-déj, sauf sam. petit-déj, sam. dîner · aucune nuit sur place");
     expect(
       actionSummary(
         action("Bob", [
@@ -308,7 +420,7 @@ describe("résumés de l'assistant", () => {
           { date: "2026-10-31", meal: "dinner" },
         ]),
       ),
-    ).toBe("Bob : sam. déjeuner → sam. dîner");
+    ).toBe("Bob : sam. déjeuner → sam. dîner · aucune nuit sur place");
     const full = [
       { date: "2026-10-30", meal: "dinner" },
       { date: "2026-10-31", meal: "breakfast" },
@@ -316,9 +428,9 @@ describe("résumés de l'assistant", () => {
       { date: "2026-11-01", meal: "breakfast" },
       { date: "2026-11-01", meal: "lunch" },
     ] as const;
-    expect(actionSummary(action("Marie", [...full]))).toBe("Marie : ven. dîner → dim. déjeuner, sauf sam. dîner");
-    expect(actionSummary(action("Marie", [...full, { date: "2026-10-31", meal: "dinner" }]))).toBe(
-      "Marie : ven. dîner → dim. déjeuner",
+    expect(actionSummary(action("Marie", [...full]))).toBe("Marie : ven. dîner → dim. déjeuner, sauf sam. dîner · aucune nuit sur place");
+    expect(actionSummary(action("Marie", [...full, { date: "2026-10-31", meal: "dinner" }], ["2026-10-31", "2026-10-30"]))).toBe(
+      "Marie : ven. dîner → dim. déjeuner · nuits : ven. 30, sam. 31",
     );
   });
 });

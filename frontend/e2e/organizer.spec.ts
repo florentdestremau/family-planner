@@ -34,7 +34,8 @@ test("créer un séjour puis le configurer comme organisateur", async ({ page, c
   const leo = foyer.locator(".person-admin").filter({ has: page.locator('[value="Léo"]') });
   await expect(leo.getByRole("checkbox", { name: "Corvées" })).not.toBeChecked();
 
-  // Chambres : une chambre, un lit double et un d'appoint, répartition proposée.
+  // Chambres : une chambre, un lit double et un d'appoint. Personne n'a encore déclaré ses nuits :
+  // l'organisateur peut quand même coucher chacun, ce qui ajoute toutes les nuits (avec un avertissement).
   await page.locator(".subtabs").getByRole("link", { name: "Chambres" }).click();
   await page.getByPlaceholder("Nouvelle chambre").fill("Chambre bleue");
   await page.getByRole("button", { name: "Ajouter" }).click();
@@ -45,7 +46,15 @@ test("créer un séjour puis le configurer comme organisateur", async ({ page, c
   await room.locator(".inline-form select").selectOption("extra");
   await room.getByRole("button", { name: "+ Lit" }).click();
   await expect(room.locator(".bed")).toHaveCount(2);
-  await page.getByRole("button", { name: /Proposer une répartition/ }).click();
+  await expect(page.getByText("Nuits non déclarées : Claire, Florent, Léo.", { exact: false })).toBeVisible();
+  const pick = async (bed: number, name: string, child = false) => {
+    const label = `${name}${child ? " (enfant)" : ""} — nuits non déclarées`;
+    await room.locator(".bed").nth(bed).locator(".add-select").selectOption({ label });
+    await expect(page.getByText(`${name} n'avait pas déclaré la nuit du jeu. 24/12, ven. 25/12 : ajoutée à ses présences.`)).toBeVisible();
+  };
+  await pick(0, "Florent");
+  await pick(0, "Claire");
+  await pick(1, "Léo", true);
   await expect(page.getByText("Tout le monde a un lit.")).toBeVisible();
   await expect(room.locator(".bed").first()).toContainText("Florent");
   await expect(room.locator(".bed").first()).toContainText("Claire");
