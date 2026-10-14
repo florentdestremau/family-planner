@@ -1,14 +1,18 @@
+import { useIsRestoring } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { Link, NavLink, Outlet, useParams } from "react-router";
 import { ApiError } from "../api";
 import AssistantFab from "../components/Assistant";
+import { InstallButton, OfflineBanner, useOnline } from "../components/Pwa";
 import { rangeLabel } from "../lib";
 import { StayProvider, useSnapshot, useStay } from "../stay";
 import { ThemeToggle } from "../theme";
 
 export default function StayLayout() {
   const { slug = "" } = useParams();
-  const { data, error, isPending } = useSnapshot(slug);
+  const { data, error, isPending, isError, dataUpdatedAt } = useSnapshot(slug);
+  const isOnline = useOnline();
+  const restoring = useIsRestoring();
 
   useEffect(() => {
     if (data) {
@@ -16,11 +20,22 @@ export default function StayLayout() {
     }
   }, [data]);
 
-  if (isPending) return <div className="center muted">Chargement…</div>;
-  if (error || !data)
+  if (isPending && !isOnline && !restoring)
     return (
       <div className="center">
-        <p>{error instanceof ApiError && error.status === 404 ? "Ce séjour n'existe pas." : "Impossible de charger le séjour."}</p>
+        <p>📴 Hors ligne : ce séjour n'a pas encore été ouvert sur cet appareil.</p>
+        <Link to="/" className="btn">
+          Accueil
+        </Link>
+      </div>
+    );
+  if (isPending) return <div className="center muted">Chargement…</div>;
+  // Réseau coupé avec des données déjà chargées : on garde l'affichage.
+  const missing = error instanceof ApiError && error.status === 404;
+  if (!data || missing)
+    return (
+      <div className="center">
+        <p>{missing ? "Ce séjour n'existe pas." : "Impossible de charger le séjour."}</p>
         <Link to="/" className="btn">
           Accueil
         </Link>
@@ -29,12 +44,12 @@ export default function StayLayout() {
 
   return (
     <StayProvider slug={slug} snap={data}>
-      <Shell />
+      <Shell savedAt={dataUpdatedAt} failed={isError} />
     </StayProvider>
   );
 }
 
-function Shell() {
+function Shell({ savedAt, failed }: { savedAt: number; failed: boolean }) {
   const { slug, snap, me, setMe, adminKey } = useStay();
   const base = `/s/${slug}`;
   const tabs = [
@@ -62,6 +77,7 @@ function Shell() {
             </div>
           </div>
           <div className="topbar-actions">
+            <InstallButton compact />
             <ThemeToggle />
             {me && (
               <button className="who" onClick={() => setMe(null)} title="Changer de personne">
@@ -80,6 +96,7 @@ function Shell() {
         </nav>
       </header>
       <main className="content">
+        <OfflineBanner savedAt={savedAt} failed={failed} />
         <Outlet />
       </main>
       <AssistantFab />

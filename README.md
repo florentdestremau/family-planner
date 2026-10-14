@@ -24,7 +24,7 @@ Sans clé (`ANTHROPIC_API_KEY` dans `backend/.env`, ignoré par git), l'assistan
 | --- | --- |
 | `cd backend && uv run pytest --cov` | API (droits sur chaque route organisateur, isolation entre séjours, validations, règles métier), propriétés du tirage et des couchages (Hypothesis), service du front, fixtures, script serveur `family-env` (faux `once`). Couverture lignes + branches exigée : 100 %. |
 | `cd frontend && npm run typecheck` | Types TypeScript. |
-| `cd frontend && npm run test:coverage` | Logique du front (`lib`, `storage`, `api`) avec vitest, couverture 100 %. |
+| `cd frontend && npm run test:coverage` | Logique du front (`lib`, `storage`, `api`, `pwa`) avec vitest, couverture 100 %. |
 | `cd frontend && npm run test:e2e` | Parcours complets dans Chromium, bureau et mobile, contre le vrai back (base jetable, fixtures). |
 
 ### Fixtures
@@ -104,8 +104,15 @@ seule la clé organisateur protège la configuration.
 
 **Impressions** — présences, corvées par personne et jour par jour, menus avec couverts, chambres, activités. Export texte menus × couverts à coller dans un LLM pour générer la liste de courses.
 
+**Appli installable et hors ligne (PWA)** — un bouton 📲 « Installer l'appli » apparaît quand le navigateur le permet (Chrome, Edge, Android) ; sur iPhone et iPad, il explique l'ajout depuis Safari (Partager → Sur l'écran d'accueil). Hors ligne, **consultation seule** :
+- l'interface est servie par un service worker (`vite-plugin-pwa`, cache de `index.html` et `/assets`) ;
+- les données (liste des séjours, séjours déjà ouverts sur l'appareil) viennent du cache de React Query, sauvegardé dans le navigateur une semaine et vidé à chaque nouvelle version du front ;
+- un bandeau indique l'heure des données ; inscriptions, présences, création de séjour et espace organisateur sont désactivés, l'assistant est masqué ; rien n'est mis en file pour plus tard.
+
+Une nouvelle version déployée est proposée par « ✨ Nouvelle version disponible — Recharger » (vérification toutes les heures). Le back sert `index.html`, `sw.js` et le manifest en `no-cache`, `/assets` en `immutable`. Icônes : `cd frontend && node scripts/icons.mjs` les régénère dans `public/`.
+
 ## Limites v1 / pistes
 
 - Migrations Alembic (`backend/migrations`), appliquées au démarrage ; une base créée avant Alembic est reconnue comme `0001`. Pas de retour arrière : restaurer une sauvegarde once. Nouvelle migration : `cd backend && uv run alembic revision -m "…"` (un test vérifie que modèles et migrations ne divergent pas).
 - Couchage fixe pour tout le séjour (pas de lit par nuit).
-- Hors périmètre : covoiturage, notifications push, génération intégrée de la liste de courses par LLM.
+- Hors périmètre : covoiturage, notifications push, modifications hors ligne synchronisées au retour du réseau, génération intégrée de la liste de courses par LLM.

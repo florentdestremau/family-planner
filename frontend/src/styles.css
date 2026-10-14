@@ -318,6 +318,9 @@ textarea:focus {
   gap: 0.7rem;
   min-width: 0;
 }
+.topbar-title > div {
+  min-width: 0;
+}
 .topbar-actions {
   display: flex;
   align-items: center;
@@ -1365,6 +1368,80 @@ details .chips {
 .toast-error {
   background: var(--danger);
   color: #fff;
+}
+
+/* --- Appli installable, hors ligne ------------------------------------- */
+
+/* Simple porteur de l'attribut disabled : sans effet sur la mise en page. */
+fieldset.offline-lock {
+  display: contents;
+}
+fieldset.offline-lock:disabled :is(button, input, select, textarea),
+fieldset.offline-lock:disabled .toggle {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.offline-banner {
+  margin: 0 0 1rem;
+  padding: 0.55rem 1rem;
+  border-radius: var(--radius-sm);
+  background: var(--sunshine-soft);
+  border: 2px solid var(--sunshine);
+  color: var(--text);
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-align: center;
+}
+.card > .offline-banner {
+  margin-bottom: 0.75rem;
+}
+.install-btn {
+  box-shadow: var(--shadow);
+}
+.install-help-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: end center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.35);
+}
+.install-help {
+  width: 100%;
+  max-width: 420px;
+  animation: slideUp 0.25s ease;
+}
+.install-help ol {
+  margin: 0 0 0.75rem;
+  padding-left: 1.2rem;
+}
+.install-help li + li {
+  margin-top: 0.4rem;
+}
+.install-help .btn {
+  margin-top: 0.75rem;
+  width: 100%;
+}
+.update-prompt {
+  position: fixed;
+  left: 50%;
+  bottom: 1.25rem;
+  transform: translateX(-50%);
+  z-index: 110;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  padding: 0.5rem 0.6rem 0.5rem 1rem;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 2px solid var(--primary);
+  box-shadow: var(--shadow-pop);
+  font-size: 0.9rem;
+  font-weight: 700;
+  animation: slideUp 0.25s ease;
 }
 
 /* --- Assistant ----------------------------------------------------------- */

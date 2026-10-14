@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import type { Person } from "../api";
 import AddMember from "../components/AddMember";
 import HouseholdPresences from "../components/HouseholdPresences";
+import { OfflineLock } from "../components/Pwa";
 import { Chip, Empty, Toggle } from "../components/ui";
 import { BED_LABEL, dayLabel, MOMENT_LABEL, sortedMoments } from "../lib";
 import { useStay } from "../stay";
@@ -26,14 +27,18 @@ function Dashboard({ me }: { me: Person }) {
     <div className="stack">
       <h1 className="page-title">Bonjour {me.name} 👋</h1>
 
-      <HouseholdCard me={me} />
+      <OfflineLock>
+        <HouseholdCard me={me} />
+      </OfflineLock>
 
       <section className="card">
         <div className="card-head">
           <h2>✅ Présences</h2>
           <span className="muted small">Présent sur place = présent au repas</span>
         </div>
-        <HouseholdPresences me={me} />
+        <OfflineLock>
+          <HouseholdPresences me={me} />
+        </OfflineLock>
       </section>
 
       <section className="card">
@@ -81,21 +86,23 @@ function Dashboard({ me }: { me: Person }) {
                     {a.location && ` · ${a.location}`}
                   </div>
                 </div>
-                <div className="toggles">
-                  {household
-                    .filter((p) => p.does_activities)
-                    .map((p) => {
-                      const on = idx.signups.has(`${a.id}|${p.id}`);
-                      return (
-                        <Toggle
-                          key={p.id}
-                          label={p.name}
-                          checked={on}
-                          onChange={(v) => call(v ? "PUT" : "DELETE", `/activities/${a.id}/signups/${p.id}`)}
-                        />
-                      );
-                    })}
-                </div>
+                <OfflineLock>
+                  <div className="toggles">
+                    {household
+                      .filter((p) => p.does_activities)
+                      .map((p) => {
+                        const on = idx.signups.has(`${a.id}|${p.id}`);
+                        return (
+                          <Toggle
+                            key={p.id}
+                            label={p.name}
+                            checked={on}
+                            onChange={(v) => call(v ? "PUT" : "DELETE", `/activities/${a.id}/signups/${p.id}`)}
+                          />
+                        );
+                      })}
+                  </div>
+                </OfflineLock>
               </li>
             ))}
           </ul>

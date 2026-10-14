@@ -143,14 +143,21 @@ export async function api<T = unknown>(
   body?: unknown,
   adminKey?: string | null,
 ): Promise<T> {
+  // Hors ligne, l'appli reste consultable (données en cache) mais rien ne s'enregistre.
+  if (method !== "GET" && !navigator.onLine) throw new ApiError(0, "Hors ligne : modification impossible.");
   const headers: Record<string, string> = {};
   if (body !== undefined) headers["Content-Type"] = "application/json";
   if (adminKey) headers["X-Admin-Key"] = adminKey;
-  const res = await fetch(`/api${path}`, {
-    method,
-    headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  let res: Response;
+  try {
+    res = await fetch(`/api${path}`, {
+      method,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  } catch {
+    throw new ApiError(0, "Connexion impossible, réessayez.");
+  }
   if (!res.ok) {
     let message = res.statusText;
     try {

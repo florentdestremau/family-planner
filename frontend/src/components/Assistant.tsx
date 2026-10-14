@@ -2,6 +2,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { api, ApiError, assistantAsk, assistantStatus, type AssistantAction } from "../api";
 import { actionSummary } from "../lib";
+import { useOnline } from "./Pwa";
 import { useStay } from "../stay";
 import { toast } from "../toast";
 
@@ -36,12 +37,15 @@ export default function AssistantFab() {
   const listRef = useRef<HTMLDivElement | null>(null);
   const recRef = useRef<MicRec | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  const isOnline = useOnline();
 
+  // Hors ligne au chargement : on redemande au retour du réseau.
   useEffect(() => {
+    if (!isOnline || enabled !== null) return;
     assistantStatus()
       .then((r) => setEnabled(r.enabled))
       .catch(() => setEnabled(false));
-  }, []);
+  }, [isOnline, enabled]);
 
   useEffect(() => {
     const el = listRef.current;
@@ -55,7 +59,7 @@ export default function AssistantFab() {
     if (open && window.matchMedia?.("(pointer: fine)").matches) inputRef.current?.focus();
   }, [open]);
 
-  if (!me || enabled !== true) return null;
+  if (!me || enabled !== true || !isOnline) return null;
 
   const win = window as unknown as { SpeechRecognition?: MicCtor; webkitSpeechRecognition?: MicCtor };
   const Mic = win.SpeechRecognition ?? win.webkitSpeechRecognition;

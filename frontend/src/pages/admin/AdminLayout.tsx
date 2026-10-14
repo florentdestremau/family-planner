@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useSearchParams } from "react-router";
 import { api } from "../../api";
+import { useOnline } from "../../components/Pwa";
 import { useStay } from "../../stay";
 
 export default function AdminLayout() {
@@ -8,6 +9,7 @@ export default function AdminLayout() {
   const [params, setParams] = useSearchParams();
   const [status, setStatus] = useState<"checking" | "ok" | "denied">("checking");
   const [input, setInput] = useState("");
+  const isOnline = useOnline();
 
   // Le lien organisateur porte la clé en paramètre : on la mémorise puis on la retire de l'URL.
   useEffect(() => {
@@ -19,6 +21,7 @@ export default function AdminLayout() {
   }, [params, setParams, setAdminKey]);
 
   useEffect(() => {
+    if (!isOnline) return;
     const key = params.get("key") ?? adminKey;
     if (!key) {
       setStatus("denied");
@@ -28,8 +31,15 @@ export default function AdminLayout() {
     api("GET", `/stays/${slug}/admin`, undefined, key)
       .then(() => setStatus("ok"))
       .catch(() => setStatus("denied"));
-  }, [slug, adminKey, params]);
+  }, [slug, adminKey, params, isOnline]);
 
+  if (!isOnline)
+    return (
+      <section className="card">
+        <h2>Espace organisateur</h2>
+        <p className="muted">📴 Hors ligne : l'organisation du séjour reviendra avec le réseau.</p>
+      </section>
+    );
   if (status === "checking") return <div className="center muted">Vérification…</div>;
   if (status === "denied")
     return (
