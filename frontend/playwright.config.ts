@@ -5,6 +5,8 @@ const PORT = 8123;
 // Vrai back FastAPI (base SQLite jetable, fixtures chargées) qui sert le front compilé.
 // E2E_SKIP_FRONT_BUILD=1 : réutilise frontend/dist (déjà construit en CI).
 // E2E_BASE_URL=https://… : recette sur un environnement déjà déployé (PR), sans serveur local.
+// TZ : le back date les fixtures dans le fuseau du navigateur (timezoneId), sinon un séjour « à venir »
+// devient « en cours » entre minuit à Paris et minuit UTC.
 const build = process.env.E2E_SKIP_FRONT_BUILD ? "true" : "npm run build";
 const remote = process.env.E2E_BASE_URL;
 
@@ -30,7 +32,7 @@ export default defineConfig({
         command: [
           build,
           "rm -f ../backend/e2e.db*",
-          `cd ../backend && DATABASE_URL=sqlite:///./e2e.db STATIC_DIR=../frontend/dist FIXTURES=true ASSISTANT_STUB=true uv run uvicorn app.main:app --port ${PORT}`,
+          `cd ../backend && TZ=Europe/Paris DATABASE_URL=sqlite:///./e2e.db STATIC_DIR=../frontend/dist FIXTURES=true ASSISTANT_STUB=true uv run uvicorn app.main:app --port ${PORT}`,
         ].join(" && "),
         url: `http://127.0.0.1:${PORT}/up`,
         reuseExistingServer: false,

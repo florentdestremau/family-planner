@@ -65,6 +65,9 @@ class Person(Base):
     )
     # Lien de couple entre deux adultes du même foyer (symétrique, maintenu des deux côtés).
     partner_id: Mapped[int | None] = mapped_column(ForeignKey("persons.id", ondelete="SET NULL"))
+    # Régimes et allergies : codes séparés par des virgules (voir schemas.Diet) ; vide : aucun.
+    diets: Mapped[str] = mapped_column(String(128), default="")
+    diet_note: Mapped[str] = mapped_column(String(200), default="")  # précision libre, non comptée
 
 
 class Presence(Base):

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import type { Person } from "../api";
 import AddMember from "../components/AddMember";
+import { DietCard, DietSummary } from "../components/Diets";
 import HouseholdPresences from "../components/HouseholdPresences";
 import { OfflineLock } from "../components/Pwa";
 import { Chip, Empty } from "../components/ui";
@@ -39,6 +40,10 @@ function Dashboard({ me }: { me: Person }) {
         <HouseholdCard me={me} />
       </OfflineLock>
 
+      <OfflineLock>
+        <DietCard me={me} />
+      </OfflineLock>
+
       <section className="card">
         <div className="card-head">
           <h2>✅ Présences</h2>
@@ -65,6 +70,7 @@ function Dashboard({ me }: { me: Person }) {
                       {dayLabel(a.date)} · {MOMENT_LABEL[a.moment]}
                       {household.length > 1 && ` · ${idx.name(a.person_id)}`}
                     </div>
+                    {a.moment !== "day" && <DietSummary persons={idx.presentAt(a.date, a.moment)} />}
                   </div>
                   <div className="chips">
                     {team

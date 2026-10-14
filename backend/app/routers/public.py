@@ -157,6 +157,15 @@ def rename_household(household_id: int, body: s.HouseholdIn, stay: StayDep, db: 
     return found
 
 
+@router.put("/stays/{slug}/persons/{person_id}/diet", response_model=s.PersonOut)
+def set_diet(person_id: int, body: s.DietIn, stay: StayDep, db: DB) -> Person:
+    """Régimes et allergies, saisis par un adulte du foyer (ou corrigés par l'organisateur)."""
+    p = person(db, person_id, stay)
+    p.diets, p.diet_note = ",".join(body.diets), body.diet_note
+    db.commit()
+    return p
+
+
 @router.put("/stays/{slug}/persons/{person_id}/presences", status_code=204)
 def set_presences(person_id: int, body: s.PresencesIn, stay: StayDep, db: DB) -> None:
     h.replace_presences(db, stay, [h.Member(person(db, person_id, stay), body.slots, body.nights)])

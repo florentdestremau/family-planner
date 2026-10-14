@@ -1,4 +1,4 @@
-import type { Activity, AssistantAction, BedKind, Meal, Moment, Person, PersonNight, Snapshot, Slot, StaySummary } from "./api";
+import type { Activity, AssistantAction, BedKind, Diet, Meal, Moment, Person, PersonNight, Snapshot, Slot, StaySummary } from "./api";
 
 export const MEALS: Meal[] = ["breakfast", "lunch", "dinner"];
 export const MOMENTS: Moment[] = [...MEALS, "day"];
@@ -18,6 +18,71 @@ export const BED_LABEL: Record<BedKind, string> = {
 };
 
 export const BED_PLACES: Record<BedKind, number> = { double: 2, single: 1, bunk: 2, extra: 1 };
+
+/** Régimes, puis allergies et intolérances, dans l'ordre d'affichage. */
+export const REGIMES: Diet[] = ["vegetarian", "vegan"];
+export const ALLERGIES: Diet[] = ["gluten_free", "lactose_free", "nut_allergy", "seafood_allergy"];
+export const DIETS: Diet[] = [...REGIMES, ...ALLERGIES];
+
+export const DIET_LABEL: Record<Diet, string> = {
+  vegetarian: "Végétarien",
+  vegan: "Végan",
+  gluten_free: "Sans gluten",
+  lactose_free: "Sans lactose",
+  nut_allergy: "Allergie arachides et fruits à coque",
+  seafood_allergy: "Allergie poisson et fruits de mer",
+};
+
+const plural = (n: number) => (n > 1 ? "s" : "");
+
+/** Compteur d'une contrainte : « 2 végétariens », « 1 sans gluten ». */
+const DIET_COUNT: Record<Diet, (n: number) => string> = {
+  vegetarian: (n) => `${n} végétarien${plural(n)}`,
+  vegan: (n) => `${n} végan${plural(n)}`,
+  gluten_free: (n) => `${n} sans gluten`,
+  lactose_free: (n) => `${n} sans lactose`,
+  nut_allergy: (n) => `${n} allergie${plural(n)} arachides et fruits à coque`,
+  seafood_allergy: (n) => `${n} allergie${plural(n)} poisson et fruits de mer`,
+};
+
+/** Une allergie est signalée d'une alerte, un régime d'une pousse. */
+export const dietIcon = (diet: Diet) => (ALLERGIES.includes(diet) ? "⚠️" : "🌱");
+
+/** Coche ou décoche une contrainte ; végétarien et végan s'excluent. */
+export function toggleDiet(diets: Diet[], diet: Diet, on: boolean): Diet[] {
+  const excluded = on && REGIMES.includes(diet) ? REGIMES : [diet];
+  const kept = diets.filter((d) => !excluded.includes(d));
+  return DIETS.filter((d) => kept.includes(d) || (on && d === diet));
+}
+
+/** La personne a-t-elle déclaré une contrainte ou une précision ? */
+export const hasDiet = (p: Person) => p.diets.length > 0 || p.diet_note !== "";
+
+/** Contraintes déclarées par une personne, en une ligne. */
+export function dietLabel(p: Person): string {
+  return [...p.diets.map((d) => DIET_LABEL[d]), p.diet_note].filter(Boolean).join(" · ") || "Aucune contrainte";
+}
+
+export interface DietGroups {
+  /** Contraintes de la liste, dans l'ordre d'affichage, avec les personnes concernées. */
+  byDiet: { diet: Diet; persons: Person[] }[];
+  /** Personnes qui ont une précision libre. */
+  notes: Person[];
+}
+
+export function dietGroups(persons: Person[]): DietGroups {
+  return {
+    byDiet: DIETS.map((diet) => ({ diet, persons: persons.filter((p) => p.diets.includes(diet)) })).filter((g) => g.persons.length),
+    notes: persons.filter((p) => p.diet_note),
+  };
+}
+
+/** « 🌱 2 végétariens · ⚠️ 1 sans gluten · 📝 1 précision » ; vide s'il n'y a rien. */
+export function dietCountLabel({ byDiet, notes }: DietGroups): string {
+  const parts = byDiet.map(({ diet, persons }) => `${dietIcon(diet)} ${DIET_COUNT[diet](persons.length)}`);
+  if (notes.length) parts.push(`📝 ${notes.length} précision${plural(notes.length)}`);
+  return parts.join(" · ");
+}
 
 const asDate = (iso: string) => new Date(`${iso}T12:00:00`);
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -140,6 +205,9 @@ export function buildIndex(snap: Snapshot) {
   const isPresent = (personId: number, date: string, meal: Meal) => presence.has(presenceKey(personId, date, meal));
   const sleepsOn = (personId: number, date: string) => nightsOf(personId).some((n) => n.date === date);
 
+  /** Personnes présentes à un repas. */
+  const presentAt = (date: string, meal: Meal) => snap.persons.filter((p) => isPresent(p.id, date, meal));
+
   const count = (keep: (p: Person) => boolean) => {
     let adults = 0;
     let children = 0;
@@ -227,6 +295,7 @@ export function buildIndex(snap: Snapshot) {
     occurrences,
     name,
     isPresent,
+    presentAt,
     mealCount,
     nightCount,
     nightsOf,
@@ -281,25 +350,36 @@ export function toNights(snap: Snapshot, keys: Set<string>): string[] {
   return snap.nights.filter((d) => keys.has(nightKey(d)));
 }
 
-/** Texte prêt à coller dans un LLM pour générer une liste de courses. */
+/**
+ * Texte prêt à coller dans un LLM pour générer une liste de courses. Régimes et allergies y figurent
+ * en nombres par repas, et les précisions libres à part : jamais de noms.
+ */
 export function llmExport(snap: Snapshot, idx: Index): string {
+  const eating = snap.persons.filter((p) => snap.slots.some((s) => idx.isPresent(p.id, s.date, s.meal)));
+  const constrained = eating.some((p) => p.diets.length);
   const lines = [
     `Voici les menus de notre séjour « ${snap.stay.name} » avec le nombre de couverts par repas`,
     "(compter environ une demi-portion par enfant).",
     "Génère une liste de courses consolidée, regroupée par rayon, avec les quantités totales.",
-    "",
   ];
+  if (constrained) {
+    lines.push("Régimes et allergies indiqués par repas : prévois de quoi les respecter (produits de remplacement ou variante du plat).");
+  }
+  lines.push("");
   for (const slot of snap.slots) {
     const menu = idx.menuBySlot.get(`${slot.date}|${slot.meal}`);
     const count = idx.mealCount(slot.date, slot.meal);
     if (!count.total) continue;
     const dishes = menu?.dishes.split("\n").map((d) => d.trim()).filter(Boolean) ?? [];
+    const diets = dietGroups(idx.presentAt(slot.date, slot.meal)).byDiet.map(({ diet, persons }) => DIET_COUNT[diet](persons.length));
     lines.push(
-      `- ${dayLabel(slot.date)}, ${MOMENT_LABEL[slot.meal].toLowerCase()} — ${countLabel(count)} : ${
-        dishes.length ? dishes.join(" ; ") : "(menu non défini)"
-      }${menu?.notes ? ` [${menu.notes}]` : ""}`,
+      `- ${dayLabel(slot.date)}, ${MOMENT_LABEL[slot.meal].toLowerCase()} — ${countLabel(count)}${
+        diets.length ? `, dont ${diets.join(", ")}` : ""
+      } : ${dishes.length ? dishes.join(" ; ") : "(menu non défini)"}${menu?.notes ? ` [${menu.notes}]` : ""}`,
     );
   }
+  const notes = [...new Set(eating.map((p) => p.diet_note).filter(Boolean))];
+  if (notes.length) lines.push("", `Autres précisions alimentaires : ${notes.join(" ; ")}`);
   return lines.join("\n");
 }
 

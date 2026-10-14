@@ -1,3 +1,4 @@
+import { DietSummary } from "../components/Diets";
 import { Chip } from "../components/ui";
 import { countLabel, dayLabel, MOMENT_LABEL } from "../lib";
 import { useStay } from "../stay";
@@ -29,6 +30,7 @@ export default function Meals() {
                       </span>
                     </header>
                     <div className="muted small">{countLabel(count)}</div>
+                    <DietSummary persons={idx.presentAt(s.date, s.meal)} />
                     {dishes.length ? (
                       <ul className="dishes">
                         {dishes.map((d, i) => (

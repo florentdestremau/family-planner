@@ -1,5 +1,5 @@
 from datetime import date
-from typing import Literal
+from typing import Literal, get_args
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -7,6 +7,9 @@ Meal = Literal["breakfast", "lunch", "dinner"]
 Moment = Literal["breakfast", "lunch", "dinner", "day"]
 PersonKind = Literal["adult", "child"]
 BedKind = Literal["double", "single", "bunk", "extra"]
+# Régimes (végétarien, végan : l'un ou l'autre) puis allergies et intolérances, dans l'ordre d'affichage.
+Diet = Literal["vegetarian", "vegan", "gluten_free", "lactose_free", "nut_allergy", "seafood_allergy"]
+DIETS: tuple[str, ...] = get_args(Diet)
 Time = Field(default="", pattern=r"^(([01]\d|2[0-3]):[0-5]\d)?$")
 
 
@@ -52,6 +55,26 @@ class PersonUpdate(In):
     name: str | None = Field(default=None, min_length=1, max_length=100)
     kind: PersonKind | None = None
     does_chores: bool | None = None
+
+
+class DietIn(In):
+    """Régimes et allergies d'une personne, remplacés en bloc."""
+
+    diets: list[Diet] = Field(default_factory=list, max_length=len(DIETS))
+    diet_note: str = Field(default="", max_length=200)
+
+    @field_validator("diets")
+    @classmethod
+    def _diets(cls, v: list[str]) -> list[str]:
+        if {"vegetarian", "vegan"} <= set(v):
+            raise ValueError("Végétarien et végan s'excluent : choisir l'un ou l'autre")
+        return [d for d in DIETS if d in v]  # sans doublon, dans l'ordre d'affichage
+
+    @field_validator("diet_note", mode="before")
+    @classmethod
+    def _one_line(cls, v: object) -> object:
+        # Une seule ligne (recopiée telle quelle dans l'export), avant de vérifier la longueur.
+        return " ".join(v.split()) if isinstance(v, str) else v
 
 
 class HouseholdIn(In):
@@ -200,6 +223,15 @@ class PersonOut(ORM):
     does_chores: bool
     household_id: int
     partner_id: int | None
+    diets: list[Diet]
+    diet_note: str
+
+    @field_validator("diets", mode="before")
+    @classmethod
+    def _split_diets(cls, v: str) -> list[str]:
+        # Un code inconnu (retiré de la liste, base modifiée à la main) est ignoré plutôt que de
+        # rendre tout le séjour illisible.
+        return [d for d in v.split(",") if d in DIETS]
 
 
 class PresenceOut(ORM):

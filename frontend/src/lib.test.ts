@@ -15,6 +15,13 @@ import {
   toSlots,
   buildIndex,
   countLabel,
+  DIETS,
+  dietCountLabel,
+  dietGroups,
+  dietIcon,
+  dietLabel,
+  hasDiet,
+  toggleDiet,
   coverThumbUrl,
   coverUrl,
   dayLabel,
@@ -147,6 +154,89 @@ describe("llmExport", () => {
     expect(text).toContain("- Sam. 31 oct., déjeuner — 2 adultes : (menu non défini)");
     expect(text).not.toContain("petit-déj");
     expect(text.split("\n").filter((l) => l.startsWith("- "))).toHaveLength(2);
+    expect(text).not.toContain("Régimes");
+    expect(text).not.toContain("précisions");
+  });
+
+  it("donne régimes et allergies en nombres par repas, les précisions à part, sans aucun nom", () => {
+    const snap = withDiets();
+    const text = llmExport(snap, buildIndex(snap));
+    expect(text).toContain("Régimes et allergies indiqués par repas : prévois de quoi les respecter");
+    expect(text).toContain(
+      "- Ven. 30 oct., dîner — 2 adultes · 1 enfant, dont 1 végétarien, 1 végan, 1 sans gluten, 1 allergie arachides et fruits à coque : Soupe ; Gratin [Sans gluten]",
+    );
+    expect(text).toContain("- Sam. 31 oct., déjeuner — 2 adultes, dont 1 végétarien, 1 sans gluten : (menu non défini)");
+    // Une même précision une seule fois ; Nina, jamais présente, n'y est pas.
+    expect(text.endsWith("\n\nAutres précisions alimentaires : Pas de champignons ; Stylo d'adrénaline")).toBe(true);
+    for (const p of snap.persons) expect(text).not.toContain(p.name);
+  });
+});
+
+/** Alice végétarienne sans gluten, Bob végan, Léo allergique aux fruits à coque ; Nina jamais présente. */
+function withDiets() {
+  const base = makeSnapshot();
+  const diets: Record<number, Partial<(typeof base.persons)[number]>> = {
+    1: { diets: ["vegetarian", "gluten_free"] },
+    2: { diets: ["vegan"], diet_note: "Pas de champignons" },
+    3: { diets: ["nut_allergy"], diet_note: "Stylo d'adrénaline" },
+    4: { diet_note: "Pas de champignons" },
+    5: { diets: ["seafood_allergy"], diet_note: "Sans crevettes" },
+  };
+  return makeSnapshot({ persons: base.persons.map((p) => ({ ...p, ...diets[p.id] })) });
+}
+
+describe("régimes et allergies", () => {
+  it("végétarien et végan s'excluent ; l'ordre d'affichage est conservé", () => {
+    expect(toggleDiet([], "vegan", true)).toEqual(["vegan"]);
+    expect(toggleDiet(["vegetarian", "gluten_free"], "vegan", true)).toEqual(["vegan", "gluten_free"]);
+    expect(toggleDiet(["vegan"], "vegetarian", true)).toEqual(["vegetarian"]);
+    expect(toggleDiet(["seafood_allergy"], "gluten_free", true)).toEqual(["gluten_free", "seafood_allergy"]);
+    expect(toggleDiet(["vegan", "gluten_free"], "gluten_free", false)).toEqual(["vegan"]);
+    expect(toggleDiet(["vegan", "gluten_free"], "vegan", false)).toEqual(["gluten_free"]);
+    expect(toggleDiet(["gluten_free"], "gluten_free", true)).toEqual(["gluten_free"]);
+  });
+
+  it("signale les allergies d'une alerte, les régimes d'une pousse", () => {
+    expect(DIETS.map(dietIcon)).toEqual(["🌱", "🌱", "⚠️", "⚠️", "⚠️", "⚠️"]);
+  });
+
+  it("résume les contraintes d'une personne", () => {
+    const [alice, bob, , mamie] = withDiets().persons;
+    expect(dietLabel(alice)).toBe("Végétarien · Sans gluten");
+    expect(dietLabel(bob)).toBe("Végan · Pas de champignons");
+    expect(dietLabel(mamie)).toBe("Pas de champignons");
+    expect(dietLabel(makeSnapshot().persons[0])).toBe("Aucune contrainte");
+    expect(withDiets().persons.map(hasDiet)).toEqual([true, true, true, true, true]);
+    expect(makeSnapshot().persons.some(hasDiet)).toBe(false);
+  });
+
+  it("compte par repas les contraintes des seuls présents", () => {
+    const snap = withDiets();
+    const idx = buildIndex(snap);
+    expect(idx.presentAt("2026-10-31", "lunch").map((p) => p.name)).toEqual(["Alice", "Mamie"]);
+    const dinner = dietGroups(idx.presentAt("2026-10-30", "dinner"));
+    expect(dinner.byDiet.map(({ diet, persons }) => [diet, persons.map((p) => p.name)])).toEqual([
+      ["vegetarian", ["Alice"]],
+      ["vegan", ["Bob"]],
+      ["gluten_free", ["Alice"]],
+      ["nut_allergy", ["Léo"]],
+    ]);
+    expect(dinner.notes.map((p) => p.name)).toEqual(["Bob", "Léo"]);
+    expect(dietCountLabel(dinner)).toBe(
+      "🌱 1 végétarien · 🌱 1 végan · ⚠️ 1 sans gluten · ⚠️ 1 allergie arachides et fruits à coque · 📝 2 précisions",
+    );
+    expect(dietCountLabel(dietGroups(idx.presentAt("2026-10-31", "lunch")))).toBe(
+      "🌱 1 végétarien · ⚠️ 1 sans gluten · 📝 1 précision",
+    );
+    expect(dietCountLabel(dietGroups(idx.presentAt("2026-11-01", "lunch")))).toBe("");
+  });
+
+  it("accorde chaque compteur au pluriel", () => {
+    const people = withDiets().persons.map((p) => ({ ...p, diets: [...DIETS] }));
+    expect(dietCountLabel({ byDiet: dietGroups(people).byDiet, notes: [] })).toBe(
+      "🌱 5 végétariens · 🌱 5 végans · ⚠️ 5 sans gluten · ⚠️ 5 sans lactose · ⚠️ 5 allergies arachides et fruits à coque · ⚠️ 5 allergies poisson et fruits de mer",
+    );
+    expect(dietCountLabel(dietGroups([people[1]]))).toContain("1 allergie poisson et fruits de mer");
   });
 });
 
