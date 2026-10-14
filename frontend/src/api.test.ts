@@ -24,6 +24,17 @@ describe("api", () => {
     });
   });
 
+  it("envoie un Blob tel quel, sans en-tête JSON", async () => {
+    const fetchMock = mockFetch(200, { cover_version: 1 });
+    const image = new Blob(["jpeg"], { type: "image/jpeg" });
+    await api("PUT", "/stays/x/admin/cover", image, "secret");
+    expect(fetchMock).toHaveBeenCalledWith("/api/stays/x/admin/cover", {
+      method: "PUT",
+      headers: { "X-Admin-Key": "secret" },
+      body: image,
+    });
+  });
+
   it("n'envoie ni corps ni clé quand il n'y en a pas", async () => {
     const fetchMock = mockFetch(200, []);
     await api("GET", "/stays/x");

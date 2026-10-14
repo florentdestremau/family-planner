@@ -161,7 +161,6 @@ function MemberRow({ person: p, members }: { person: Person; members: Person[] }
       </div>
       <div className="person-admin-flags">
         <Toggle label="Corvées" checked={p.does_chores} onChange={(v) => patch({ does_chores: v })} />
-        <Toggle label="Activités" checked={p.does_activities} onChange={(v) => patch({ does_activities: v })} />
         <select
           className="add-select"
           value=""

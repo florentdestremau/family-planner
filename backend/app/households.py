@@ -59,7 +59,6 @@ def create_person(db: Session, stay: Stay, body: s.PersonCreate) -> Person:
         name=body.name,
         kind=body.kind,
         does_chores=does_chores,
-        does_activities=body.does_activities,
     )
     db.add(p)
     db.flush()

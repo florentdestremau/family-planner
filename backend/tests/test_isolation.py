@@ -17,13 +17,13 @@ def two(client):
     ids["bed"] = a.adm("POST", f"/rooms/{room['id']}/beds", {"kind": "double"}, status=201).json()["id"]
     ids["chore"] = a.snap()["chore_types"][0]["id"]
     ids["activity"] = a.adm(
-        "POST", "/activities", {"name": "Rando", "date": "2026-10-31", "optional": True}, status=201
+        "POST", "/activities", {"name": "Rando", "date": "2026-10-31"}, status=201
     ).json()["id"]
     ids["b_adult"] = b.person("Brigitte")
     ids["b_household"] = b.household_of(ids["b_adult"])
     ids["b_room"] = b.adm("POST", "/rooms", {"name": "Verte"}, status=201).json()["id"]
     ids["b_activity"] = b.adm(
-        "POST", "/activities", {"name": "Jeux", "date": "2026-10-31", "optional": True}, status=201
+        "POST", "/activities", {"name": "Jeux", "date": "2026-10-31"}, status=201
     ).json()["id"]
     return a, b, ids
 
@@ -33,6 +33,7 @@ CASES = [
     ("pub", "PUT", "/activities/{activity}/signups/{b_adult}", None),
     ("pub", "PUT", "/activities/{b_activity}/signups/{adult}", None),
     ("pub", "DELETE", "/activities/{b_activity}/signups/{adult}", None),
+    ("pub", "DELETE", "/activities/{activity}/signups/{b_adult}", None),
     ("pub", "POST", "/persons", {"name": "X", "kind": "child", "household_id": "{household}"}),
     ("pub", "PATCH", "/households/{household}", {"name": "Piraté"}),
     ("pub", "PUT", "/households/{household}/presences", {"members": [{"person_id": "{adult}", "slots": []}]}),
@@ -57,6 +58,7 @@ CASES = [
     ("adm", "PUT", "/chores/occurrence", {"chore_type_id": "{chore}", "date": "2026-10-31", "moment": "day", "person_ids": []}),
     ("adm", "PATCH", "/activities/{activity}", {"name": "X", "date": "2026-10-31"}),
     ("adm", "DELETE", "/activities/{activity}", None),
+    ("adm", "POST", "/activities/{activity}/signups/all", None),
 ]
 
 

@@ -84,9 +84,11 @@ seule la clé organisateur protège la configuration.
 - un lien famille `/s/<slug>` : chacun choisit son nom dans la liste, mémorisé dans le navigateur ;
 - un lien organisateur `/s/<slug>/admin?key=<clé>` : la clé est mémorisée puis retirée de l'URL. Les routes `/api/stays/<slug>/admin/*` exigent l'en-tête `X-Admin-Key`.
 
+**Image de couverture** — l'organisateur choisit une photo (JPEG, PNG ou WebP). Le navigateur la réduit à 1600 px (JPEG pour une photo, WebP pour garder la transparence d'un PNG ; une image déjà petite part telle quelle) et refuse d'emblée un fichier de plus de 5 Mo. Envoi en corps brut (`PUT …/admin/cover`), lu seulement après la clé organisateur et coupé au-delà de 5 Mo ; format reconnu aux premiers octets, puis image décodée (Pillow, 16 Mpx au plus) pour en tirer une vignette carrée WebP de 192 px. Image et vignette sont stockées dans la base SQLite (table `stay_covers`, donc sauvegardées avec elle). La couverture s'affiche en tête de l'onglet « Moi », la vignette sur l'accueil ; servies par `GET /api/stays/<slug>/cover?v=<version>` et `…/cover/thumb?v=<version>`, en cache d'un an seulement pour la version courante. La version est un horodatage en ms, toujours croissant : jamais reprise, même après un retrait.
+
 **Foyers** — chaque personne appartient à un foyer (les personnes qui viennent ensemble) ; une nouvelle personne forme son propre foyer, un célibataire se crée donc en un geste. Tout adulte du foyer agit pour chacun : présences, inscriptions, corvées. Par défaut, « tout le foyer a les mêmes présences » : mes présences valent pour tous ; on décoche pour décaler quelqu'un. Le couple est un lien entre deux adultes du même foyer, proposé quand un célibataire ajoute un adulte. L'organisateur peut déplacer une personne, fusionner deux foyers (conjoints inscrits séparément) ou en supprimer un.
 
-**Personnes** — adulte ou enfant (portions), « participe aux corvées » (défaut : oui pour un adulte, non pour un enfant), « participe aux activités ».
+**Personnes** — adulte ou enfant (portions), « participe aux corvées » (défaut : oui pour un adulte, non pour un enfant).
 
 **Présences** — par repas (petit-déj, déjeuner, dîner) entre le premier repas du premier jour et le dernier repas du dernier jour. Présent sur place = présent au repas ; les couverts sont comptés adultes / enfants.
 
@@ -100,7 +102,7 @@ seule la clé organisateur protège la configuration.
 
 **Chambres** — lits doubles (2 places), simples (1), superposés (2), d'appoint (1). Affectation manuelle, ou proposition automatique pour les non-logés (couples en lit double, enfants près de leur adulte référent).
 
-**Activités** — par défaut tout le monde (personnes « activités » présentes ce jour-là) ; une activité facultative demande une inscription.
+**Activités** — toutes sur inscription. Depuis le planning, chacun inscrit ou retire les membres de son foyer, activité par activité (inscription possible même absent ce jour-là, avec un avertissement) ; l'accueil résume les activités du foyer. L'organisateur peut « inscrire tout le monde » : à la création (coché par défaut) ou plus tard d'un bouton, les personnes présentes ce jour-là qui manquent sont inscrites ; celles qui se sont retirées ne sont pas réinscrites. L'organisateur voit les inscrits de chaque activité et peut en retirer un d'un clic. Retirer une présence ou déplacer une activité ne touche pas aux inscriptions.
 
 **Impressions** — présences, corvées par personne et jour par jour, menus avec couverts, chambres, activités. Export texte menus × couverts à coller dans un LLM pour générer la liste de courses.
 

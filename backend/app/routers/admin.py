@@ -1,13 +1,33 @@
 """Espace organisateur : configuration du séjour, tirage des corvées, affectations."""
 
-from fastapi import APIRouter, HTTPException
+import time
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import delete, select
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy.orm import Session
 
 from .. import households as h
 from .. import schemas as s
 from ..deps import DB, AdminStay, owned, person
 from ..lottery import build_occurrences, draw
-from ..models import Activity, Bed, ChoreAssignment, ChoreType, Household, Menu, Person, Presence, Room, Stay
+from ..images import MAX_COVER_BYTES, image_type, thumbnail
+from ..models import (
+    Activity,
+    Bed,
+    ChoreAssignment,
+    ChoreType,
+    Decline,
+    Household,
+    Menu,
+    Person,
+    Presence,
+    Room,
+    Signup,
+    Stay,
+    StayCover,
+)
 from ..rooms import auto_assign
 from ..slots import BED_PLACES, stay_days, stay_slots
 from .public import validate_dates
@@ -42,6 +62,55 @@ def update_stay(body: s.StayUpdate, stay: AdminStay, db: DB) -> Stay:
     for a in db.scalars(select(ChoreAssignment).where(ChoreAssignment.stay_id == stay.id)):
         if a.date not in days or (a.moment != "day" and (a.date, a.moment) not in slots):
             db.delete(a)
+    db.commit()
+    return stay
+
+
+async def cover_body(request: Request, _: AdminStay) -> bytes:
+    """Corps brut de l'envoi, lu seulement après la clé organisateur et coupé au-delà de la limite :
+    un envoi démesuré n'est jamais gardé en mémoire."""
+    too_large = HTTPException(413, f"Image trop lourde (au plus {MAX_COVER_BYTES // 1_000_000} Mo)")
+    if int(request.headers.get("content-length") or 0) > MAX_COVER_BYTES:
+        raise too_large
+    data = bytearray()
+    async for chunk in request.stream():
+        data += chunk
+        if len(data) > MAX_COVER_BYTES:
+            raise too_large
+    return bytes(data)
+
+
+COVER_BODY = {"required": True, "content": {"image/*": {"schema": {"type": "string", "format": "binary"}}}}
+
+
+@router.put("/cover", response_model=s.StayOut, openapi_extra={"requestBody": COVER_BODY})
+def set_cover(stay: AdminStay, data: Annotated[bytes, Depends(cover_body)], db: DB) -> Stay:
+    """Image de couverture, envoyée telle quelle dans le corps (le front la réduit avant)."""
+    content_type = image_type(data)
+    if content_type is None:
+        raise HTTPException(415, "Format d'image non pris en charge (JPEG, PNG ou WebP)")
+    thumb = thumbnail(data)
+    if thumb is None:
+        raise HTTPException(415, "Image illisible ou trop grande")
+    # Upsert : l'ancienne image n'est pas relue pour être écrasée.
+    db.execute(
+        sqlite_insert(StayCover)
+        .values(stay_id=stay.id, content_type=content_type, data=data, thumb=thumb)
+        .on_conflict_do_update(
+            index_elements=[StayCover.stay_id], set_={"content_type": content_type, "data": data, "thumb": thumb}
+        )
+    )
+    # Horodatage en ms, toujours croissant : une version n'est jamais reprise, même après un retrait,
+    # et deux envois concurrents ne tombent pas sur la même (l'URL ?v= est en cache pour un an).
+    stay.cover_version = max(time.time_ns() // 1_000_000, (stay.cover_version or 0) + 1)
+    db.commit()
+    return stay
+
+
+@router.delete("/cover", response_model=s.StayOut)
+def delete_cover(stay: AdminStay, db: DB) -> Stay:
+    db.execute(delete(StayCover).where(StayCover.stay_id == stay.id))
+    stay.cover_version = None
     db.commit()
     return stay
 
@@ -264,13 +333,38 @@ def _check_activity_date(body: s.ActivityIn, stay: Stay) -> None:
         raise HTTPException(422, "Date hors du séjour")
 
 
+def _invite_all(db: Session, activity: Activity) -> int:
+    """Inscrit les présents du jour qui manquent ; ni ceux qui se sont retirés, ni désinscription."""
+    present = select(Presence.person_id).where(Presence.date == activity.date)
+    signed = select(Signup.person_id).where(Signup.activity_id == activity.id)
+    declined = select(Decline.person_id).where(Decline.activity_id == activity.id)
+    ids = db.scalars(
+        select(Person.id).where(
+            Person.stay_id == activity.stay_id, Person.id.in_(present), Person.id.not_in(signed), Person.id.not_in(declined)
+        )
+    ).all()
+    db.add_all(Signup(activity_id=activity.id, person_id=pid) for pid in ids)
+    return len(ids)
+
+
 @router.post("/activities", response_model=s.ActivityOut, status_code=201)
-def create_activity(body: s.ActivityIn, stay: AdminStay, db: DB) -> Activity:
+def create_activity(body: s.ActivityCreate, stay: AdminStay, db: DB) -> Activity:
     _check_activity_date(body, stay)
-    activity = Activity(stay_id=stay.id, **body.model_dump())
+    activity = Activity(stay_id=stay.id, **body.model_dump(exclude={"invite_all"}))
     db.add(activity)
+    db.flush()
+    if body.invite_all:
+        _invite_all(db, activity)
     db.commit()
     return activity
+
+
+@router.post("/activities/{activity_id}/signups/all", response_model=s.InvitedOut)
+def invite_all(activity_id: int, stay: AdminStay, db: DB) -> dict:
+    """« Inscrire tout le monde » : les présents du jour qui manquent (chacun peut ensuite se retirer)."""
+    added = _invite_all(db, owned(db, Activity, activity_id, stay))
+    db.commit()
+    return {"added": added}
 
 
 @router.patch("/activities/{activity_id}", response_model=s.ActivityOut)

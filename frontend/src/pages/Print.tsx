@@ -169,11 +169,9 @@ function ActivitiesPrint() {
                     {a.name}
                   </strong>
                   {a.location && ` — ${a.location}`}
-                  {a.optional && (
-                    <div className="small muted">
-                      Inscrits : {idx.activityParticipants(a).map((p) => p.name).join(", ") || "personne"}
-                    </div>
-                  )}
+                  <div className="small muted">
+                    Inscrits : {idx.activityParticipants(a).map((p) => p.name).join(", ") || "personne"}
+                  </div>
                 </li>
               ))}
             </ul>

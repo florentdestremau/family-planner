@@ -11,6 +11,8 @@ export interface Stay {
   first_meal: Meal;
   last_meal: Meal;
   separate_couples: boolean;
+  /** Incrémenté à chaque nouvelle image de couverture ; null : pas d'image. */
+  cover_version: number | null;
 }
 
 export interface StaySummary {
@@ -18,6 +20,7 @@ export interface StaySummary {
   name: string;
   start_date: string;
   end_date: string;
+  cover_version: number | null;
   households: number;
   persons: number;
 }
@@ -33,7 +36,6 @@ export interface Person {
   name: string;
   kind: PersonKind;
   does_chores: boolean;
-  does_activities: boolean;
   household_id: number;
   partner_id: number | null;
   bed_id: number | null;
@@ -85,7 +87,6 @@ export interface Activity {
   date: string;
   start_time: string;
   end_time: string;
-  optional: boolean;
 }
 
 export interface Signup {
@@ -145,15 +146,17 @@ export async function api<T = unknown>(
 ): Promise<T> {
   // Hors ligne, l'appli reste consultable (données en cache) mais rien ne s'enregistre.
   if (method !== "GET" && !navigator.onLine) throw new ApiError(0, "Hors ligne : modification impossible.");
+  // Un Blob (image) part tel quel, avec son propre type ; le reste en JSON.
+  const raw = body instanceof Blob;
   const headers: Record<string, string> = {};
-  if (body !== undefined) headers["Content-Type"] = "application/json";
+  if (body !== undefined && !raw) headers["Content-Type"] = "application/json";
   if (adminKey) headers["X-Admin-Key"] = adminKey;
   let res: Response;
   try {
     res = await fetch(`/api${path}`, {
       method,
       headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: body === undefined ? undefined : raw ? body : JSON.stringify(body),
     });
   } catch {
     throw new ApiError(0, "Connexion impossible, réessayez.");

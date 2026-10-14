@@ -46,14 +46,12 @@ class PersonCreate(In):
     household_id: int | None = None  # absent : la personne forme son propre foyer
     partner_id: int | None = None  # en couple avec un adulte du même foyer
     does_chores: bool | None = None  # défaut : oui pour un adulte, non pour un enfant
-    does_activities: bool = True
 
 
 class PersonUpdate(In):
     name: str | None = Field(default=None, min_length=1, max_length=100)
     kind: PersonKind | None = None
     does_chores: bool | None = None
-    does_activities: bool | None = None
 
 
 class HouseholdIn(In):
@@ -125,13 +123,16 @@ class ActivityIn(In):
     date: date
     start_time: str = Time
     end_time: str = Time
-    optional: bool = False
 
     @model_validator(mode="after")
     def _end_after_start(self) -> "ActivityIn":
         if self.start_time and self.end_time and self.end_time < self.start_time:
             raise ValueError("L'heure de fin doit suivre l'heure de début")
         return self
+
+
+class ActivityCreate(ActivityIn):
+    invite_all: bool = False  # inscrire d'emblée les personnes présentes ce jour-là
 
 
 class MenuIn(In):
@@ -167,6 +168,7 @@ class StayOut(ORM):
     first_meal: Meal
     last_meal: Meal
     separate_couples: bool
+    cover_version: int | None
 
 
 class StaySummary(BaseModel):
@@ -174,6 +176,7 @@ class StaySummary(BaseModel):
     name: str
     start_date: date
     end_date: date
+    cover_version: int | None
     households: int
     persons: int
 
@@ -192,7 +195,6 @@ class PersonOut(ORM):
     name: str
     kind: PersonKind
     does_chores: bool
-    does_activities: bool
     household_id: int
     partner_id: int | None
     bed_id: int | None
@@ -246,7 +248,6 @@ class ActivityOut(ORM):
     date: date
     start_time: str
     end_time: str
-    optional: bool
 
 
 class SignupOut(ORM):
@@ -279,6 +280,10 @@ class Snapshot(BaseModel):
     activities: list[ActivityOut]
     signups: list[SignupOut]
     menus: list[MenuOut]
+
+
+class InvitedOut(BaseModel):
+    added: int
 
 
 class DrawOut(BaseModel):

@@ -5,7 +5,7 @@ import { useStay } from "../stay";
 
 export default function Planning() {
   const { snap, idx, me, call } = useStay();
-  const household = idx.household(me).filter((p) => p.does_activities);
+  const household = idx.household(me);
 
   if (!snap.activities.length) return <Empty>Aucune activité prévue pour l'instant.</Empty>;
 
@@ -30,17 +30,21 @@ export default function Planning() {
                     <div className="timeline-body">
                       <div className="timeline-title">
                         <strong>{a.name}</strong>
-                        {a.optional ? <span className="badge badge-accent">facultatif</span> : <span className="badge">tout le monde</span>}
                       </div>
                       {a.location && <div className="muted small">📍 {a.location}</div>}
                       {a.description && <p className="small pre">{a.description}</p>}
-                      {a.optional && household.length > 0 && (
+                      {household.length > 0 && (
                         <OfflineLock>
                           <div className="toggles">
                             {household.map((p) => (
                               <Toggle
                                 key={p.id}
-                                label={p.name}
+                                label={
+                                  <>
+                                    {p.name}
+                                    {!idx.isPresentOnDay(p.id, a.date) && <span className="muted small"> · absent ce jour-là</span>}
+                                  </>
+                                }
                                 checked={idx.signups.has(`${a.id}|${p.id}`)}
                                 onChange={(v) => call(v ? "PUT" : "DELETE", `/activities/${a.id}/signups/${p.id}`)}
                               />
@@ -49,7 +53,9 @@ export default function Planning() {
                         </OfflineLock>
                       )}
                       <details className="small">
-                        <summary>{participants.length} participant{participants.length > 1 ? "s" : ""}</summary>
+                        <summary>
+                          {participants.length} inscrit{participants.length > 1 ? "s" : ""}
+                        </summary>
                         <div className="chips">
                           {participants.map((p) => (
                             <Chip key={p.id} person={p} highlight={p.id === me?.id} />

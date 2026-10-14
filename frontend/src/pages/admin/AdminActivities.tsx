@@ -1,30 +1,45 @@
 import { useState } from "react";
 import type { Activity } from "../../api";
-import { Empty, Toggle } from "../../components/ui";
+import { Chip, Empty, Toggle } from "../../components/ui";
 import { dayLabel } from "../../lib";
 import { useStay } from "../../stay";
+import { toast } from "../../toast";
 
-type Form = Omit<Activity, "id">;
+/** `invite_all` ne sert qu'à la création : inscrire d'emblée les présents du jour. */
+type Form = Omit<Activity, "id"> & { invite_all: boolean };
 
 export default function AdminActivities() {
   const { snap, idx, call } = useStay();
-  const empty: Form = { name: "", description: "", location: "", date: snap.days[0], start_time: "", end_time: "", optional: false };
+  const empty: Form = { name: "", description: "", location: "", date: snap.days[0], start_time: "", end_time: "", invite_all: true };
   const [editing, setEditing] = useState<number | "new" | null>(null);
   const [form, setForm] = useState<Form>(empty);
 
   const start = (a?: Activity) => {
     setEditing(a ? a.id : "new");
-    setForm(a ? { ...a } : empty);
+    setForm(a ? { ...a, invite_all: false } : empty);
   };
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
-    const body = { ...form, id: undefined };
+    const { invite_all, ...fields } = form;
+    const body = { ...fields, id: undefined };
     const ok =
       editing === "new"
-        ? await call("POST", "/activities", body, { admin: true })
+        ? await call("POST", "/activities", { ...body, invite_all }, { admin: true })
         : await call("PATCH", `/activities/${editing}`, body, { admin: true });
     if (ok) setEditing(null);
+  }
+
+  async function inviteAll(a: Activity) {
+    const res = await call<{ added: number }>("POST", `/activities/${a.id}/signups/all`, undefined, { admin: true });
+    if (res) {
+      const n = res.added;
+      toast(
+        n
+          ? `${n} personne${n > 1 ? "s" : ""} inscrite${n > 1 ? "s" : ""} à « ${a.name} »`
+          : "Tous les présents de ce jour sont déjà inscrits",
+      );
+    }
   }
 
   return (
@@ -38,7 +53,10 @@ export default function AdminActivities() {
             </button>
           )}
         </div>
-        <p className="hint">Par défaut tout le monde participe (personnes « Activités » présentes ce jour-là). Une activité facultative demande une inscription.</p>
+        <p className="hint">
+          Chacun s'inscrit depuis le planning ; × retire un inscrit. « Inscrire tout le monde » inscrit d'un coup les personnes présentes ce
+          jour-là ; chacun peut ensuite se retirer.
+        </p>
         {editing !== null && (
           <form className="form" onSubmit={save}>
             <label>
@@ -73,7 +91,13 @@ export default function AdminActivities() {
               Description
               <textarea rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
             </label>
-            <Toggle label="Facultative (inscription individuelle)" checked={form.optional} onChange={(v) => setForm({ ...form, optional: v })} />
+            {editing === "new" && (
+              <Toggle
+                label="Inscrire tout le monde (présents ce jour-là)"
+                checked={form.invite_all}
+                onChange={(v) => setForm({ ...form, invite_all: v })}
+              />
+            )}
             <div className="actions">
               <button className="btn btn-primary">Enregistrer</button>
               <button type="button" className="btn btn-ghost" onClick={() => setEditing(null)}>
@@ -89,30 +113,48 @@ export default function AdminActivities() {
       ) : (
         <section className="card">
           <ul className="list">
-            {snap.activities.map((a) => (
-              <li key={a.id} className="list-row">
-                <div>
-                  <strong>{a.name}</strong> {a.optional && <span className="badge badge-accent">facultatif</span>}
-                  <div className="muted small">
-                    {dayLabel(a.date)}
-                    {a.start_time && ` · ${a.start_time}`}
-                    {a.end_time && `–${a.end_time}`}
-                    {a.location && ` · ${a.location}`} · {idx.activityParticipants(a).length} participant(s)
+            {snap.activities.map((a) => {
+              const participants = idx.activityParticipants(a);
+              return (
+                <li key={a.id} className="list-row list-row-wrap">
+                  <div>
+                    <strong>{a.name}</strong>
+                    <div className="muted small">
+                      {dayLabel(a.date)}
+                      {a.start_time && ` · ${a.start_time}`}
+                      {a.end_time && `–${a.end_time}`}
+                      {a.location && ` · ${a.location}`}
+                    </div>
+                    <details className="small">
+                      <summary>
+                        {participants.length} inscrit{participants.length > 1 ? "s" : ""}
+                      </summary>
+                      <div className="chips">
+                        {participants.map((p) => (
+                          <Chip key={p.id} person={p} onRemove={() => call("DELETE", `/activities/${a.id}/signups/${p.id}`)} />
+                        ))}
+                      </div>
+                    </details>
                   </div>
-                </div>
-                <div className="actions">
-                  <button className="btn btn-small btn-ghost" onClick={() => start(a)}>
-                    Modifier
-                  </button>
-                  <button
-                    className="btn btn-small btn-danger"
-                    onClick={() => confirm(`Supprimer « ${a.name} » ?`) && call("DELETE", `/activities/${a.id}`, undefined, { admin: true })}
-                  >
-                    ×
-                  </button>
-                </div>
-              </li>
-            ))}
+                  <div className="actions">
+                    <button className="btn btn-small" onClick={() => inviteAll(a)}>
+                      Inscrire tout le monde
+                    </button>
+                    <button className="btn btn-small btn-ghost" onClick={() => start(a)}>
+                      Modifier
+                    </button>
+                    <button
+                      className="btn btn-small btn-danger"
+                      onClick={() =>
+                        confirm(`Supprimer « ${a.name} » ?`) && call("DELETE", `/activities/${a.id}`, undefined, { admin: true })
+                      }
+                    >
+                      ×
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         </section>
       )}

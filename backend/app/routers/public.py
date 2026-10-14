@@ -3,8 +3,9 @@
 import secrets
 from datetime import timedelta
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
 from sqlalchemy import delete, func, select
+from sqlalchemy.orm import Session
 
 from .. import assistant
 from .. import households as h
@@ -16,6 +17,7 @@ from ..models import (
     Bed,
     ChoreAssignment,
     ChoreType,
+    Decline,
     Household,
     Menu,
     Person,
@@ -23,6 +25,7 @@ from ..models import (
     Room,
     Signup,
     Stay,
+    StayCover,
 )
 from ..slots import MAX_STAY_DAYS, stay_days, stay_slots
 
@@ -69,7 +72,15 @@ def list_stays(db: DB) -> list[dict]:
         .order_by(Stay.start_date, Stay.id)
     ).all()
     return [
-        {"slug": st.slug, "name": st.name, "start_date": st.start_date, "end_date": st.end_date, "households": h, "persons": n}
+        {
+            "slug": st.slug,
+            "name": st.name,
+            "start_date": st.start_date,
+            "end_date": st.end_date,
+            "cover_version": st.cover_version,
+            "households": h,
+            "persons": n,
+        }
         for st, h, n in rows
     ]
 
@@ -104,6 +115,31 @@ def snapshot(stay: StayDep, db: DB) -> dict:
     }
 
 
+def cover_response(stay: Stay, db: Session, v: int | None, thumb: bool) -> Response:
+    found = db.get(StayCover, stay.id)
+    if found is None:
+        raise HTTPException(404, "Pas d'image de couverture")
+    # Cache d'un an seulement pour l'URL de la version courante : une version périmée ou absente
+    # ne doit pas figer l'image actuelle sous une autre adresse.
+    cache = "public, max-age=31536000, immutable" if v == stay.cover_version else "no-cache"
+    headers = {"Cache-Control": cache, "X-Content-Type-Options": "nosniff"}
+    if thumb:
+        return Response(found.thumb, media_type="image/webp", headers=headers)
+    return Response(found.data, media_type=found.content_type, headers=headers)
+
+
+@router.get("/stays/{slug}/cover", response_class=Response, responses={200: {"content": {"image/*": {}}}})
+def cover(stay: StayDep, db: DB, v: int | None = None) -> Response:
+    """Image de couverture, à l'URL `?v=<cover_version>`."""
+    return cover_response(stay, db, v, thumb=False)
+
+
+@router.get("/stays/{slug}/cover/thumb", response_class=Response, responses={200: {"content": {"image/webp": {}}}})
+def cover_thumb(stay: StayDep, db: DB, v: int | None = None) -> Response:
+    """Vignette carrée de la couverture, pour l'accueil."""
+    return cover_response(stay, db, v, thumb=True)
+
+
 @router.post("/stays/{slug}/persons", response_model=s.PersonOut, status_code=201)
 def add_person(body: s.PersonCreate, stay: StayDep, db: DB) -> Person:
     """Un participant s'ajoute (nouveau foyer) ou ajoute quelqu'un à son foyer (conjoint, enfant)."""
@@ -129,26 +165,34 @@ def set_household_presences(household_id: int, body: s.HouseholdPresencesIn, sta
     h.replace_presences(db, stay, h.household_members(db, stay, household_id, body))
 
 
-@router.put("/stays/{slug}/activities/{activity_id}/signups/{person_id}", status_code=204)
-def sign_up(activity_id: int, person_id: int, stay: StayDep, db: DB) -> None:
+def _activity(db: DB, activity_id: int, stay: Stay) -> Activity:
     activity = db.get(Activity, activity_id)
     if activity is None or activity.stay_id != stay.id:
         raise HTTPException(404, "Activité introuvable")
-    if not activity.optional:
-        raise HTTPException(422, "Activité non facultative : tout le monde y participe")
-    p = person(db, person_id, stay)
-    if not p.does_activities:
-        raise HTTPException(422, f"{p.name} ne participe pas aux activités")
+    return activity
+
+
+@router.put("/stays/{slug}/activities/{activity_id}/signups/{person_id}", status_code=204)
+def sign_up(activity_id: int, person_id: int, stay: StayDep, db: DB) -> None:
+    """Inscription libre, même absent ce jour-là ; efface un éventuel désistement."""
+    _activity(db, activity_id, stay)
+    person(db, person_id, stay)
+    db.execute(delete(Decline).where(Decline.activity_id == activity_id, Decline.person_id == person_id))
     exists = db.scalar(select(Signup).where(Signup.activity_id == activity_id, Signup.person_id == person_id))
     if exists is None:
         db.add(Signup(activity_id=activity_id, person_id=person_id))
-        db.commit()
+    db.commit()
 
 
 @router.delete("/stays/{slug}/activities/{activity_id}/signups/{person_id}", status_code=204)
 def sign_out(activity_id: int, person_id: int, stay: StayDep, db: DB) -> None:
+    """Désinscription, mémorisée : « inscrire tout le monde » ne réinscrira pas la personne."""
+    _activity(db, activity_id, stay)
     person(db, person_id, stay)
     db.execute(delete(Signup).where(Signup.activity_id == activity_id, Signup.person_id == person_id))
+    exists = db.scalar(select(Decline).where(Decline.activity_id == activity_id, Decline.person_id == person_id))
+    if exists is None:
+        db.add(Decline(activity_id=activity_id, person_id=person_id))
     db.commit()
 
 

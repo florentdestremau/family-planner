@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { createStay, loginAs } from "./helpers";
+import { createStay, loginAs, SLOTS } from "./helpers";
 
 test("un participant s'identifie et déclare ses présences", async ({ page, request }) => {
   const stay = await createStay(request);
@@ -48,29 +48,48 @@ test("un nouveau venu s'ajoute lui-même", async ({ page, request }) => {
   await expect(page.getByRole("heading", { name: "Bonjour Camille" })).toBeVisible();
 });
 
-test("inscriptions aux activités facultatives pour soi et ses enfants", async ({ page, request }) => {
+test("choisir ses activités et celles de son foyer", async ({ page, request }) => {
   const stay = await createStay(request);
   const alice = await stay.person("Alice");
-  await stay.person("Léo", { kind: "child", with: alice });
-  await stay.person("Paul", { does_activities: false });
-  const kayak = await stay.adm("POST", "/activities", { name: "Kayak", date: "2026-10-31", start_time: "14:00", optional: true });
-  await stay.adm("POST", "/activities", { name: "Grand jeu", date: "2026-10-31" });
+  const leo = await stay.person("Léo", { kind: "child", with: alice });
+  const paul = await stay.person("Paul");
+  await stay.present(alice);
+  await stay.present(leo, SLOTS.filter((s) => s.date !== "2026-10-31"));
+  await stay.present(paul);
+  const kayak = await stay.adm("POST", "/activities", { name: "Kayak", date: "2026-10-31", start_time: "14:00" });
+  const jeu = await stay.adm("POST", "/activities", { name: "Grand jeu", date: "2026-10-31", invite_all: true });
 
+  // Accueil : seulement les activités où quelqu'un du foyer est inscrit.
   await loginAs(page, stay.url, "Alice");
-  const card = page.locator(".list-row").filter({ hasText: "Kayak" });
-  await card.getByText("Léo").click();
-  await expect(card.getByRole("checkbox", { name: "Léo" })).toBeChecked();
-  await expect.poll(async () => (await stay.snap()).signups.length).toBe(1);
+  const mine = page.locator(".card").filter({ has: page.getByRole("heading", { name: "🎯 Mes activités" }) });
+  await expect(mine.locator(".list-row")).toHaveCount(1);
+  await expect(mine.locator(".list-row")).toContainText("Grand jeu");
 
-  await page.getByRole("link", { name: "Activités" }).click();
-  const item = page.locator(".timeline-item").filter({ hasText: "Kayak" });
-  await expect(item.getByText("1 participant")).toBeVisible();
-  await item.getByText("Alice").first().click();
-  await expect(item.getByText("2 participants")).toBeVisible();
-  await expect(page.locator(".timeline-item").filter({ hasText: "Grand jeu" }).locator(".badge")).toHaveText("tout le monde");
+  await mine.getByRole("link", { name: "Choisir mes activités →" }).click();
+  const kayakItem = page.locator(".timeline-item").filter({ hasText: "Kayak" });
+  await expect(kayakItem.getByText("0 inscrit")).toBeVisible();
+  await expect(kayakItem.locator(".toggle").filter({ hasText: "Léo" })).toContainText("absent ce jour-là");
+  await expect(kayakItem.locator(".toggle").filter({ hasText: "Alice" })).not.toContainText("absent");
+  await kayakItem.locator(".toggle").filter({ hasText: "Léo" }).click();
+  await expect(kayakItem.getByText("1 inscrit")).toBeVisible();
+  await kayakItem.locator(".toggle").filter({ hasText: "Alice" }).click();
+  await expect(kayakItem.getByText("2 inscrits")).toBeVisible();
 
-  // Désinscription.
-  await item.getByText("Léo").first().click();
-  await expect(item.getByText("1 participant")).toBeVisible();
-  expect((await stay.snap()).signups).toEqual([{ activity_id: kayak.id, person_id: alice }]);
+  // Je me retire du grand jeu où l'organisateur a inscrit tout le monde.
+  const jeuItem = page.locator(".timeline-item").filter({ hasText: "Grand jeu" });
+  await expect(jeuItem.getByRole("checkbox", { name: "Alice" })).toBeChecked();
+  await expect(jeuItem.getByText("2 inscrits")).toBeVisible();
+  await jeuItem.locator(".toggle").filter({ hasText: "Alice" }).click();
+  await expect(jeuItem.getByText("1 inscrit")).toBeVisible();
+
+  const key = (s: { activity_id: number; person_id: number }) => `${s.activity_id}|${s.person_id}`;
+  await expect
+    .poll(async () => (await stay.snap()).signups.map(key).sort())
+    .toEqual([`${kayak.id}|${alice}`, `${kayak.id}|${leo}`, `${jeu.id}|${paul}`].sort());
+
+  // L'accueil suit : le kayak, avec Alice et Léo.
+  await page.getByRole("link", { name: "🏠 Moi" }).click();
+  await expect(mine.locator(".list-row")).toHaveCount(1);
+  await expect(mine.locator(".list-row")).toContainText("Kayak");
+  await expect(mine.locator(".chip")).toHaveText(["Alice", "Léo"]);
 });

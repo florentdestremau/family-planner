@@ -1,6 +1,6 @@
 from datetime import date, datetime, timezone
 
-from sqlalchemy import ForeignKey, Index, String, Text, UniqueConstraint
+from sqlalchemy import ForeignKey, Index, LargeBinary, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -26,6 +26,20 @@ class Stay(Base):
     last_meal: Mapped[str] = mapped_column(String(16), default="lunch")
     separate_couples: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(default=_now)
+    # Change à chaque nouvelle image de couverture, sans jamais reprendre une valeur passée (cache
+    # navigateur de longue durée sur l'URL qui la porte) ; vide : pas d'image.
+    cover_version: Mapped[int | None]
+
+
+class StayCover(Base):
+    """Image de couverture, à part pour ne pas la charger avec le séjour."""
+
+    __tablename__ = "stay_covers"
+
+    stay_id: Mapped[int] = mapped_column(ForeignKey("stays.id", ondelete="CASCADE"), primary_key=True)
+    content_type: Mapped[str] = mapped_column(String(32))
+    data: Mapped[bytes] = mapped_column(LargeBinary)
+    thumb: Mapped[bytes] = mapped_column(LargeBinary)  # vignette WebP de l'accueil
 
 
 class Household(Base):
@@ -46,7 +60,6 @@ class Person(Base):
     name: Mapped[str] = mapped_column(String(100))
     kind: Mapped[str] = mapped_column(String(16), default="adult")  # adult | child
     does_chores: Mapped[bool] = mapped_column(default=True)
-    does_activities: Mapped[bool] = mapped_column(default=True)
     household_id: Mapped[int] = mapped_column(
         ForeignKey("households.id", ondelete="CASCADE", name="fk_persons_household_id"), index=True
     )
@@ -131,11 +144,23 @@ class Activity(Base):
     date: Mapped[date]
     start_time: Mapped[str] = mapped_column(String(5), default="")  # HH:MM
     end_time: Mapped[str] = mapped_column(String(5), default="")
-    optional: Mapped[bool] = mapped_column(default=False)
 
 
 class Signup(Base):
+    """Inscription d'une personne à une activité (toutes les activités sont sur inscription)."""
+
     __tablename__ = "signups"
+    __table_args__ = (UniqueConstraint("activity_id", "person_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    activity_id: Mapped[int] = mapped_column(ForeignKey("activities.id", ondelete="CASCADE"), index=True)
+    person_id: Mapped[int] = mapped_column(ForeignKey("persons.id", ondelete="CASCADE"))
+
+
+class Decline(Base):
+    """Désistement : la personne s'est retirée d'une activité ; « inscrire tout le monde » la laisse de côté."""
+
+    __tablename__ = "activity_declines"
     __table_args__ = (UniqueConstraint("activity_id", "person_id"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
