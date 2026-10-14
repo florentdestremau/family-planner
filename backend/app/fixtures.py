@@ -19,7 +19,7 @@ from . import schemas as s
 from .db import SessionLocal
 from .models import Stay
 from .routers import admin, public
-from .slots import stay_slots
+from .slots import night_sides, stay_nights, stay_slots
 
 
 Meal = tuple[int, str]  # (jour du séjour, à partir de 0 ; repas)
@@ -31,7 +31,8 @@ class Family:
 
     Présences : du repas `arrive` au repas `leave` inclus (par défaut tout le séjour) ; `members`
     décale une personne (arrivée, départ) ; `away` retire des repas (dîner au restaurant…).
-    Nuits : déduites des repas (dîner puis petit-déjeuner), sauf si `nights` les donne (jours du séjour).
+    Nuits : toutes celles qu'encadrent l'arrivée et le départ (un repas pris ailleurs n'y change rien,
+    comme « tout le séjour » puis un repas décoché), sauf si `nights` les donne (jours du séjour).
     """
 
     adults: list[str]
@@ -217,7 +218,11 @@ def load(db: Session, fx: Fixture) -> Stay:
             last = position(leave or fam.leave, len(slots) - 1)
             away = {(start + timedelta(days=day), meal) for day, meal in fam.away.get(name, [])}
             present = [s.SlotIn(date=d, meal=m) for d, m in slots[first : last + 1] if (d, m) not in away]
-            nights = None if fam.nights is None else [start + timedelta(days=day) for day in fam.nights]
+            if fam.nights is None:
+                span = set(slots[first : last + 1])
+                nights = [n for n in stay_nights(start, end) if set(night_sides(n)) <= span]
+            else:
+                nights = [start + timedelta(days=day) for day in fam.nights]
             public.set_presences(ids[name], s.PresencesIn(slots=present, nights=nights), stay, db)
 
     for room_name, beds in fx.rooms:

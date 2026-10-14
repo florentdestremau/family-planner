@@ -22,17 +22,18 @@ export function makeSnapshot(overrides: Partial<Snapshot> = {}): Snapshot {
       { date: "2026-11-01", meal: "breakfast" },
       { date: "2026-11-01", meal: "lunch" },
     ],
+    nights: ["2026-10-30", "2026-10-31"],
     households: [
       { id: 50, name: "" },
       { id: 51, name: "Mamie" },
       { id: 52, name: "" },
     ],
     persons: [
-      { id: 1, name: "Alice", kind: "adult", does_chores: true, household_id: 50, partner_id: 2, bed_id: 10 },
-      { id: 2, name: "Bob", kind: "adult", does_chores: true, household_id: 50, partner_id: 1, bed_id: 10 },
-      { id: 3, name: "Léo", kind: "child", does_chores: false, household_id: 50, partner_id: null, bed_id: null },
-      { id: 4, name: "Mamie", kind: "adult", does_chores: false, household_id: 51, partner_id: null, bed_id: null },
-      { id: 5, name: "Nina", kind: "child", does_chores: false, household_id: 52, partner_id: null, bed_id: null },
+      { id: 1, name: "Alice", kind: "adult", does_chores: true, household_id: 50, partner_id: 2 },
+      { id: 2, name: "Bob", kind: "adult", does_chores: true, household_id: 50, partner_id: 1 },
+      { id: 3, name: "Léo", kind: "child", does_chores: false, household_id: 50, partner_id: null },
+      { id: 4, name: "Mamie", kind: "adult", does_chores: false, household_id: 51, partner_id: null },
+      { id: 5, name: "Nina", kind: "child", does_chores: false, household_id: 52, partner_id: null },
     ],
     presences: [
       { person_id: 1, date: "2026-10-30", meal: "dinner" },
@@ -40,6 +41,14 @@ export function makeSnapshot(overrides: Partial<Snapshot> = {}): Snapshot {
       { person_id: 2, date: "2026-10-30", meal: "dinner" },
       { person_id: 3, date: "2026-10-30", meal: "dinner" },
       { person_id: 4, date: "2026-10-31", meal: "lunch" },
+    ],
+    // Alice et Bob dans le lit double les deux nuits ; Léo vendredi seulement, sans lit.
+    person_nights: [
+      { person_id: 1, date: "2026-10-30", bed_id: 10 },
+      { person_id: 1, date: "2026-10-31", bed_id: 10 },
+      { person_id: 2, date: "2026-10-30", bed_id: 10 },
+      { person_id: 2, date: "2026-10-31", bed_id: 10 },
+      { person_id: 3, date: "2026-10-30", bed_id: null },
     ],
     rooms: [{ id: 5, name: "Bleue", notes: "", beds: [{ id: 10, room_id: 5, kind: "double", label: "" }] }],
     chore_types: [{ id: 7, name: "Cuisine", moments: ["dinner"], people_needed: 2, every_n_days: 1 }],

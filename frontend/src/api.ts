@@ -38,7 +38,6 @@ export interface Person {
   does_chores: boolean;
   household_id: number;
   partner_id: number | null;
-  bed_id: number | null;
 }
 
 export interface Slot {
@@ -48,6 +47,25 @@ export interface Slot {
 
 export interface Presence extends Slot {
   person_id: number;
+}
+
+/** Nuit passée sur place (nuit du jour `date`, de `date` au lendemain) et lit occupé cette nuit-là. */
+export interface PersonNight {
+  person_id: number;
+  date: string;
+  bed_id: number | null;
+}
+
+export interface BedAssignResult {
+  /** Nuits que la personne n'avait pas déclarées, ajoutées par l'affectation. */
+  warning: string | null;
+}
+
+export interface AutoAssignResult {
+  /** Nuitées attribuées. */
+  assigned: number;
+  /** Nuitées encore sans lit. */
+  unassigned: number;
 }
 
 export interface Bed {
@@ -107,6 +125,8 @@ export interface AssistantAction {
   person_id: number;
   name: string;
   slots: Slot[];
+  /** Nuits sur place (date du soir). */
+  nights: string[];
 }
 
 export interface AssistantReply {
@@ -118,9 +138,12 @@ export interface Snapshot {
   stay: Stay;
   days: string[];
   slots: Slot[];
+  /** Nuits du séjour (date du soir), sans le dernier jour. */
+  nights: string[];
   households: Household[];
   persons: Person[];
   presences: Presence[];
+  person_nights: PersonNight[];
   rooms: Room[];
   chore_types: ChoreType[];
   chore_assignments: ChoreAssignment[];

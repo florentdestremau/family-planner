@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-type Toast = { id: number; message: string; kind: "error" | "ok" };
+type Toast = { id: number; message: string; kind: "error" | "ok" | "warn" };
 const listeners = new Set<(t: Toast) => void>();
 let nextId = 1;
 

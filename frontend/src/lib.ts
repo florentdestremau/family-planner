@@ -1,4 +1,4 @@
-import type { Activity, AssistantAction, BedKind, Meal, Moment, Person, Snapshot, Slot, StaySummary } from "./api";
+import type { Activity, AssistantAction, BedKind, Meal, Moment, Person, PersonNight, Snapshot, Slot, StaySummary } from "./api";
 
 export const MEALS: Meal[] = ["breakfast", "lunch", "dinner"];
 export const MOMENTS: Moment[] = [...MEALS, "day"];
@@ -52,6 +52,42 @@ export const coverThumbUrl = (slug: string, version: number) => `/api/stays/${sl
 export const MAX_COVER_BYTES = 5_000_000;
 
 export const presenceKey = (personId: number, date: string, meal: Meal) => `${personId}|${date}|${meal}`;
+/** Nuit dans un ensemble de présences, à côté des clés « date|repas ». */
+export const nightKey = (date: string) => `${date}|night`;
+
+const WEEKDAYS = ["dim.", "lun.", "mar.", "mer.", "jeu.", "ven.", "sam."];
+
+/** Nuits courtes, triées : « ven., sam. ». */
+export function nightsLabel(dates: string[]): string {
+  return [...dates]
+    .sort()
+    .map((d) => WEEKDAYS[asDate(d).getDay()])
+    .join(", ");
+}
+
+/**
+ * Nuits qui suivent les repas, sans ambiguïté (même règle que le serveur). Seules les nuits dont un
+ * repas voisin a changé entre `before` et `after` sont revues : dîner et petit-déj du lendemain →
+ * la personne dort sur place ; ni l'un ni l'autre → elle n'y dort pas ; un seul des deux (arrivée
+ * après le dîner…) → la nuit reste comme dans `after`.
+ */
+export function followMeals(nights: string[], before: Set<string>, after: Set<string>): Set<string> {
+  const next = new Set(after);
+  for (const night of nights) {
+    const sides = [`${night}|dinner`, `${addDays(night, 1)}|breakfast`];
+    if (sides.every((k) => before.has(k) === after.has(k))) continue;
+    const present = sides.filter((k) => after.has(k)).length;
+    if (present === 2) next.add(nightKey(night));
+    if (present === 0) next.delete(nightKey(night));
+  }
+  return next;
+}
+
+export interface Lodging {
+  person: Person;
+  /** Nuits concernées (dans ce lit, ou sans lit), triées. */
+  nights: string[];
+}
 export const occurrenceKey = (choreId: number, date: string, moment: Moment) => `${choreId}|${date}|${moment}`;
 
 export type Index = ReturnType<typeof buildIndex>;
@@ -73,6 +109,9 @@ export function buildIndex(snap: Snapshot) {
   const bedById = new Map(snap.rooms.flatMap((r) => r.beds.map((b) => [b.id, { ...b, room: r }] as const)));
   const signups = new Set(snap.signups.map((s) => `${s.activity_id}|${s.person_id}`));
   const menuBySlot = new Map(snap.menus.map((m) => [`${m.date}|${m.meal}`, m]));
+  const nightsByPerson = new Map<number, PersonNight[]>();
+  for (const n of snap.person_nights) nightsByPerson.set(n.person_id, [...(nightsByPerson.get(n.person_id) ?? []), n]);
+  const nightsOf = (personId: number): PersonNight[] => nightsByPerson.get(personId) ?? [];
 
   const occurrences = new Map<string, number[]>();
   for (const a of snap.chore_assignments) {
@@ -83,16 +122,48 @@ export function buildIndex(snap: Snapshot) {
   const name = (id: number | null | undefined) => (id != null ? (personById.get(id)?.name ?? "?") : "");
 
   const isPresent = (personId: number, date: string, meal: Meal) => presence.has(presenceKey(personId, date, meal));
+  const sleepsOn = (personId: number, date: string) => nightsOf(personId).some((n) => n.date === date);
 
-  const mealCount = (date: string, meal: Meal) => {
+  const count = (keep: (p: Person) => boolean) => {
     let adults = 0;
     let children = 0;
     for (const p of snap.persons) {
-      if (!isPresent(p.id, date, meal)) continue;
+      if (!keep(p)) continue;
       if (p.kind === "adult") adults++;
       else children++;
     }
     return { adults, children, total: adults + children };
+  };
+  const mealCount = (date: string, meal: Meal) => count((p) => isPresent(p.id, date, meal));
+  /** Personnes qui dorment sur place cette nuit-là (couchages). */
+  const nightCount = (date: string) => count((p) => sleepsOn(p.id, date));
+
+  /** Personnes regroupées avec leurs nuits retenues par `keep` (une nuit donnée, ou toutes si `night` est nul). */
+  const lodgings = (keep: (n: PersonNight) => boolean, night: string | null): Lodging[] =>
+    snap.persons
+      .map((person) => ({
+        person,
+        nights: nightsOf(person.id)
+          .filter((n) => (night === null || n.date === night) && keep(n))
+          .map((n) => n.date)
+          .sort(),
+      }))
+      .filter((l) => l.nights.length > 0);
+  /** Occupants d'un lit, une nuit donnée ou toutes nuits confondues. */
+  const occupants = (bedId: number, night: string | null) => lodgings((n) => n.bed_id === bedId, night);
+  /** Personnes qui dorment sur place sans lit, une nuit donnée ou toutes nuits confondues. */
+  const unbedded = (night: string | null) => lodgings((n) => n.bed_id === null, night);
+  /** Occupation la plus forte d'un lit sur l'ensemble des nuits. */
+  const bedLoad = (bedId: number) => Math.max(0, ...snap.nights.map((d) => occupants(bedId, d).length));
+  /** Nuits à préciser quand elles ne couvrent pas tout le séjour : « ven. », sinon rien. */
+  const nightsNote = (nights: string[]) => (nights.length === snap.nights.length ? "" : nightsLabel(nights));
+  /** Couchage d'une personne : ses lits (null : sans lit), chacun avec ses nuits. */
+  const bedPlan = (personId: number) => {
+    const byBed = new Map<number | null, string[]>();
+    for (const n of [...nightsOf(personId)].sort((a, b) => a.date.localeCompare(b.date))) {
+      byBed.set(n.bed_id, [...(byBed.get(n.bed_id) ?? []), n.date]);
+    }
+    return [...byBed].map(([bedId, nights]) => ({ bed: bedId === null ? undefined : bedById.get(bedId), nights }));
   };
 
   /** Inscrits à une activité (toutes les activités sont sur inscription). */
@@ -133,6 +204,16 @@ export function buildIndex(snap: Snapshot) {
     name,
     isPresent,
     mealCount,
+    nightCount,
+    nightsOf,
+    sleepsOn,
+    occupants,
+    unbedded,
+    bedLoad,
+    nightsNote,
+    bedPlan,
+    /** Personnes qui n'ont déclaré aucune nuit. */
+    withoutNights: () => snap.persons.filter((p) => nightsOf(p.id).length === 0),
     activityParticipants,
     household,
     hasSlot: (date: string, meal: Meal) => slotSet.has(`${date}|${meal}`),
@@ -151,9 +232,12 @@ export function sortedMoments(a: { date: string; moment: Moment }, b: { date: st
   return a.date.localeCompare(b.date) || MOMENTS.indexOf(a.moment) - MOMENTS.indexOf(b.moment);
 }
 
-/** Présences d'une personne, en clés « date|repas ». */
+/** Présences d'une personne, en clés « date|repas » et « date|night ». */
 export function slotsOf(snap: Snapshot, personId: number): Set<string> {
-  return new Set(snap.presences.filter((p) => p.person_id === personId).map((p) => `${p.date}|${p.meal}`));
+  return new Set([
+    ...snap.presences.filter((p) => p.person_id === personId).map((p) => `${p.date}|${p.meal}`),
+    ...snap.person_nights.filter((n) => n.person_id === personId).map((n) => nightKey(n.date)),
+  ]);
 }
 
 export function sameSets(sets: Set<string>[]): boolean {
@@ -163,6 +247,11 @@ export function sameSets(sets: Set<string>[]): boolean {
 /** Clés « date|repas » → créneaux de l'API, dans l'ordre du séjour. */
 export function toSlots(snap: Snapshot, keys: Set<string>) {
   return snap.slots.filter((s) => keys.has(`${s.date}|${s.meal}`)).map(({ date, meal }) => ({ date, meal }));
+}
+
+/** Clés « date|night » → nuits de l'API, dans l'ordre du séjour. */
+export function toNights(snap: Snapshot, keys: Set<string>): string[] {
+  return snap.nights.filter((d) => keys.has(nightKey(d)));
 }
 
 /** Texte prêt à coller dans un LLM pour générer une liste de courses. */
@@ -201,8 +290,6 @@ export function shortRange(start: string, end: string): string {
   return start === end ? dayLabel(start) : `${dayLabel(start)} → ${dayLabel(end)}`;
 }
 
-const WEEKDAYS = ["dim.", "lun.", "mar.", "mer.", "jeu.", "ven.", "sam."];
-
 /** Créneau court pour l'assistant : « ven. dîner », « dim. déjeuner ». */
 export function slotShortLabel(slot: Slot): string {
   return `${WEEKDAYS[asDate(slot.date).getDay()]} ${MOMENT_LABEL[slot.meal].toLowerCase()}`;
@@ -213,6 +300,11 @@ export function slotShortLabel(slot: Slot): string {
  * manquants dans la fourchette (« sauf sam. dîner ») pour qu'un trou ne passe pas inaperçu.
  */
 export function actionSummary(action: AssistantAction): string {
+  const nights = action.nights.length ? ` · nuits : ${nightsLabel(action.nights)}` : " · aucune nuit sur place";
+  return mealsSummary(action) + nights;
+}
+
+function mealsSummary(action: AssistantAction): string {
   const ordered = [...action.slots].sort((a, b) => a.date.localeCompare(b.date) || MEALS.indexOf(a.meal) - MEALS.indexOf(b.meal));
   if (ordered.length === 0) return `${action.name} : aucun repas`;
   const first = ordered[0];
