@@ -3,7 +3,7 @@ import { Link } from "react-router";
 import type { Person } from "../api";
 import AddMember from "../components/AddMember";
 import HouseholdPresences from "../components/HouseholdPresences";
-import { Chip, Empty, Toggle } from "../components/ui";
+import { Chip, Empty } from "../components/ui";
 import { BED_LABEL, coverUrl, dayLabel, MOMENT_LABEL, sortedMoments } from "../lib";
 import { useStay } from "../stay";
 import WhoAmI from "./WhoAmI";
@@ -20,12 +20,15 @@ export default function Me() {
 }
 
 function Dashboard({ me }: { me: Person }) {
-  const { snap, idx, slug, call, setMe } = useStay();
+  const { snap, idx, slug, setMe } = useStay();
   const household = idx.household(me);
   const householdIds = new Set(household.map((p) => p.id));
 
   const myChores = snap.chore_assignments.filter((a) => householdIds.has(a.person_id)).sort(sortedMoments);
-  const optional = snap.activities.filter((a) => a.optional);
+  // Activités où quelqu'un du foyer est inscrit, avec qui y va.
+  const myActivities = snap.activities
+    .map((a) => ({ activity: a, going: household.filter((p) => idx.signups.has(`${a.id}|${p.id}`)) }))
+    .filter(({ going }) => going.length > 0);
 
   return (
     <div className="stack">
@@ -72,11 +75,15 @@ function Dashboard({ me }: { me: Person }) {
         )}
       </section>
 
-      {optional.length > 0 && (
-        <section className="card">
-          <h2>🎯 Activités facultatives</h2>
+      <section className="card">
+        <h2>🎯 Mes activités</h2>
+        {snap.activities.length === 0 ? (
+          <Empty>Aucune activité prévue pour l'instant.</Empty>
+        ) : myActivities.length === 0 ? (
+          <Empty>Personne du foyer n'est inscrit pour l'instant.</Empty>
+        ) : (
           <ul className="list">
-            {optional.map((a) => (
+            {myActivities.map(({ activity: a, going }) => (
               <li key={a.id} className="list-row list-row-wrap">
                 <div>
                   <strong>{a.name}</strong>
@@ -86,29 +93,23 @@ function Dashboard({ me }: { me: Person }) {
                     {a.location && ` · ${a.location}`}
                   </div>
                 </div>
-                <div className="toggles">
-                  {household
-                    .filter((p) => p.does_activities)
-                    .map((p) => {
-                      const on = idx.signups.has(`${a.id}|${p.id}`);
-                      return (
-                        <Toggle
-                          key={p.id}
-                          label={p.name}
-                          checked={on}
-                          onChange={(v) => call(v ? "PUT" : "DELETE", `/activities/${a.id}/signups/${p.id}`)}
-                        />
-                      );
-                    })}
-                </div>
+                {household.length > 1 && (
+                  <div className="chips">
+                    {going.map((p) => (
+                      <Chip key={p.id} person={p} highlight={p.id === me.id} />
+                    ))}
+                  </div>
+                )}
               </li>
             ))}
           </ul>
+        )}
+        {snap.activities.length > 0 && (
           <Link to={`/s/${slug}/planning`} className="small">
-            Voir tout le planning →
+            Choisir mes activités →
           </Link>
-        </section>
-      )}
+        )}
+      </section>
 
       <section className="card">
         <h2>🛏️ Couchage</h2>

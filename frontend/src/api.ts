@@ -36,7 +36,6 @@ export interface Person {
   name: string;
   kind: PersonKind;
   does_chores: boolean;
-  does_activities: boolean;
   household_id: number;
   partner_id: number | null;
   bed_id: number | null;
@@ -88,7 +87,6 @@ export interface Activity {
   date: string;
   start_time: string;
   end_time: string;
-  optional: boolean;
 }
 
 export interface Signup {

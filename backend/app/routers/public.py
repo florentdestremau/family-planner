@@ -17,6 +17,7 @@ from ..models import (
     Bed,
     ChoreAssignment,
     ChoreType,
+    Decline,
     Household,
     Menu,
     Person,
@@ -164,26 +165,34 @@ def set_household_presences(household_id: int, body: s.HouseholdPresencesIn, sta
     h.replace_presences(db, stay, h.household_members(db, stay, household_id, body))
 
 
-@router.put("/stays/{slug}/activities/{activity_id}/signups/{person_id}", status_code=204)
-def sign_up(activity_id: int, person_id: int, stay: StayDep, db: DB) -> None:
+def _activity(db: DB, activity_id: int, stay: Stay) -> Activity:
     activity = db.get(Activity, activity_id)
     if activity is None or activity.stay_id != stay.id:
         raise HTTPException(404, "Activité introuvable")
-    if not activity.optional:
-        raise HTTPException(422, "Activité non facultative : tout le monde y participe")
-    p = person(db, person_id, stay)
-    if not p.does_activities:
-        raise HTTPException(422, f"{p.name} ne participe pas aux activités")
+    return activity
+
+
+@router.put("/stays/{slug}/activities/{activity_id}/signups/{person_id}", status_code=204)
+def sign_up(activity_id: int, person_id: int, stay: StayDep, db: DB) -> None:
+    """Inscription libre, même absent ce jour-là ; efface un éventuel désistement."""
+    _activity(db, activity_id, stay)
+    person(db, person_id, stay)
+    db.execute(delete(Decline).where(Decline.activity_id == activity_id, Decline.person_id == person_id))
     exists = db.scalar(select(Signup).where(Signup.activity_id == activity_id, Signup.person_id == person_id))
     if exists is None:
         db.add(Signup(activity_id=activity_id, person_id=person_id))
-        db.commit()
+    db.commit()
 
 
 @router.delete("/stays/{slug}/activities/{activity_id}/signups/{person_id}", status_code=204)
 def sign_out(activity_id: int, person_id: int, stay: StayDep, db: DB) -> None:
+    """Désinscription, mémorisée : « inscrire tout le monde » ne réinscrira pas la personne."""
+    _activity(db, activity_id, stay)
     person(db, person_id, stay)
     db.execute(delete(Signup).where(Signup.activity_id == activity_id, Signup.person_id == person_id))
+    exists = db.scalar(select(Decline).where(Decline.activity_id == activity_id, Decline.person_id == person_id))
+    if exists is None:
+        db.add(Decline(activity_id=activity_id, person_id=person_id))
     db.commit()
 
 

@@ -95,12 +95,9 @@ export function buildIndex(snap: Snapshot) {
     return { adults, children, total: adults + children };
   };
 
+  /** Inscrits à une activité (toutes les activités sont sur inscription). */
   const activityParticipants = (activity: Activity): Person[] =>
-    snap.persons.filter((p) =>
-      activity.optional
-        ? signups.has(`${activity.id}|${p.id}`)
-        : p.does_activities && presentDays.has(`${p.id}|${activity.date}`),
-    );
+    snap.persons.filter((p) => signups.has(`${activity.id}|${p.id}`));
 
   /** Mon foyer : moi d'abord, puis les autres membres. */
   const household = (me: Person | undefined): Person[] =>

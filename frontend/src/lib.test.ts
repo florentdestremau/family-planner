@@ -106,11 +106,11 @@ describe("buildIndex", () => {
     expect(idx.mealCount("2026-11-01", "lunch")).toEqual({ adults: 0, children: 0, total: 0 });
   });
 
-  it("participants : inscrits si facultative, sinon présents ce jour-là qui participent aux activités", () => {
-    const [optional, mandatory] = snap.activities;
-    expect(idx.activityParticipants(optional).map((p) => p.name)).toEqual(["Léo"]);
-    // Mamie est présente le 31 mais ne participe pas aux activités ; Bob et Léo ne sont là que le 30.
-    expect(idx.activityParticipants(mandatory).map((p) => p.name)).toEqual(["Alice"]);
+  it("participants : les inscrits, présents ou non ce jour-là", () => {
+    const [rando, jeux] = snap.activities;
+    // Léo n'est là que le 30 : inscrit quand même à la rando du 31.
+    expect(idx.activityParticipants(rando).map((p) => p.name)).toEqual(["Léo"]);
+    expect(idx.activityParticipants(jeux).map((p) => p.name)).toEqual(["Alice", "Mamie"]);
   });
 
   it("foyer : soi-même d'abord, puis les adultes, puis les enfants", () => {
