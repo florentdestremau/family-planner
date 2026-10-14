@@ -128,3 +128,46 @@ describe("savedAtLabel", () => {
     expect(savedAtLabel(Date.now())).toMatch(/^à \d\d:\d\d$/);
   });
 });
+
+describe("suggestion d'installation", () => {
+  const DAY = 24 * 3600 * 1000;
+
+  it("isMobile : écran tactile seulement", async () => {
+    const { isMobile } = await load();
+    expect(isMobile({ matchMedia: matchMedia(true) } as unknown as Window)).toBe(true);
+    expect(isMobile({ matchMedia: matchMedia(false) } as unknown as Window)).toBe(false);
+    expect(isMobile({} as Window)).toBe(false);
+    expect(isMobile()).toBe(false);
+  });
+
+  it("compte les pages, pas les rechargements", async () => {
+    const { countView, NUDGE_START } = await load();
+    const s = countView(countView(NUDGE_START, "/s/a"), "/s/a");
+    expect(s.views).toBe(1);
+    expect(countView(s, "/s/a/repas").views).toBe(2);
+  });
+
+  it("dès la 3ᵉ page", async () => {
+    const { countView, shouldSuggestInstall, NUDGE_START } = await load();
+    let s = countView(countView(NUDGE_START, "/"), "/s/a");
+    expect(shouldSuggestInstall(s)).toBe(false);
+    s = countView(s, "/s/a/repas");
+    expect(shouldSuggestInstall(s)).toBe(true);
+    expect(shouldSuggestInstall({ ...s, done: true })).toBe(false);
+  });
+
+  it("après « Plus tard » : 14 jours et 3 pages de plus, 3 refus au plus", async () => {
+    const { dismissNudge, shouldSuggestInstall, NUDGE_START } = await load();
+    const t0 = 1_000 * DAY;
+    let s = dismissNudge({ ...NUDGE_START, views: 3 }, t0);
+    expect(s).toMatchObject({ dismissals: 1, dismissedAt: t0, viewsAtDismiss: 3 });
+    expect(shouldSuggestInstall({ ...s, views: 10 }, t0 + 13 * DAY)).toBe(false);
+    expect(shouldSuggestInstall({ ...s, views: 5 }, t0 + 15 * DAY)).toBe(false);
+    expect(shouldSuggestInstall({ ...s, views: 6 }, t0 + 15 * DAY)).toBe(true);
+
+    s = dismissNudge(dismissNudge({ ...s, views: 6 }, t0 + 15 * DAY), t0 + 30 * DAY);
+    expect(s.dismissals).toBe(3);
+    expect(shouldSuggestInstall({ ...s, views: 100 }, t0 + 365 * DAY)).toBe(false);
+    expect(dismissNudge(s).dismissedAt).toBeGreaterThan(0);
+  });
+});

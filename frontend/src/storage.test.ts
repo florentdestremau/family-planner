@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { NUDGE_START } from "./pwa";
 import { storage } from "./storage";
 
 afterEach(() => {
@@ -44,6 +45,15 @@ describe("storage", () => {
     expect(storage.theme()).toBe("light");
     storage.setTheme("system");
     expect(storage.theme()).toBe("system");
+  });
+
+  it("mémorise la suggestion d'installation", () => {
+    expect(storage.installNudge()).toEqual(NUDGE_START);
+    storage.setInstallNudge({ ...NUDGE_START, views: 4, lastPath: "/" });
+    expect(storage.installNudge()).toMatchObject({ views: 4, lastPath: "/", done: false });
+    // Ancien format incomplet : complété par les valeurs par défaut.
+    localStorage.setItem("fp:install-nudge", '{"views": 2}');
+    expect(storage.installNudge()).toEqual({ ...NUDGE_START, views: 2 });
   });
 
   it("résiste à un thème corrompu", () => {

@@ -104,7 +104,7 @@ seule la clé organisateur protège la configuration.
 
 **Impressions** — présences, corvées par personne et jour par jour, menus avec couverts, chambres, activités. Export texte menus × couverts à coller dans un LLM pour générer la liste de courses.
 
-**Appli installable et hors ligne (PWA)** — un bouton 📲 « Installer l'appli » apparaît quand le navigateur le permet (Chrome, Edge, Android) ; sur iPhone et iPad, il explique l'ajout depuis Safari (Partager → Sur l'écran d'accueil). Hors ligne, **consultation seule** :
+**Appli installable et hors ligne (PWA)** — un bouton 📲 « Installer l'appli » apparaît quand le navigateur le permet (Chrome, Edge, Android) ; sur iPhone et iPad, il explique l'ajout depuis Safari (Partager → Sur l'écran d'accueil). Sur mobile, un bandeau discret le suggère à partir de la 3ᵉ page vue ; « Plus tard » le masque (retour au plus tôt 14 jours et 3 pages après, 3 refus au plus). Hors ligne, **consultation seule** :
 - l'interface est servie par un service worker (`vite-plugin-pwa`, cache de `index.html` et `/assets`) ;
 - les données (liste des séjours, séjours déjà ouverts sur l'appareil) viennent du cache de React Query, sauvegardé dans le navigateur une semaine et vidé à chaque nouvelle version du front ;
 - un bandeau indique l'heure des données ; inscriptions, présences, création de séjour et espace organisateur sont désactivés, l'assistant est masqué ; rien n'est mis en file pour plus tard.

@@ -1423,6 +1423,48 @@ fieldset.offline-lock:disabled .toggle {
   margin-top: 0.75rem;
   width: 100%;
 }
+.install-nudge {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.4rem 0.4rem 0.9rem;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  font-size: 0.85rem;
+  font-weight: 600;
+  animation: slideUp 0.25s ease;
+}
+.install-nudge span {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.25;
+}
+.install-nudge .btn-small {
+  padding: 0.35rem 0.8rem;
+}
+.install-nudge-close {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 0.9rem;
+  padding: 0.3rem 0.5rem;
+  cursor: pointer;
+}
+/* Laisse la place au bouton de l'assistant ; s'efface devant son panneau et la mise à jour. */
+body:has(.assistant-fab) .install-nudge {
+  right: calc(1.25rem + 60px + 12px);
+}
+body:has(.assistant-panel) .install-nudge,
+body:has(.update-prompt) .install-nudge {
+  display: none;
+}
 .update-prompt {
   position: fixed;
   left: 50%;

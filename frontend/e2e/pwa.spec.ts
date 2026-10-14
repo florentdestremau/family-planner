@@ -98,3 +98,72 @@ test.describe("sur iPhone", () => {
     await expect(help).toHaveCount(0);
   });
 });
+
+/** Simule l'invite d'installation du navigateur (Chromium) ; `window.prompted` passe à true au clic. */
+async function fakeInstallPrompt(page: Page) {
+  await page.evaluate(() => {
+    const e = new Event("beforeinstallprompt", { cancelable: true }) as Event & Record<string, unknown>;
+    e.prompt = async () => void ((window as unknown as Record<string, boolean>).prompted = true);
+    e.userChoice = Promise.resolve({ outcome: "accepted" });
+    window.dispatchEvent(e);
+  });
+}
+
+/** Trois pages : l'accueil, un séjour, son onglet Repas (navigation dans l'appli, sans rechargement). */
+async function browseThreePages(page: Page, { beforeLast, prompt = true }: { beforeLast?: () => Promise<void>; prompt?: boolean } = {}) {
+  await page.goto("/");
+  if (prompt) await fakeInstallPrompt(page);
+  await page.getByRole("link", { name: /Grand week-end chez Mamie/ }).click();
+  await expect(page.getByRole("heading", { name: "Qui êtes-vous ?" })).toBeVisible();
+  await beforeLast?.();
+  await page.getByRole("link", { name: "Repas" }).click();
+}
+
+const nudge = (page: Page) => page.locator(".install-nudge");
+
+test("suggestion d'installation : sur mobile, à la 3ᵉ page, « Plus tard » est mémorisé", async ({ page }, info) => {
+  test.skip(info.project.name !== "mobile", "mobile seulement");
+  await browseThreePages(page, { beforeLast: () => expect(nudge(page)).toHaveCount(0) });
+  await expect(nudge(page)).toContainText("L'appli, même hors ligne");
+
+  await nudge(page).getByRole("button", { name: "Plus tard" }).click();
+  await expect(nudge(page)).toHaveCount(0);
+  await page.getByRole("link", { name: "Corvées" }).click();
+  await page.reload();
+  await fakeInstallPrompt(page);
+  await page.getByRole("link", { name: "Activités" }).click();
+  await expect(page.getByRole("heading", { name: /Activités|Planning/ }).first()).toBeVisible();
+  await expect(nudge(page)).toHaveCount(0);
+});
+
+test("suggestion d'installation : « Installer » ouvre l'invite du navigateur", async ({ page }, info) => {
+  test.skip(info.project.name !== "mobile", "mobile seulement");
+  await browseThreePages(page);
+  await nudge(page).getByRole("button", { name: "Installer" }).click();
+  await expect.poll(() => page.evaluate(() => (window as unknown as Record<string, boolean>).prompted)).toBe(true);
+  await expect(nudge(page)).toHaveCount(0);
+});
+
+test("suggestion d'installation : jamais sur ordinateur", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop", "ordinateur seulement");
+  await browseThreePages(page);
+  await page.getByRole("link", { name: "Corvées" }).click();
+  await expect(page.getByRole("button", { name: "Installer l'appli" })).toBeVisible();
+  await expect(nudge(page)).toHaveCount(0);
+});
+
+test.describe("suggestion sur iPhone", () => {
+  test.use({ userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile Safari/604.1" });
+
+  test("« Installer » explique l'ajout depuis Safari", async ({ page }, info) => {
+    test.skip(info.project.name !== "mobile", "mobile seulement");
+    // Safari n'a pas d'invite d'installation.
+    await browseThreePages(page, { prompt: false });
+    await nudge(page).getByRole("button", { name: "Installer" }).click();
+    const help = page.getByRole("dialog", { name: "Installer l'appli" });
+    await expect(help).toContainText("Sur l'écran d'accueil");
+    await help.getByRole("button", { name: "Compris" }).click();
+    await expect(help).toHaveCount(0);
+    await expect(nudge(page)).toHaveCount(0);
+  });
+});

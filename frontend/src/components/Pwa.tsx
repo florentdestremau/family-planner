@@ -1,7 +1,9 @@
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
+import { useLocation } from "react-router";
 import { useRegisterSW } from "virtual:pwa-register/react";
-import { install, online, savedAtLabel } from "../pwa";
+import { countView, dismissNudge, install, isMobile, type NudgeState, online, savedAtLabel, shouldSuggestInstall } from "../pwa";
+import { storage } from "../storage";
 
 export function useOnline(): boolean {
   return useSyncExternalStore(online.subscribe, online.get);
@@ -46,29 +48,86 @@ export function InstallButton({ compact = false }: { compact?: boolean }) {
       >
         {compact ? <span className="theme-toggle-icon">📲</span> : "📲 Installer l'appli"}
       </button>
-      {help &&
-        // Hors de la barre du haut (sticky, flou) qui piégerait la fenêtre dans son empilement.
-        createPortal(
-          <div className="install-help-backdrop" onClick={() => setHelp(false)}>
-            <div className="card install-help" role="dialog" aria-label="Installer l'appli" onClick={(e) => e.stopPropagation()}>
-              <h2>📲 Installer l'appli</h2>
-              <ol>
-                <li>
-                  Dans Safari, touchez <strong>Partager</strong> (le carré avec une flèche vers le haut).
-                </li>
-                <li>
-                  Choisissez <strong>Sur l'écran d'accueil</strong>, puis <strong>Ajouter</strong>.
-                </li>
-              </ol>
-              <p className="hint">L'appli s'ouvrira en plein écran et restera consultable hors ligne.</p>
-              <button className="btn btn-primary" onClick={() => setHelp(false)}>
-                Compris
-              </button>
-            </div>
-          </div>,
-          document.body,
-        )}
+      {help && <IosInstallHelp onClose={() => setHelp(false)} />}
     </>
+  );
+}
+
+/** Mode d'emploi Safari : iOS n'a pas d'invite d'installation. */
+function IosInstallHelp({ onClose }: { onClose: () => void }) {
+  // Hors de la barre du haut (sticky, flou) qui piégerait la fenêtre dans son empilement.
+  return createPortal(
+    <div className="install-help-backdrop" onClick={onClose}>
+      <div className="card install-help" role="dialog" aria-label="Installer l'appli" onClick={(e) => e.stopPropagation()}>
+        <h2>📲 Installer l'appli</h2>
+        <ol>
+          <li>
+            Dans Safari, touchez <strong>Partager</strong> (le carré avec une flèche vers le haut).
+          </li>
+          <li>
+            Choisissez <strong>Sur l'écran d'accueil</strong>, puis <strong>Ajouter</strong>.
+          </li>
+        </ol>
+        <p className="hint">L'appli s'ouvrira en plein écran et restera consultable hors ligne.</p>
+        <button className="btn btn-primary" onClick={onClose}>
+          Compris
+        </button>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+/**
+ * Bandeau discret qui suggère l'installation, sur mobile, à partir de la 3ᵉ page vue. « Plus tard »
+ * le masque ; il revient au plus tôt 14 jours après, 3 refus au plus (règles dans pwa.ts).
+ */
+export function InstallNudge() {
+  const { pathname } = useLocation();
+  useSyncExternalStore(install.subscribe, install.get);
+  const [state, setState] = useState(() => storage.installNudge());
+  const [help, setHelp] = useState(false);
+
+  useEffect(() => {
+    const next = countView(storage.installNudge(), pathname);
+    storage.setInstallNudge(next);
+    setState(next);
+  }, [pathname]);
+
+  const save = (next: NudgeState) => {
+    storage.setInstallNudge(next);
+    setState(next);
+  };
+  const later = () => save(dismissNudge(state));
+
+  async function accept() {
+    if (install.mode() === "ios") return setHelp(true);
+    if (await install.prompt()) save({ ...state, done: true });
+    else later();
+  }
+
+  const mode = install.mode();
+  const visible = isMobile() && (mode === "prompt" || mode === "ios") && !pathname.includes("/imprimer") && shouldSuggestInstall(state);
+  if (help)
+    return (
+      <IosInstallHelp
+        onClose={() => {
+          setHelp(false);
+          later();
+        }}
+      />
+    );
+  if (!visible) return null;
+  return (
+    <div className="install-nudge no-print" role="status">
+      <span>📲 L'appli, même hors ligne</span>
+      <button className="btn btn-small btn-primary" onClick={() => void accept()}>
+        Installer
+      </button>
+      <button className="install-nudge-close" onClick={later} aria-label="Plus tard" title="Plus tard">
+        ✕
+      </button>
+    </div>
   );
 }
 

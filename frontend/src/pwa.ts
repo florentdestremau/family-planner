@@ -85,3 +85,40 @@ export function savedAtLabel(ts: number, now: number = Date.now()): string {
   if (d.toDateString() === new Date(now).toDateString()) return `à ${time}`;
   return `le ${d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" })} à ${time}`;
 }
+
+/** Écran tactile (téléphone, tablette) : seule cible de la suggestion d'installation. */
+export function isMobile(win: Window = window): boolean {
+  return win.matchMedia?.("(pointer: coarse)").matches ?? false;
+}
+
+/** Suggestion d'installation : pages vues, refus, mémorisés dans le navigateur. */
+export interface NudgeState {
+  views: number;
+  lastPath: string | null;
+  dismissals: number;
+  dismissedAt: number | null;
+  viewsAtDismiss: number;
+  done: boolean;
+}
+
+export const NUDGE_START: NudgeState = { views: 0, lastPath: null, dismissals: 0, dismissedAt: null, viewsAtDismiss: 0, done: false };
+
+const NUDGE_AFTER_VIEWS = 3;
+const NUDGE_AGAIN_AFTER = 14 * 24 * 3600 * 1000;
+const NUDGE_MAX_DISMISSALS = 3;
+
+/** Une page de plus (un rechargement de la même page ne compte pas). */
+export function countView(s: NudgeState, path: string): NudgeState {
+  return path === s.lastPath ? s : { ...s, views: s.views + 1, lastPath: path };
+}
+
+/** Dès la 3ᵉ page ; après « Plus tard », pas avant 14 jours et 3 pages de plus ; 3 refus au plus. */
+export function shouldSuggestInstall(s: NudgeState, now: number = Date.now()): boolean {
+  if (s.done || s.dismissals >= NUDGE_MAX_DISMISSALS || s.views < NUDGE_AFTER_VIEWS) return false;
+  if (s.dismissedAt === null) return true;
+  return now - s.dismissedAt >= NUDGE_AGAIN_AFTER && s.views - s.viewsAtDismiss >= NUDGE_AFTER_VIEWS;
+}
+
+export function dismissNudge(s: NudgeState, now: number = Date.now()): NudgeState {
+  return { ...s, dismissals: s.dismissals + 1, dismissedAt: now, viewsAtDismiss: s.views };
+}
