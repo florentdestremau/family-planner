@@ -187,17 +187,10 @@ Les fixtures de démonstration (`/s/demo`) contiennent les trois cas : Antoine e
 - **Couple** : la proposition automatique cherche un double nuit par nuit. Si les deux conjoints n'ont
   pas les mêmes nuits, chacun est traité seul les nuits où l'autre est absent.
 
-## Points de contact avec le covoiturage
+## Covoiturage
 
-Les heures d'arrivée et de départ du covoiturage disent la même chose que les premiers et derniers
-repas et nuits. Il ne faut **qu'une source de vérité** pour la présence :
-
-- **soit** le trajet préremplit les repas et les nuits (« arrivée vendredi 22 h » coche la nuit du
-  vendredi, pas le dîner), en passant par la même règle (`nights` explicite) ;
-- **soit** le covoiturage affiche les présences sans stocker sa propre arrivée.
-
-À ne pas faire : une heure d'arrivée stockée à part qui contredirait les cases cochées. La notion de
-« nuit du jour J » et le format `nights: [date]` de l'API peuvent servir tels quels.
+Décidé : pas de lien avec le covoiturage. Les nuits ne dépendent d'aucune heure d'arrivée, et le
+covoiturage n'écrit pas dans les présences.
 
 ## Prototype
 
@@ -232,16 +225,13 @@ Il est complet, back et front.
 **Taille** : environ +720/−80 lignes côté back (dont environ 450 de tests) et +520/−130 côté front
 (dont environ 200 de tests et d'e2e).
 
-## Questions ouvertes
+## Décisions (14/10/2026)
 
-1. **Proposition automatique et nuits non déclarées** : le prototype ne couche pas automatiquement les
-   personnes sans nuit (seule l'affectation manuelle le fait, avec l'avertissement). Faut-il les
-   inclure, en leur créant toutes les nuits, comme l'ancien lit « tout le séjour » ?
-2. **Personne pré-affectée** : quand elle saisit ses repas pour la première fois, faut-il recalculer
-   toutes ses nuits par la règle, et non seulement celles dont un repas voisin change ? Ce serait plus
-   juste pour un visiteur de jour, mais cela effacerait la nuit d'une arrivée tardive pré-affectée.
-3. **Qualité de la proposition** : la continuité garde chacun dans son lit, mais elle peut laisser une
-   chambre entière vide quand d'autres lits sont partagés entre plusieurs nuits (c'est le cas dans la
-   démo). Faut-il préférer les lits libres toutes les nuits pour ceux qui restent tout le séjour ?
-4. **Covoiturage** : laquelle des deux options ci-dessus (le trajet préremplit, ou il affiche
-   seulement) ?
+1. **Proposition automatique et nuits non déclarées** : on les ignore. Les personnes sans nuit ne sont
+   pas couchées automatiquement, et le toast les signale en alerte. Seule l'affectation manuelle les
+   couche, avec un avertissement.
+2. **Personne pré-affectée** : on garde ses nuits. À sa première saisie, seules les nuits dont un repas
+   voisin change sont revues ; un visiteur de jour pré-affecté décoche lui-même ses nuits.
+3. **Qualité de la proposition** : on garde la continuité seule (chacun garde son lit d'une nuit à
+   l'autre). L'organisateur ajuste à la main.
+4. **Covoiturage** : pas de lien.
