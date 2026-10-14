@@ -1,6 +1,10 @@
 import { expect, test } from "@playwright/test";
 import { createStay, loginAs } from "./helpers";
 
+// Réponses déterministes du mode démo (ASSISTANT_STUB) : sans objet sur un environnement déployé,
+// qui interroge le vrai modèle.
+test.skip(!!process.env.E2E_BASE_URL, "assistant réel sur l'environnement distant");
+
 test("l'assistant propose les présences du foyer, on les valide ou ignore", async ({ page, request }) => {
   const stay = await createStay(request);
   const alice = await stay.person("Alice");

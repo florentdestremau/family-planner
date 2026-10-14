@@ -19,7 +19,7 @@ from . import schemas as s
 from .db import SessionLocal
 from .models import Stay
 from .routers import admin, public
-from .slots import stay_slots
+from .slots import night_sides, stay_nights, stay_slots
 
 
 Meal = tuple[int, str]  # (jour du séjour, à partir de 0 ; repas)
@@ -31,6 +31,8 @@ class Family:
 
     Présences : du repas `arrive` au repas `leave` inclus (par défaut tout le séjour) ; `members`
     décale une personne (arrivée, départ) ; `away` retire des repas (dîner au restaurant…).
+    Nuits : toutes celles qu'encadrent l'arrivée et le départ (un repas pris ailleurs n'y change rien,
+    comme « tout le séjour » puis un repas décoché), sauf si `nights` les donne (jours du séjour).
     """
 
     adults: list[str]
@@ -42,6 +44,7 @@ class Family:
     away: dict[str, list[Meal]] = field(default_factory=dict)
     teens: list[str] = field(default_factory=list)  # enfants qui participent aux corvées
     no_chores: list[str] = field(default_factory=list)
+    nights: list[int] | None = None
 
 
 @dataclass
@@ -86,6 +89,11 @@ FIXTURES = [
             Family(["Marc", "Anne"], ["Lina"], arrive=(1, "lunch"), leave=(2, "breakfast")),  # aller-retour
             Family(["Thomas"], arrive=(2, "lunch"), leave=(3, "breakfast")),
             Family(["Camille"], arrive=(2, "dinner"), leave=(3, "breakfast")),  # célibataire, pour la soirée
+            # Arrivés jeudi après le dîner : ils dorment là dès jeudi soir.
+            Family(["Antoine", "Lucie"], arrive=(1, "breakfast"), nights=[0, 1, 2]),
+            # Hélène dîne et dort là vendredi ; samedi midi et soir chez une amie, où elle dort ; de
+            # retour dimanche pour le petit-déjeuner (qui ne dit pas qu'elle a dormi là samedi).
+            Family(["Hélène"], arrive=(1, "dinner"), away={"Hélène": [(2, "lunch"), (2, "dinner")]}, nights=[1]),
         ],
         rooms=[
             ("Chambre de Mamie", ["single"]),
@@ -93,6 +101,7 @@ FIXTURES = [
             ("Chambre verte", ["double", "single"]),
             ("Grenier", ["bunk", "bunk"]),
             ("Salon", ["double", "extra"]),
+            ("Chambre d'amis", ["double"]),
         ],
         activities=[
             dict(day=0, name="Apéro d'arrivée", start_time="19:30", location="Terrasse"),
@@ -209,7 +218,12 @@ def load(db: Session, fx: Fixture) -> Stay:
             last = position(leave or fam.leave, len(slots) - 1)
             away = {(start + timedelta(days=day), meal) for day, meal in fam.away.get(name, [])}
             present = [s.SlotIn(date=d, meal=m) for d, m in slots[first : last + 1] if (d, m) not in away]
-            public.set_presences(ids[name], s.PresencesIn(slots=present), stay, db)
+            if fam.nights is None:
+                span = set(slots[first : last + 1])
+                nights = [n for n in stay_nights(start, end) if set(night_sides(n)) <= span]
+            else:
+                nights = [start + timedelta(days=day) for day in fam.nights]
+            public.set_presences(ids[name], s.PresencesIn(slots=present, nights=nights), stay, db)
 
     for room_name, beds in fx.rooms:
         room = admin.create_room(s.RoomIn(name=room_name), stay, db)

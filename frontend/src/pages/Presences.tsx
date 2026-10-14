@@ -1,29 +1,37 @@
+import type { Meal } from "../api";
 import { dayLabel, MOMENT_LABEL } from "../lib";
 import { useStay } from "../stay";
 
-/** Tableau global personnes × repas, avec les couverts par repas. */
+type Column = { date: string; meal: Meal | null }; // meal nul : la nuit du jour
+
+/** Tableau global personnes × repas et nuits, avec les couverts par repas et les couchages par nuit. */
 export function PresenceTable() {
   const { snap, idx, me } = useStay();
+  const nights = new Set(snap.nights);
+  const columns: Column[] = snap.days.flatMap((date) => [
+    ...snap.slots.filter((s) => s.date === date),
+    ...(nights.has(date) ? [{ date, meal: null }] : []),
+  ]);
+  const colKey = (c: Column) => `${c.date}${c.meal ?? "night"}`;
+  const count = (c: Column) => (c.meal ? idx.mealCount(c.date, c.meal) : idx.nightCount(c.date));
+  const on = (personId: number, c: Column) => (c.meal ? idx.isPresent(personId, c.date, c.meal) : idx.sleepsOn(personId, c.date));
   return (
     <div className="table-wrap">
       <table className="grid-table">
         <thead>
           <tr>
             <th />
-            {snap.days.map((d) => {
-              const n = snap.slots.filter((s) => s.date === d).length;
-              return (
-                <th key={d} colSpan={n} className="th-day">
-                  {dayLabel(d)}
-                </th>
-              );
-            })}
+            {snap.days.map((d) => (
+              <th key={d} colSpan={columns.filter((c) => c.date === d).length} className="th-day">
+                {dayLabel(d)}
+              </th>
+            ))}
           </tr>
           <tr>
             <th />
-            {snap.slots.map((s) => (
-              <th key={`${s.date}${s.meal}`} className="th-meal">
-                {MOMENT_LABEL[s.meal].slice(0, 4)}.
+            {columns.map((c) => (
+              <th key={colKey(c)} className={`th-meal ${c.meal ? "" : "cell-night"}`} title={c.meal ? undefined : "Dort sur place"}>
+                {c.meal ? `${MOMENT_LABEL[c.meal].slice(0, 4)}.` : "Nuit"}
               </th>
             ))}
           </tr>
@@ -31,7 +39,7 @@ export function PresenceTable() {
         {idx.households().map((h) => (
           <tbody key={h.id} className="household-rows">
             <tr className="row-household">
-              <th colSpan={snap.slots.length + 1}>Foyer {h.label}</th>
+              <th colSpan={columns.length + 1}>Foyer {h.label}</th>
             </tr>
             {h.members.map((p) => (
               <tr key={p.id} className={p.id === me?.id ? "row-me" : ""}>
@@ -39,9 +47,9 @@ export function PresenceTable() {
                   {p.name}
                   {p.kind === "child" && <span className="muted"> (e)</span>}
                 </th>
-                {snap.slots.map((s) => (
-                  <td key={`${s.date}${s.meal}`} className={idx.isPresent(p.id, s.date, s.meal) ? "cell-on" : ""}>
-                    {idx.isPresent(p.id, s.date, s.meal) ? "●" : ""}
+                {columns.map((c) => (
+                  <td key={colKey(c)} className={`${on(p.id, c) ? "cell-on" : ""} ${c.meal ? "" : "cell-night"}`}>
+                    {on(p.id, c) ? (c.meal ? "●" : "☾") : ""}
                   </td>
                 ))}
               </tr>
@@ -51,20 +59,20 @@ export function PresenceTable() {
         <tfoot>
           <tr>
             <th>Adultes</th>
-            {snap.slots.map((s) => (
-              <td key={`${s.date}${s.meal}`}>{idx.mealCount(s.date, s.meal).adults}</td>
+            {columns.map((c) => (
+              <td key={colKey(c)}>{count(c).adults}</td>
             ))}
           </tr>
           <tr>
             <th>Enfants</th>
-            {snap.slots.map((s) => (
-              <td key={`${s.date}${s.meal}`}>{idx.mealCount(s.date, s.meal).children}</td>
+            {columns.map((c) => (
+              <td key={colKey(c)}>{count(c).children}</td>
             ))}
           </tr>
           <tr className="row-total">
-            <th>Couverts</th>
-            {snap.slots.map((s) => (
-              <td key={`${s.date}${s.meal}`}>{idx.mealCount(s.date, s.meal).total}</td>
+            <th title="Couverts pour les repas, couchages pour les nuits">Couverts · couchages</th>
+            {columns.map((c) => (
+              <td key={colKey(c)}>{count(c).total}</td>
             ))}
           </tr>
         </tfoot>

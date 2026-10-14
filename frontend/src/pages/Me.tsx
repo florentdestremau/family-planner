@@ -39,7 +39,7 @@ function Dashboard({ me }: { me: Person }) {
       <section className="card">
         <div className="card-head">
           <h2>✅ Présences</h2>
-          <span className="muted small">Présent sur place = présent au repas</span>
+          <span className="muted small">Repas pris sur place, et nuits 🌙 où l'on dort sur place</span>
         </div>
         <HouseholdPresences me={me} />
       </section>
@@ -115,12 +115,19 @@ function Dashboard({ me }: { me: Person }) {
         <h2>🛏️ Couchage</h2>
         <ul className="list">
           {household.map((p) => {
-            const bed = p.bed_id != null ? idx.bedById.get(p.bed_id) : undefined;
+            const plan = idx.bedPlan(p.id);
             return (
               <li key={p.id} className="list-row">
                 <strong>{p.name}</strong>
                 <span className="muted">
-                  {bed ? `${bed.room.name} — ${bed.label || BED_LABEL[bed.kind]}` : "Pas encore attribué"}
+                  {plan.length === 0
+                    ? "Ne dort pas sur place"
+                    : plan
+                        .map(({ bed, nights }) => {
+                          const where = bed ? `${bed.room.name} — ${bed.label || BED_LABEL[bed.kind]}` : "Pas encore attribué";
+                          return where + idx.nightsSuffix(nights, plan.length > 1);
+                        })
+                        .join(" · ")}
                 </span>
               </li>
             );
