@@ -3,8 +3,9 @@
 import secrets
 from datetime import timedelta
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
 from sqlalchemy import delete, func, select
+from sqlalchemy.orm import Session
 
 from .. import assistant
 from .. import households as h
@@ -24,6 +25,7 @@ from ..models import (
     Room,
     Signup,
     Stay,
+    StayCover,
 )
 from ..slots import MAX_STAY_DAYS, stay_days, stay_slots
 
@@ -70,7 +72,15 @@ def list_stays(db: DB) -> list[dict]:
         .order_by(Stay.start_date, Stay.id)
     ).all()
     return [
-        {"slug": st.slug, "name": st.name, "start_date": st.start_date, "end_date": st.end_date, "households": h, "persons": n}
+        {
+            "slug": st.slug,
+            "name": st.name,
+            "start_date": st.start_date,
+            "end_date": st.end_date,
+            "cover_version": st.cover_version,
+            "households": h,
+            "persons": n,
+        }
         for st, h, n in rows
     ]
 
@@ -103,6 +113,31 @@ def snapshot(stay: StayDep, db: DB) -> dict:
         "signups": db.scalars(select(Signup).where(Signup.activity_id.in_([a.id for a in activities]))).all(),
         "menus": db.scalars(select(Menu).where(Menu.stay_id == stay.id)).all(),
     }
+
+
+def cover_response(stay: Stay, db: Session, v: int | None, thumb: bool) -> Response:
+    found = db.get(StayCover, stay.id)
+    if found is None:
+        raise HTTPException(404, "Pas d'image de couverture")
+    # Cache d'un an seulement pour l'URL de la version courante : une version périmée ou absente
+    # ne doit pas figer l'image actuelle sous une autre adresse.
+    cache = "public, max-age=31536000, immutable" if v == stay.cover_version else "no-cache"
+    headers = {"Cache-Control": cache, "X-Content-Type-Options": "nosniff"}
+    if thumb:
+        return Response(found.thumb, media_type="image/webp", headers=headers)
+    return Response(found.data, media_type=found.content_type, headers=headers)
+
+
+@router.get("/stays/{slug}/cover", response_class=Response, responses={200: {"content": {"image/*": {}}}})
+def cover(stay: StayDep, db: DB, v: int | None = None) -> Response:
+    """Image de couverture, à l'URL `?v=<cover_version>`."""
+    return cover_response(stay, db, v, thumb=False)
+
+
+@router.get("/stays/{slug}/cover/thumb", response_class=Response, responses={200: {"content": {"image/webp": {}}}})
+def cover_thumb(stay: StayDep, db: DB, v: int | None = None) -> Response:
+    """Vignette carrée de la couverture, pour l'accueil."""
+    return cover_response(stay, db, v, thumb=True)
 
 
 @router.post("/stays/{slug}/persons", response_model=s.PersonOut, status_code=201)

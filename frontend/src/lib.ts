@@ -44,6 +44,13 @@ export function rangeLabel(start: string, end: string): string {
   return `du ${dayLabel(start, true).toLowerCase()} au ${dayLabel(end, true).toLowerCase()}`;
 }
 
+/** URL de l'image de couverture ; la version change à chaque envoi (cache navigateur long). */
+export const coverUrl = (slug: string, version: number) => `/api/stays/${slug}/cover?v=${version}`;
+/** Vignette carrée de la couverture, pour l'accueil. */
+export const coverThumbUrl = (slug: string, version: number) => `/api/stays/${slug}/cover/thumb?v=${version}`;
+/** Taille maximale acceptée par le serveur. */
+export const MAX_COVER_BYTES = 5_000_000;
+
 export const presenceKey = (personId: number, date: string, meal: Meal) => `${personId}|${date}|${meal}`;
 export const occurrenceKey = (choreId: number, date: string, moment: Moment) => `${choreId}|${date}|${moment}`;
 
