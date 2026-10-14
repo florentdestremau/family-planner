@@ -69,6 +69,7 @@ class MergeIn(In):
 class MemberPresences(In):
     person_id: int
     slots: list["SlotIn"]
+    nights: list[date] | None = None  # absent : déduites du changement de repas
 
 
 class HouseholdPresencesIn(In):
@@ -81,6 +82,7 @@ class PartnerIn(In):
 
 class BedAssignIn(In):
     bed_id: int | None
+    dates: list[date] | None = None  # nuits concernées ; absent : toutes celles de la personne
 
 
 class SlotIn(In):
@@ -90,6 +92,7 @@ class SlotIn(In):
 
 class PresencesIn(In):
     slots: list[SlotIn]
+    nights: list[date] | None = None  # absent : déduites du changement de repas
 
 
 class RoomIn(In):
@@ -197,13 +200,27 @@ class PersonOut(ORM):
     does_chores: bool
     household_id: int
     partner_id: int | None
-    bed_id: int | None
 
 
 class PresenceOut(ORM):
     person_id: int
     date: date
     meal: Meal
+
+
+class NightOut(ORM):
+    person_id: int
+    date: date
+    bed_id: int | None
+
+
+class BedAssignOut(BaseModel):
+    warning: str | None = None
+
+
+class AutoAssignOut(BaseModel):
+    assigned: int  # nuitées attribuées
+    unassigned: int  # nuitées encore sans lit
 
 
 class BedOut(ORM):
@@ -271,9 +288,11 @@ class Snapshot(BaseModel):
     stay: StayOut
     days: list[date]
     slots: list[SlotOut]
+    nights: list[date]  # nuits du séjour (nuit du jour J)
     households: list[HouseholdOut]
     persons: list[PersonOut]
     presences: list[PresenceOut]
+    person_nights: list[NightOut]
     rooms: list[RoomOut]
     chore_types: list[ChoreTypeOut]
     chore_assignments: list[ChoreAssignmentOut]
@@ -302,6 +321,7 @@ class AssistantAction(BaseModel):
     person_id: int
     name: str
     slots: list[SlotIn]
+    nights: list[date]
 
 
 class AssistantOut(BaseModel):

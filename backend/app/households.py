@@ -1,15 +1,25 @@
 """Règles des foyers et des couples, partagées par l'espace participant et l'espace organisateur."""
 
 from datetime import date
+from typing import NamedTuple
 
 from fastapi import HTTPException
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
+from . import nights as n
 from . import schemas as s
 from .deps import owned, person
 from .models import Household, Person, Presence, Stay
-from .slots import stay_slots
+from .slots import stay_nights, stay_slots
+
+
+class Member(NamedTuple):
+    """Présences demandées pour une personne : repas, et nuits (None : déduites des repas)."""
+
+    person: Person
+    slots: list[s.SlotIn]
+    nights: list[date] | None = None
 
 
 def household(db: Session, household_id: int | None, stay: Stay) -> Household:
@@ -98,9 +108,7 @@ def merge(db: Session, stay: Stay, source_id: int, into_id: int) -> Household:
     return into
 
 
-def household_members(
-    db: Session, stay: Stay, household_id: int, body: s.HouseholdPresencesIn
-) -> list[tuple[Person, list[s.SlotIn]]]:
+def household_members(db: Session, stay: Stay, household_id: int, body: s.HouseholdPresencesIn) -> list[Member]:
     """Présences d'un foyer, vérifiées sans rien écrire (route du foyer, propositions de l'assistant)."""
     found = household(db, household_id, stay)
     members = []
@@ -108,21 +116,31 @@ def household_members(
         p = person(db, member.person_id, stay)
         if p.household_id != found.id:
             raise HTTPException(422, f"{p.name} n'appartient pas à ce foyer")
-        members.append((p, member.slots))
+        members.append(Member(p, member.slots, member.nights))
     check_slots(stay, members)
     return members
 
 
-def check_slots(stay: Stay, members: list[tuple[Person, list[s.SlotIn]]]) -> None:
+def check_slots(stay: Stay, members: list[Member]) -> None:
     allowed: set[tuple[date, str]] = set(stay_slots(stay.start_date, stay.end_date, stay.first_meal, stay.last_meal))
-    for _, slots in members:
+    nights = set(stay_nights(stay.start_date, stay.end_date))
+    for _, slots, wanted in members:
         if {(slot.date, slot.meal) for slot in slots} - allowed:
             raise HTTPException(422, "Créneau hors des dates du séjour")
+        if set(wanted or []) - nights:
+            raise HTTPException(422, "Nuit hors des dates du séjour")
 
 
-def replace_presences(db: Session, stay: Stay, members: list[tuple[Person, list[s.SlotIn]]]) -> None:
+def resolved_nights(db: Session, stay: Stay, member: Member) -> set[date]:
+    return n.resolve(db, stay, member.person, {(slot.date, slot.meal) for slot in member.slots}, member.nights)
+
+
+def replace_presences(db: Session, stay: Stay, members: list[Member]) -> None:
     check_slots(stay, members)
-    for p, slots in members:
+    # Nuits calculées avant d'effacer les repas : la déduction compare anciens et nouveaux repas.
+    nights = [resolved_nights(db, stay, m) for m in members]
+    for (p, slots, _), wanted in zip(members, nights):
         db.execute(delete(Presence).where(Presence.person_id == p.id))
         db.add_all(Presence(person_id=p.id, date=d, meal=m) for d, m in {(slot.date, slot.meal) for slot in slots})
+        n.write(db, p, wanted)
     db.commit()

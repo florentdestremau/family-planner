@@ -1,8 +1,10 @@
-"""Proposition automatique de couchages pour les personnes non logées.
+"""Proposition automatique de couchages pour les personnes non logées, nuit par nuit.
 
 Couples dans un lit double, enfants puis adultes seuls ; chacun de préférence dans la chambre
-où dort déjà quelqu'un de son foyer.
+où dort déjà quelqu'un de son foyer. D'une nuit à l'autre, chacun garde son lit s'il est libre.
 """
+
+from datetime import date
 
 from .slots import BED_PLACES
 
@@ -75,3 +77,42 @@ def auto_assign(
         if place([p], ["single", "extra", "bunk"]) or place([p], ["double"], empty_only=True) or place([p], ["double"]):
             done.add(p["id"])
     return assigned
+
+
+def auto_assign_nights(
+    people: list[dict],  # {id, kind, partner_id, household_id}
+    beds: list[dict],  # {id, room_id, kind}
+    nights: list[dict],  # {person_id, date, bed_id}
+) -> dict[tuple[int, date], int]:
+    """Retourne {(person_id, nuit): bed_id} pour les nuits sans lit.
+
+    Nuit après nuit : d'abord la continuité (le lit de la nuit précédente, ou à défaut le premier
+    lit déjà attribué à la personne, s'il reste de la place), puis auto_assign pour les autres
+    dormeurs de la nuit, avec l'occupation de cette nuit-là.
+    """
+    by_id = {p["id"]: p for p in people}
+    places = {b["id"]: BED_PLACES[b["kind"]] for b in beds}
+    by_night: dict[date, dict[int, int | None]] = {}
+    for x in sorted(nights, key=lambda x: x["date"]):
+        by_night.setdefault(x["date"], {})[x["person_id"]] = x["bed_id"]
+    last: dict[int, int] = {}
+    for night in sorted(by_night, reverse=True):  # à défaut de veille : premier lit connu
+        last.update((pid, bed) for pid, bed in by_night[night].items() if bed is not None)
+
+    result: dict[tuple[int, date], int] = {}
+    for night in sorted(by_night):
+        sleepers = by_night[night]
+        free = dict(places)
+        for bed in sleepers.values():
+            if bed is not None:
+                free[bed] -= 1
+        for pid in sorted(sleepers):
+            bed = last.get(pid)
+            if sleepers[pid] is None and free.get(bed, 0) > 0:
+                free[bed] -= 1
+                sleepers[pid] = result[(pid, night)] = bed
+        tonight = [{**by_id[pid], "bed_id": bed} for pid, bed in sleepers.items()]
+        for pid, bed in auto_assign(tonight, beds).items():
+            sleepers[pid] = result[(pid, night)] = bed
+        last.update((pid, bed) for pid, bed in sleepers.items() if bed is not None)
+    return result

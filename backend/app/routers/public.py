@@ -20,6 +20,7 @@ from ..models import (
     Decline,
     Household,
     Menu,
+    Night,
     Person,
     Presence,
     Room,
@@ -27,7 +28,7 @@ from ..models import (
     Stay,
     StayCover,
 )
-from ..slots import MAX_STAY_DAYS, stay_days, stay_slots
+from ..slots import MAX_STAY_DAYS, stay_days, stay_nights, stay_slots
 
 router = APIRouter(prefix="/api")
 
@@ -98,9 +99,11 @@ def snapshot(stay: StayDep, db: DB) -> dict:
         "stay": stay,
         "days": stay_days(stay.start_date, stay.end_date),
         "slots": [{"date": d, "meal": m} for d, m in stay_slots(stay.start_date, stay.end_date, stay.first_meal, stay.last_meal)],
+        "nights": stay_nights(stay.start_date, stay.end_date),
         "households": db.scalars(select(Household).where(Household.stay_id == stay.id).order_by(Household.id)).all(),
         "persons": persons,
         "presences": db.scalars(select(Presence).where(Presence.person_id.in_(person_ids))).all(),
+        "person_nights": db.scalars(select(Night).where(Night.person_id.in_(person_ids)).order_by(Night.date)).all(),
         "rooms": [
             {**s.RoomOut.model_validate(r).model_dump(exclude={"beds"}), "beds": [b for b in beds if b.room_id == r.id]}
             for r in rooms
@@ -156,7 +159,7 @@ def rename_household(household_id: int, body: s.HouseholdIn, stay: StayDep, db: 
 
 @router.put("/stays/{slug}/persons/{person_id}/presences", status_code=204)
 def set_presences(person_id: int, body: s.PresencesIn, stay: StayDep, db: DB) -> None:
-    h.replace_presences(db, stay, [(person(db, person_id, stay), body.slots)])
+    h.replace_presences(db, stay, [h.Member(person(db, person_id, stay), body.slots, body.nights)])
 
 
 @router.put("/stays/{slug}/households/{household_id}/presences", status_code=204)

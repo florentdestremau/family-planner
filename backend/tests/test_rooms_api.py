@@ -37,7 +37,7 @@ def test_move_and_unassign(api, room) -> None:
     api.adm("PUT", f"/persons/{a}/bed", {"bed_id": b1}, status=200)
     api.adm("PUT", f"/persons/{a}/bed", {"bed_id": b2}, status=200)
     api.adm("PUT", f"/persons/{a}/bed", {"bed_id": None}, status=200)
-    assert api.persons()[a]["bed_id"] is None
+    assert api.beds_of(a) == {None}, "les nuits restent, sans lit"
     api.adm("PUT", f"/persons/{a}/bed", {"bed_id": 999999}, status=404)
 
 
@@ -52,26 +52,27 @@ def test_deleting_bed_or_room_frees_people(api, room) -> None:
     api.adm("PUT", f"/persons/{a}/bed", {"bed_id": b1}, status=200)
     api.adm("PUT", f"/persons/{c}/bed", {"bed_id": b2}, status=200)
     api.adm("DELETE", f"/beds/{b1}", status=204)
-    assert api.persons()[a]["bed_id"] is None
+    assert api.beds_of(a) == {None}
     api.adm("DELETE", f"/rooms/{room['id']}", status=204)
     snap = api.snap()
-    assert snap["rooms"] == [] and all(p["bed_id"] is None for p in snap["persons"])
+    assert snap["rooms"] == [] and all(n["bed_id"] is None for n in snap["person_nights"])
 
 
 def test_auto_assign_only_places_unassigned_and_respects_capacity(api, room) -> None:
     single, double = bed(api, room["id"], "single"), bed(api, room["id"], "double")
     a, b, c = api.person("Alice"), api.person("Bob"), api.person("Chloé")
     api.couple(a, b)
+    for x in (a, b, c):
+        api.present(x)
     api.adm("PUT", f"/persons/{c}/bed", {"bed_id": double}, status=200)
     r = api.adm("POST", "/rooms/auto-assign", status=200).json()
-    p = api.persons()
-    assert p[c]["bed_id"] == double, "une affectation existante n'est jamais déplacée"
-    # Le double n'a plus qu'une place : le couple ne peut pas y dormir ensemble.
-    placed = [x for x in (a, b) if p[x]["bed_id"] is not None]
-    assert len(placed) == 2 and r == {"assigned": 2, "unassigned": 0}
-    assert sorted(p[x]["bed_id"] for x in placed) == sorted([single, double])
+    assert api.beds_of(c) == {double}, "une affectation existante n'est jamais déplacée"
+    # Le double n'a plus qu'une place : le couple ne peut pas y dormir ensemble, et chacun garde
+    # le même lit les deux nuits.
+    assert r == {"assigned": 4, "unassigned": 0}
+    assert sorted(bed for x in (a, b) for bed in api.beds_of(x)) == sorted([single, double])
 
 
 def test_auto_assign_without_beds(api) -> None:
-    api.person("Alice")
-    assert api.adm("POST", "/rooms/auto-assign", status=200).json() == {"assigned": 0, "unassigned": 1}
+    api.present(api.person("Alice"))
+    assert api.adm("POST", "/rooms/auto-assign", status=200).json() == {"assigned": 0, "unassigned": 2}
