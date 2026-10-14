@@ -1,4 +1,4 @@
-import type { Activity, BedKind, Meal, Moment, Person, Snapshot, StaySummary } from "./api";
+import type { Activity, AssistantAction, BedKind, Meal, Moment, Person, Snapshot, Slot, StaySummary } from "./api";
 
 export const MEALS: Meal[] = ["breakfast", "lunch", "dinner"];
 export const MOMENTS: Moment[] = [...MEALS, "day"];
@@ -198,4 +198,35 @@ export function groupStays(stays: StaySummary[], today: string) {
 
 export function shortRange(start: string, end: string): string {
   return start === end ? dayLabel(start) : `${dayLabel(start)} → ${dayLabel(end)}`;
+}
+
+const WEEKDAYS = ["dim.", "lun.", "mar.", "mer.", "jeu.", "ven.", "sam."];
+
+/** Créneau court pour l'assistant : « ven. dîner », « dim. déjeuner ». */
+export function slotShortLabel(slot: Slot): string {
+  return `${WEEKDAYS[asDate(slot.date).getDay()]} ${MOMENT_LABEL[slot.meal].toLowerCase()}`;
+}
+
+/**
+ * Résumé d'une proposition de l'assistant : « Alice : ven. dîner → dim. déjeuner », suivi des repas
+ * manquants dans la fourchette (« sauf sam. dîner ») pour qu'un trou ne passe pas inaperçu.
+ */
+export function actionSummary(action: AssistantAction): string {
+  const ordered = [...action.slots].sort((a, b) => a.date.localeCompare(b.date) || MEALS.indexOf(a.meal) - MEALS.indexOf(b.meal));
+  if (ordered.length === 0) return `${action.name} : aucun repas`;
+  const first = ordered[0];
+  const last = ordered[ordered.length - 1];
+  const label = `${action.name} : ${slotShortLabel(first)}`;
+  if (ordered.length === 1) return label;
+  const taken = new Set(ordered.map((slot) => `${slot.date}|${slot.meal}`));
+  const missing: Slot[] = [];
+  for (let date = first.date; date <= last.date; date = addDays(date, 1)) {
+    for (const meal of MEALS) {
+      const afterFirst = date > first.date || MEALS.indexOf(meal) > MEALS.indexOf(first.meal);
+      const beforeLast = date < last.date || MEALS.indexOf(meal) < MEALS.indexOf(last.meal);
+      if (afterFirst && beforeLast && !taken.has(`${date}|${meal}`)) missing.push({ date, meal });
+    }
+  }
+  const range = `${label} → ${slotShortLabel(last)}`;
+  return missing.length ? `${range}, sauf ${missing.map(slotShortLabel).join(", ")}` : range;
 }

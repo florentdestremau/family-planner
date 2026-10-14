@@ -9,12 +9,14 @@ Organisation des séjours familiaux (week-end ou semaine) : présences par repas
 ## Lancer en local
 
 ```bash
-# Terminal 1 — API sur :8000
-cd backend && uv run uvicorn app.main:app --reload
+# Terminal 1 — API sur :8000 (met la clé Anthropic dans backend/.env)
+cd backend && uv run uvicorn app.main:app --reload --env-file .env
 
 # Terminal 2 — front sur :5173 (proxy /api → :8000)
 cd frontend && npm install && npm run dev
 ```
+
+Sans clé (`ANTHROPIC_API_KEY` dans `backend/.env`, ignoré par git), l'assistant est désactivé et son bouton reste masqué. Pour le tester sans consommer de crédits : `ASSISTANT_STUB=true` sert des réponses déterministes (mode démo, aussi utilisé par les tests e2e).
 
 ### Tests
 
@@ -67,7 +69,10 @@ script, puis `bin/server list`, `bin/server logs production --tail 100`, etc.
   `command="/home/ubuntu/family-planner/family-env ci",restrict ssh-ed25519 … family-planner-ci@github-actions` ;
 - secrets du dépôt `ONCE_SSH_KEY` et `ONCE_KNOWN_HOSTS`, variable `DEPLOY_ONCE=true` (la passer à
   `false` coupe tous les déploiements automatiques) ;
-- après une modification de `deploy/server/family-env` : `bin/server sync`.
+- après une modification de `deploy/server/family-env` : `bin/server sync` ;
+- clé de l'assistant IA dans `~/family-planner/secrets.env` du serveur (`ANTHROPIC_API_KEY=…`, chmod 600) :
+  `family-env` la passe à la production et à chaque environnement de PR (prise en compte au déploiement
+  suivant). Sans ce fichier, l'assistant reste désactivé.
 
 ⚠️ Pas d'authentification forte, et **la page d'accueil liste tous les séjours** (choix assumé :
 instance familiale). Tout visiteur peut donc ouvrir un séjour, lire et modifier les présences ;
@@ -86,6 +91,8 @@ seule la clé organisateur protège la configuration.
 **Personnes** — adulte ou enfant (portions), « participe aux corvées » (défaut : oui pour un adulte, non pour un enfant), « participe aux activités ».
 
 **Présences** — par repas (petit-déj, déjeuner, dîner) entre le premier repas du premier jour et le dernier repas du dernier jour. Présent sur place = présent au repas ; les couverts sont comptés adultes / enfants.
+
+**Assistant (formulaires conversationnels)** — un bouton ✨ ouvre un panneau de discussion ; on décrit les présences du foyer en langue naturelle (« toute l'équipe au dîner du vendredi ») ou à la voix (micro, si le navigateur le permet). L'assistant (modèle `claude-sonnet-5-5`, effort bas) propose des présences, vérifiées par les règles du foyer, et chaque proposition se valide ou s'ignore d'un clic — ce qui met à jour les présences comme la grille habituelle. Le panneau exige d'avoir choisi « qui je suis ». Limite : 30 demandes par séjour et par jour.
 
 **Corvées** — chaque type a des moments (un ou plusieurs repas, ou « journée »), un nombre de personnes et un rythme (tous les N jours). Le tirage (`POST …/admin/chores/draw`) :
 - ne retient que les personnes « corvées » présentes au créneau ;

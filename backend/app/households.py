@@ -99,11 +99,30 @@ def merge(db: Session, stay: Stay, source_id: int, into_id: int) -> Household:
     return into
 
 
-def replace_presences(db: Session, stay: Stay, members: list[tuple[Person, list[s.SlotIn]]]) -> None:
+def household_members(
+    db: Session, stay: Stay, household_id: int, body: s.HouseholdPresencesIn
+) -> list[tuple[Person, list[s.SlotIn]]]:
+    """Présences d'un foyer, vérifiées sans rien écrire (route du foyer, propositions de l'assistant)."""
+    found = household(db, household_id, stay)
+    members = []
+    for member in body.members:
+        p = person(db, member.person_id, stay)
+        if p.household_id != found.id:
+            raise HTTPException(422, f"{p.name} n'appartient pas à ce foyer")
+        members.append((p, member.slots))
+    check_slots(stay, members)
+    return members
+
+
+def check_slots(stay: Stay, members: list[tuple[Person, list[s.SlotIn]]]) -> None:
     allowed: set[tuple[date, str]] = set(stay_slots(stay.start_date, stay.end_date, stay.first_meal, stay.last_meal))
     for _, slots in members:
         if {(slot.date, slot.meal) for slot in slots} - allowed:
             raise HTTPException(422, "Créneau hors des dates du séjour")
+
+
+def replace_presences(db: Session, stay: Stay, members: list[tuple[Person, list[s.SlotIn]]]) -> None:
+    check_slots(stay, members)
     for p, slots in members:
         db.execute(delete(Presence).where(Presence.person_id == p.id))
         db.add_all(Presence(person_id=p.id, date=d, meal=m) for d, m in {(slot.date, slot.meal) for slot in slots})

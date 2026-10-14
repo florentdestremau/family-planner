@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
+import type { Slot } from "./api";
 import {
+  actionSummary,
   addDays,
   groupStays,
   shortRange,
   sameSets,
+  slotShortLabel,
   slotsOf,
   toSlots,
   buildIndex,
@@ -185,5 +188,48 @@ describe("groupStays", () => {
 describe("couverture", () => {
   it("met la version dans l'URL", () => {
     expect(coverUrl("abc", 3)).toBe("/api/stays/abc/cover?v=3");
+  });
+});
+
+describe("résumés de l'assistant", () => {
+  const action = (name: string, slots: Slot[]) => ({ person_id: 1, name, slots });
+
+  it("formate un créneau court", () => {
+    expect(slotShortLabel({ date: "2026-10-30", meal: "dinner" })).toBe("ven. dîner");
+    expect(slotShortLabel({ date: "2026-11-01", meal: "breakfast" })).toBe("dim. petit-déj");
+    expect(slotShortLabel({ date: "2026-10-31", meal: "lunch" })).toBe("sam. déjeuner");
+  });
+
+  it("résume une proposition en fourchette, triée chronologiquement", () => {
+    expect(actionSummary(action("Alice", []))).toBe("Alice : aucun repas");
+    expect(actionSummary(action("Alice", [{ date: "2026-10-30", meal: "dinner" }]))).toBe("Alice : ven. dîner");
+    expect(
+      actionSummary(
+        action("Alice", [
+          { date: "2026-10-31", meal: "lunch" },
+          { date: "2026-11-01", meal: "breakfast" },
+          { date: "2026-10-30", meal: "dinner" },
+        ]),
+      ),
+    ).toBe("Alice : ven. dîner → dim. petit-déj, sauf sam. petit-déj, sam. dîner");
+    expect(
+      actionSummary(
+        action("Bob", [
+          { date: "2026-10-31", meal: "lunch" },
+          { date: "2026-10-31", meal: "dinner" },
+        ]),
+      ),
+    ).toBe("Bob : sam. déjeuner → sam. dîner");
+    const full = [
+      { date: "2026-10-30", meal: "dinner" },
+      { date: "2026-10-31", meal: "breakfast" },
+      { date: "2026-10-31", meal: "lunch" },
+      { date: "2026-11-01", meal: "breakfast" },
+      { date: "2026-11-01", meal: "lunch" },
+    ] as const;
+    expect(actionSummary(action("Marie", [...full]))).toBe("Marie : ven. dîner → dim. déjeuner, sauf sam. dîner");
+    expect(actionSummary(action("Marie", [...full, { date: "2026-10-31", meal: "dinner" }]))).toBe(
+      "Marie : ven. dîner → dim. déjeuner",
+    );
   });
 });

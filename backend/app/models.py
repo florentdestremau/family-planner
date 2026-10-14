@@ -1,6 +1,6 @@
 from datetime import date, datetime, timezone
 
-from sqlalchemy import ForeignKey, LargeBinary, String, Text, UniqueConstraint
+from sqlalchemy import ForeignKey, Index, LargeBinary, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -153,3 +153,14 @@ class Signup(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     activity_id: Mapped[int] = mapped_column(ForeignKey("activities.id", ondelete="CASCADE"), index=True)
     person_id: Mapped[int] = mapped_column(ForeignKey("persons.id", ondelete="CASCADE"))
+
+
+class AssistantCall(Base):
+    """Appel à l'assistant IA, pour la limite de demandes d'un séjour (fenêtre glissante de 24 h)."""
+
+    __tablename__ = "assistant_calls"
+    __table_args__ = (Index("ix_assistant_calls_stay_created", "stay_id", "created_at"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    stay_id: Mapped[int] = mapped_column(ForeignKey("stays.id", ondelete="CASCADE"))
+    created_at: Mapped[datetime] = mapped_column(default=_now)

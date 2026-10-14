@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { api, ApiError } from "./api";
+import { api, ApiError, assistantAsk, assistantStatus } from "./api";
 
 function mockFetch(status: number, body: unknown, statusText = "Erreur") {
   const fetchMock = vi.fn(async () =>
@@ -57,5 +57,23 @@ describe("api", () => {
     expect(error).toBeInstanceOf(ApiError);
     expect(error.status).toBe(409);
     expect(error.message).toBe(message);
+  });
+});
+
+describe("assistant", () => {
+  it("interroge l'état de l'assistant", async () => {
+    const fetchMock = mockFetch(200, { enabled: true });
+    await expect(assistantStatus()).resolves.toEqual({ enabled: true });
+    expect(fetchMock).toHaveBeenCalledWith("/api/assistant", { method: "GET", headers: {}, body: undefined });
+  });
+
+  it("envoie la demande au séjour", async () => {
+    const fetchMock = mockFetch(200, { text: "Voilà", actions: [] });
+    await expect(assistantAsk("voyage", 3, "On mange ?", ["Bonjour"])).resolves.toEqual({ text: "Voilà", actions: [] });
+    expect(fetchMock).toHaveBeenCalledWith("/api/stays/voyage/assistant", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: '{"person_id":3,"message":"On mange ?","history":["Bonjour"]}',
+    });
   });
 });

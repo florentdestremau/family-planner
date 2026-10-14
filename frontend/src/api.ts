@@ -101,6 +101,21 @@ export interface Menu extends Slot {
   notes: string;
 }
 
+export interface AssistantStatus {
+  enabled: boolean;
+}
+
+export interface AssistantAction {
+  person_id: number;
+  name: string;
+  slots: Slot[];
+}
+
+export interface AssistantReply {
+  text: string;
+  actions: AssistantAction[];
+}
+
 export interface Snapshot {
   stay: Stay;
   days: string[];
@@ -158,3 +173,8 @@ export async function api<T = unknown>(
   }
   return (res.status === 204 ? undefined : await res.json()) as T;
 }
+
+export const assistantStatus = () => api<AssistantStatus>("GET", "/assistant");
+
+export const assistantAsk = (slug: string, personId: number, message: string, history: string[]) =>
+  api<AssistantReply>("POST", `/stays/${slug}/assistant`, { person_id: personId, message, history });
