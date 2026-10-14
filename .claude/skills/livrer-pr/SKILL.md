@@ -39,11 +39,14 @@ l'a demandé dans sa requête, ou avec `--merge`. On ne contourne jamais une vé
 
 ## 3. CI et environnement éphémère
 
-1. `gh pr checks <n> --watch` : attendre `test` puis `deploy-pr`. Si un job échoue :
+1. Vérifier d'abord `gh pr view <n> --json mergeable` : sur une PR en conflit (`CONFLICTING`), GitHub
+   ne lance **aucune** CI, et `gh pr checks` rend la main avec « no checks reported ». `master` a pu
+   bouger entre-temps (autres sessions) : fusionner `origin/master` dans la branche, résoudre, pousser.
+2. `gh pr checks <n> --watch` : attendre `test` puis `deploy-pr`. Si un job échoue :
    `gh run view <run> --log-failed`, puis rapport, sans fusionner.
-2. L'environnement est `https://family-planning-pr-<n>.once.florent.cc`. Sa base est neuve à chaque
+3. L'environnement est `https://family-planning-pr-<n>.once.florent.cc`. Sa base est neuve à chaque
    push et chargée avec les fixtures (`/s/demo`, `/s/ete`, clé organisateur `demo`).
-3. Vérifier que c'est bien le dernier commit qui est déployé : le commentaire de la CI sur la PR
+4. Vérifier que c'est bien le dernier commit qui est déployé : le commentaire de la CI sur la PR
    indique l'image `sha-<7>` (`gh pr view <n> --comments`), à comparer à `git rev-parse --short=7 HEAD`.
    Puis `curl -sf <url>/up` doit répondre `OK`.
 
