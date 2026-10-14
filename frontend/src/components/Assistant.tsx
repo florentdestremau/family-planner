@@ -97,7 +97,7 @@ export default function AssistantFab() {
     settle(i, actions.map((a) => a.person_id));
     try {
       await api("PUT", `/stays/${slug}/households/${me.household_id}/presences`, {
-        members: actions.map((a) => ({ person_id: a.person_id, slots: a.slots })),
+        members: actions.map((a) => ({ person_id: a.person_id, slots: a.slots, nights: a.nights_explicit ? a.nights : undefined })),
       });
       const names = actions.map((a) => a.name);
       toast(names.length === 1 ? `Présences de ${names[0]} enregistrées` : `Présences enregistrées pour ${names.join(", ")}`);
@@ -160,7 +160,7 @@ export default function AssistantFab() {
           <div className="assistant-messages" ref={listRef}>
             {messages.length === 0 && (
               <p className="hint">
-                Décris ce que tu veux : « toute l'équipe au dîner du vendredi », « Léo arrive samedi matin »…
+                Décris ce que tu veux : « toute l'équipe au dîner du vendredi », « on arrive vendredi après le dîner », « Léo dort chez un copain samedi »…
               </p>
             )}
             {messages.map((m, i) => (

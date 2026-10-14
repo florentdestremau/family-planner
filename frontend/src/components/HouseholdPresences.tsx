@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { Person } from "../api";
-import { sameSets, slotsOf, toSlots } from "../lib";
+import { sameSets, slotsOf, toNights, toSlots } from "../lib";
 import { useStay } from "../stay";
 import PresenceGrid from "./PresenceGrid";
 import { Toggle } from "./ui";
@@ -25,7 +25,7 @@ export default function HouseholdPresences({ me }: { me: Person }) {
   // pendant nos propres enregistrements.
   useEffect(() => {
     if (!queue.current.running) setState(fromServer());
-  }, [snap.presences, memberIds]);
+  }, [snap.presences, snap.person_nights, memberIds]);
 
   async function flush() {
     const q = queue.current;
@@ -35,7 +35,7 @@ export default function HouseholdPresences({ me }: { me: Person }) {
       const next = q.next;
       q.next = null;
       await call("PUT", `/households/${me.household_id}/presences`, {
-        members: [...next].map(([person_id, keys]) => ({ person_id, slots: toSlots(snap, keys) })),
+        members: [...next].map(([person_id, keys]) => ({ person_id, slots: toSlots(snap, keys), nights: toNights(snap, keys) })),
       });
     }
     q.running = false;
@@ -77,7 +77,10 @@ export default function HouseholdPresences({ me }: { me: Person }) {
             <summary>
               <strong>{p.name}</strong>
               {p.kind === "child" && <span className="badge">enfant</span>}
-              <span className="muted small"> · {state.get(p.id)?.size ?? 0} repas</span>
+              <span className="muted small">
+                {" "}
+                · {toSlots(snap, state.get(p.id) ?? new Set()).length} repas, {toNights(snap, state.get(p.id) ?? new Set()).length} nuit(s)
+              </span>
             </summary>
             <PresenceGrid
               selected={state.get(p.id) ?? new Set()}

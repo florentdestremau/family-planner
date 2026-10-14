@@ -14,11 +14,13 @@ test("un participant s'identifie et déclare ses présences", async ({ page, req
   await expect(page.getByText("Tout le foyer a les mêmes présences")).toHaveCount(0);
   await page.getByRole("button", { name: "Ven. 30 oct. Dîner" }).click();
   await page.getByRole("button", { name: "Sam. 31 oct.", exact: true }).click();
-  await expect(page.getByText("4 repas sur 6")).toBeVisible();
+  // Dîner du vendredi et petit-déj du samedi : la nuit du vendredi suit ; le samedi entier coche sa nuit.
+  await expect(page.getByText("4 repas sur 6 · 2 nuits sur 2")).toBeVisible();
   await page.waitForLoadState("networkidle");
   await page.reload();
-  await expect(page.getByText("4 repas sur 6")).toBeVisible();
+  await expect(page.getByText("4 repas sur 6 · 2 nuits sur 2")).toBeVisible();
   expect((await stay.snap()).presences).toHaveLength(4);
+  expect((await stay.snap()).person_nights).toHaveLength(2);
 
   await page.getByRole("button", { name: "Sam. 31 oct. Petit-déj" }).click();
   await expect(page.getByText("3 repas sur 6")).toBeVisible();

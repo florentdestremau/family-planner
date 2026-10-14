@@ -11,7 +11,7 @@ from sqlalchemy import func, select
 from app import assistant as mod
 from app import schemas as sc
 from app.db import SessionLocal
-from app.models import AssistantCall, Household, Person, Presence, Stay
+from app.models import AssistantCall, Household, Night, Person, Presence, Stay
 
 
 @pytest.fixture
@@ -99,7 +99,7 @@ def test_text_only_reply(db) -> None:
     fake = FakeClient([answer(text_block("Dis-moi !"))])
     out = mod.assistant_reply(db, stay, sc.AssistantIn(person_id=alice.id, message="Salut"), fake)
     assert out.text == "Dis-moi !" and out.actions == []
-    assert ": Léo (enfant) — aucune présence" in fake.calls[0]["system"]
+    assert ": Léo (enfant) — repas : aucun ; nuits : aucune" in fake.calls[0]["system"]
 
 
 def test_valid_proposal_then_summary(db) -> None:
@@ -126,11 +126,37 @@ def test_valid_proposal_then_summary(db) -> None:
     assert [t["name"] for t in first["tools"]] == ["propose_household_presences"]
     assert "ven 30/10 dîner" in first["system"] and "dim 01/11 petit-déjeuner" in first["system"]
     assert "Tu parles avec Alice." in first["system"]
-    assert f"person_id {alice.id} : Alice — ven 30/10 dîner" in first["system"]
-    assert f"person_id {bob.id} : Bob — aucune présence" in first["system"]
+    assert f"person_id {alice.id} : Alice — repas : ven 30/10 dîner ; nuits : aucune" in first["system"]
+    assert f"person_id {bob.id} : Bob — repas : aucun ; nuits : aucune" in first["system"]
+    assert "- nuit du ven. 30/10 (2026-10-30)" in first["system"] and "- nuit du sam. 31/10 (2026-10-31)" in first["system"]
     assert first["messages"][0]["role"] == "user" and first["messages"][1]["role"] == "assistant"  # historique alterné
     feedback = tool_result_of(fake, 1)
     assert feedback["content"] == mod.PENDING_TEXT and feedback["is_error"] is False
+
+
+def test_nights_explicit_or_following_meals(db) -> None:
+    """Nuits données par Claude (arrivée après le dîner), ou à défaut déduites du changement de repas."""
+    stay, _h, alice, bob = make_stay(db)
+    db.add(Night(person_id=alice.id, date=date(2026, 10, 31)))
+    db.commit()
+    late = [
+        {"person_id": alice.id, "slots": [{"date": "2026-10-31", "meal": "breakfast"}], "nights": ["2026-10-30", "2026-10-31"]},
+        {"person_id": bob.id, "slots": [{"date": "2026-10-30", "meal": "dinner"}, {"date": "2026-10-31", "meal": "breakfast"}]},
+    ]
+    fake = FakeClient([answer(tool_block(members=late), text_block("Noté."))] + [answer(text_block("Noté."))])
+    out = mod.assistant_reply(db, stay, sc.AssistantIn(person_id=alice.id, message="On arrive après le dîner"), fake)
+    assert {a.name: a.nights for a in out.actions} == {"Alice": [date(2026, 10, 30), date(2026, 10, 31)], "Bob": [date(2026, 10, 30)]}
+    assert {a.name: a.nights_explicit for a in out.actions} == {"Alice": True, "Bob": False}
+    assert "nuits : nuit du sam. 31/10 (2026-10-31)" in fake.calls[0]["system"]
+    assert mod.PROPOSE_TOOL["input_schema"]["properties"]["members"]["items"]["properties"]["nights"]["type"] == "array"
+
+
+def test_night_out_of_stay_fed_back(db) -> None:
+    stay, _h, alice, _bob = make_stay(db)
+    wrong = [{"person_id": alice.id, "slots": [], "nights": ["2026-11-01"]}]  # pas de nuit le dernier jour
+    fake = FakeClient([answer(tool_block(members=wrong)), answer(text_block("Corrigé."))])
+    out = mod.assistant_reply(db, stay, sc.AssistantIn(person_id=alice.id, message="?"), fake)
+    assert out.actions == [] and "Nuit hors des dates" in tool_result_of(fake, 1)["content"]
 
 
 def test_thinking_blocks_are_sent_back_untouched(db) -> None:
@@ -201,7 +227,7 @@ def test_exhaust_rounds_with_actions_builds_summary(db) -> None:
     fake = FakeClient([answer(tool_block(members=VALID_MEMBERS([alice.id, bob.id]))) for _ in range(mod.MAX_TOOL_ROUNDS)])
     out = mod.assistant_reply(db, stay, sc.AssistantIn(person_id=alice.id, message="Rien"), fake)
     assert [a.name for a in out.actions] == ["Alice", "Bob"]  # propositions répétées fusionnées
-    assert out.text.startswith("Voici mes propositions") and "Alice" in out.text
+    assert out.text.startswith("Voici mes propositions") and "- Alice : ven 30/10 dîner ; nuits : aucune" in out.text
 
 
 def test_exhaust_rounds_keeps_model_text(db) -> None:
@@ -244,10 +270,14 @@ def test_stub_mode_is_deterministic(db, monkeypatch) -> None:
     monkeypatch.setenv("ASSISTANT_STUB", "true")
     assert mod.enabled() is True
     stay, _home, alice, bob = make_stay(db)
+    db.add_all(Night(person_id=alice.id, date=date(2026, 10, d)) for d in (30, 31))
+    db.commit()
     out = mod.assistant_reply(db, stay, sc.AssistantIn(person_id=alice.id, message="On mange ?"))
     assert out.text.startswith("Voici ma proposition")
     assert [a.name for a in out.actions] == ["Alice", "Bob"]
     assert all(a.slots == [sc.SlotIn(date=date(2026, 10, 30), meal="dinner")] for a in out.actions)
+    # Nuits non précisées : déduites, jamais effacées (un lit perdu à la validation sinon).
+    assert [(a.nights, a.nights_explicit) for a in out.actions] == [([date(2026, 10, 30), date(2026, 10, 31)], False), ([], False)]
 
 
 def _stub_reply(client, api, monkeypatch, new_value) -> None:

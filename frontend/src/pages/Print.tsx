@@ -128,26 +128,35 @@ function MenusPrint() {
 }
 
 function RoomsPrint() {
-  const { snap } = useStay();
+  const { snap, idx } = useStay();
+  const unbedded = idx.unbedded(null);
   return (
-    <div className="print-columns">
-      {snap.rooms.map((room) => (
-        <section key={room.id} className="print-block">
-          <h2>{room.name}</h2>
-          <ul className="compact">
-            {room.beds.map((bed) => (
-              <li key={bed.id}>
-                <span className="muted">{bed.label || BED_LABEL[bed.kind]} :</span>{" "}
-                {snap.persons
-                  .filter((p) => p.bed_id === bed.id)
-                  .map((p) => p.name)
-                  .join(", ") || "—"}
-              </li>
-            ))}
-          </ul>
-        </section>
-      ))}
-    </div>
+    <>
+      <div className="print-columns">
+        {snap.rooms.map((room) => (
+          <section key={room.id} className="print-block">
+            <h2>{room.name}</h2>
+            <ul className="compact">
+              {room.beds.map((bed) => (
+                <li key={bed.id}>
+                  <span className="muted">{bed.label || BED_LABEL[bed.kind]} :</span>{" "}
+                  {idx
+                    .occupants(bed.id, null)
+                    .map(({ person, nights }) => person.name + idx.nightsSuffix(nights))
+                    .join(", ") || "—"}
+                </li>
+              ))}
+            </ul>
+          </section>
+        ))}
+      </div>
+      {unbedded.length > 0 && (
+        <p className="small">
+          <strong>Sans lit :</strong>{" "}
+          {unbedded.map(({ person, nights }) => person.name + idx.nightsSuffix(nights)).join(", ")}
+        </p>
+      )}
+    </>
   );
 }
 

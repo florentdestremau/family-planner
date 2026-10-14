@@ -9,6 +9,7 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session
 
 from .. import households as h
+from .. import nights as n
 from .. import schemas as s
 from ..deps import DB, AdminStay, owned, person
 from ..lottery import build_occurrences, draw
@@ -21,6 +22,7 @@ from ..models import (
     Decline,
     Household,
     Menu,
+    Night,
     Person,
     Presence,
     Room,
@@ -28,8 +30,8 @@ from ..models import (
     Stay,
     StayCover,
 )
-from ..rooms import auto_assign
-from ..slots import BED_PLACES, stay_days, stay_slots
+from ..rooms import auto_assign_nights
+from ..slots import stay_days, stay_nights, stay_slots
 from .public import validate_dates
 
 router = APIRouter(prefix="/api/stays/{slug}/admin")
@@ -56,6 +58,10 @@ def update_stay(body: s.StayUpdate, stay: AdminStay, db: DB) -> Stay:
     for p in db.scalars(select(Presence).where(Presence.person_id.in_(person_ids))):
         if (p.date, p.meal) not in slots:
             db.delete(p)
+    nights = set(stay_nights(stay.start_date, stay.end_date))
+    for night in db.scalars(select(Night).where(Night.person_id.in_(person_ids))):
+        if night.date not in nights:
+            db.delete(night)
     for m in db.scalars(select(Menu).where(Menu.stay_id == stay.id)):
         if (m.date, m.meal) not in slots:
             db.delete(m)
@@ -175,17 +181,12 @@ def delete_household(household_id: int, stay: AdminStay, db: DB) -> None:
     db.commit()
 
 
-@router.put("/persons/{person_id}/bed", response_model=s.PersonOut)
-def set_bed(person_id: int, body: s.BedAssignIn, stay: AdminStay, db: DB) -> Person:
+@router.put("/persons/{person_id}/bed", response_model=s.BedAssignOut)
+def set_bed(person_id: int, body: s.BedAssignIn, stay: AdminStay, db: DB) -> dict:
+    """Lit pour les nuits demandées, par défaut toutes celles de la personne (capacité vérifiée nuit par nuit)."""
     p = person(db, person_id, stay)
-    if body.bed_id is not None:
-        bed = owned(db, Bed, body.bed_id, stay)
-        taken = len(db.scalars(select(Person).where(Person.bed_id == bed.id, Person.id != p.id)).all())
-        if taken >= BED_PLACES[bed.kind]:
-            raise HTTPException(409, "Ce lit est déjà complet")
-    p.bed_id = body.bed_id
-    db.commit()
-    return p
+    bed = owned(db, Bed, body.bed_id, stay) if body.bed_id is not None else None
+    return {"warning": n.assign_bed(db, stay, p, bed, body.dates)}
 
 
 # --- Chambres ----------------------------------------------------------------
@@ -228,19 +229,26 @@ def delete_bed(bed_id: int, stay: AdminStay, db: DB) -> None:
     db.commit()
 
 
-@router.post("/rooms/auto-assign")
+@router.post("/rooms/auto-assign", response_model=s.AutoAssignOut)
 def rooms_auto_assign(stay: AdminStay, db: DB) -> dict:
+    """Propose un lit pour chaque nuit qui n'en a pas ; les nuits déjà attribuées ne bougent pas."""
     people = db.scalars(select(Person).where(Person.stay_id == stay.id)).all()
     beds = db.scalars(select(Bed).join(Room).where(Room.stay_id == stay.id)).all()
-    proposal = auto_assign(
-        [{"id": p.id, "kind": p.kind, "partner_id": p.partner_id, "household_id": p.household_id, "bed_id": p.bed_id} for p in people],
+    nights = db.scalars(select(Night).where(Night.person_id.in_([p.id for p in people]))).all()
+    proposal = auto_assign_nights(
+        [{"id": p.id, "kind": p.kind, "partner_id": p.partner_id, "household_id": p.household_id} for p in people],
         [{"id": b.id, "room_id": b.room_id, "kind": b.kind} for b in beds],
+        [{"person_id": x.person_id, "date": x.date, "bed_id": x.bed_id} for x in nights],
     )
-    for p in people:
-        if p.id in proposal:
-            p.bed_id = proposal[p.id]
+    for x in nights:
+        x.bed_id = proposal.get((x.person_id, x.date), x.bed_id)
     db.commit()
-    return {"assigned": len(proposal), "unassigned": sum(1 for p in people if p.bed_id is None)}
+    sleeping = {x.person_id for x in nights}
+    return {
+        "assigned": len(proposal),
+        "unassigned": sum(1 for x in nights if x.bed_id is None),
+        "undeclared": sum(1 for p in people if p.id not in sleeping),
+    }
 
 
 # --- Corvées -----------------------------------------------------------------

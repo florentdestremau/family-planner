@@ -90,9 +90,9 @@ seule la clé organisateur protège la configuration.
 
 **Personnes** — adulte ou enfant (portions), « participe aux corvées » (défaut : oui pour un adulte, non pour un enfant).
 
-**Présences** — par repas (petit-déj, déjeuner, dîner) entre le premier repas du premier jour et le dernier repas du dernier jour. Présent sur place = présent au repas ; les couverts sont comptés adultes / enfants.
+**Présences** — par repas (petit-déj, déjeuner, dîner) entre le premier repas du premier jour et le dernier repas du dernier jour, et par nuit (nuit du jour J, de J à J+1 ; pas de nuit le dernier jour). Les couverts sont comptés adultes / enfants, les couchages par nuit. Les nuits suivent les repas sans deviner : dîner et petit-déj du lendemain → nuit cochée, ni l'un ni l'autre → décochée, un seul (arrivée après le dîner, nuit ailleurs) → on garde la case telle quelle. Détails : `docs/nuits.md`.
 
-**Assistant (formulaires conversationnels)** — un bouton ✨ ouvre un panneau de discussion ; on décrit les présences du foyer en langue naturelle (« toute l'équipe au dîner du vendredi ») ou à la voix (micro, si le navigateur le permet). L'assistant (modèle `claude-sonnet-5-5`, effort bas) propose des présences, vérifiées par les règles du foyer, et chaque proposition se valide ou s'ignore d'un clic — ce qui met à jour les présences comme la grille habituelle. Le panneau exige d'avoir choisi « qui je suis ». Limite : 30 demandes par séjour et par jour.
+**Assistant (formulaires conversationnels)** — un bouton ✨ ouvre un panneau de discussion ; on décrit les présences du foyer en langue naturelle (« toute l'équipe au dîner du vendredi », « on arrive après le dîner ») ou à la voix (micro, si le navigateur le permet). L'assistant (modèle `claude-sonnet-5-5`, effort bas) propose des présences, vérifiées par les règles du foyer, et chaque proposition se valide ou s'ignore d'un clic — ce qui met à jour les présences comme la grille habituelle. Le panneau exige d'avoir choisi « qui je suis ». Limite : 30 demandes par séjour et par jour.
 
 **Corvées** — chaque type a des moments (un ou plusieurs repas, ou « journée »), un nombre de personnes et un rythme (tous les N jours). Le tirage (`POST …/admin/chores/draw`) :
 - ne retient que les personnes « corvées » présentes au créneau ;
@@ -100,7 +100,7 @@ seule la clé organisateur protège la configuration.
 - équilibre la charge proportionnellement au temps de présence, évite deux corvées au même moment et varie les binômes ;
 - garde le meilleur de 150 tirages aléatoires. « Re-répartir » écrase les ajustements manuels.
 
-**Chambres** — lits doubles (2 places), simples (1), superposés (2), d'appoint (1). Affectation manuelle, ou proposition automatique pour les non-logés (couples en lit double, enfants près de leur adulte référent).
+**Chambres** — lits doubles (2 places), simples (1), superposés (2), d'appoint (1). Le lit se choisit nuit par nuit (capacité vérifiée chaque nuit) : par défaut pour toutes les nuits de la personne, ou pour une nuit précise (une chambre qui sert à deux familles des nuits différentes). Une nuit ajoutée reprend le lit voisin. Coucher quelqu'un une nuit qu'il n'a pas déclarée l'ajoute, avec un avertissement. Proposition automatique nuit par nuit pour les non-logés (chacun garde son lit d'une nuit à l'autre, couples en lit double, enfants près de leur adulte référent).
 
 **Activités** — toutes sur inscription. Depuis le planning, chacun inscrit ou retire les membres de son foyer, activité par activité (inscription possible même absent ce jour-là, avec un avertissement) ; l'accueil résume les activités du foyer. L'organisateur peut « inscrire tout le monde » : à la création (coché par défaut) ou plus tard d'un bouton, les personnes présentes ce jour-là qui manquent sont inscrites ; celles qui se sont retirées ne sont pas réinscrites. L'organisateur voit les inscrits de chaque activité et peut en retirer un d'un clic. Retirer une présence ou déplacer une activité ne touche pas aux inscriptions.
 
@@ -116,5 +116,4 @@ Une nouvelle version déployée est proposée par « ✨ Nouvelle version dispon
 ## Limites v1 / pistes
 
 - Migrations Alembic (`backend/migrations`), appliquées au démarrage ; une base créée avant Alembic est reconnue comme `0001`. Pas de retour arrière : restaurer une sauvegarde once. Nouvelle migration : `cd backend && uv run alembic revision -m "…"` (un test vérifie que modèles et migrations ne divergent pas).
-- Couchage fixe pour tout le séjour (pas de lit par nuit).
 - Hors périmètre : notifications push, modifications hors ligne synchronisées au retour du réseau, génération intégrée de la liste de courses par LLM, covoiturage (étudié en octobre 2026 : trop lourd pour le gain, le besoin se limitant aux voitures d'arrivée et de départ).
