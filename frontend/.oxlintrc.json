@@ -1,0 +1,84 @@
+{
+  // Lint strict du front : règles typées (tsgolint, bâti sur le compilateur TypeScript 7). `npm run lint`.
+  // Catégories : correctness, suspicious, pedantic et perf en erreur ; style (purement cosmétique :
+  // sort-keys, no-ternary, one-var…) et restriction (interdictions de syntaxe) laissées de côté.
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc", "react", "import", "promise", "jsx-a11y"],
+  "options": { "typeAware": true },
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "pedantic": "error",
+    "perf": "error"
+  },
+  "ignorePatterns": ["dist/", "coverage/", "playwright-report/", "test-results/"],
+  "rules": {
+    // JSX automatique (jsx: react-jsx) : pas d'import de React.
+    "react/react-in-jsx-scope": "off",
+    // Les apostrophes du texte français ne sont pas des entités à échapper.
+    "react/no-unescaped-entities": "off",
+    // Les brouillons locaux (formulaire du séjour, menus, nom du foyer, présences) sont volontairement
+    // resynchronisés depuis le serveur dans un effet.
+    "react/set-state-in-effect": "off",
+    // Listes statiques sans état (lignes de menu, corvées affichées) : l'index est une clé correcte.
+    "react/no-array-index-key": "off",
+    // Doublons de react-hooks/exhaustive-deps, l'implémentation de référence.
+    "react/exhaustive-effect-dependencies": "off",
+    "react/memo-dependencies": "off",
+    // role="status" / "dialog" / "group" sur une div : motifs ARIA canoniques ; <output> et <dialog>
+    // ont d'autres sémantiques et comportements.
+    "jsx-a11y/prefer-tag-over-role": "off",
+    // Inapplicable en pratique (readonly sur tous les paramètres objets).
+    "typescript/prefer-readonly-parameter-types": "off",
+    // `onClick={() => setX(1)}` : raccourci courant, lisible.
+    "typescript/no-confusing-void-expression": ["error", { "ignoreArrowShorthand": true }],
+    // `x && <span>` sur une chaîne ou un booléen optionnel : idiome React ; le reste (any, unknown,
+    // nombres nuls, unions mixtes) doit être comparé explicitement.
+    "typescript/strict-boolean-expressions": ["error", { "allowNullableString": true, "allowNullableBoolean": true }],
+    // `x == null` couvre null et undefined d'un coup.
+    "eqeqeq": ["error", "always", { "null": "ignore" }],
+    // Un composant React peut être long ; les commentaires en fin de ligne sont bienvenus.
+    "max-lines-per-function": "off",
+    "max-lines": "off",
+    "no-inline-comments": "off",
+    "import/max-dependencies": "off",
+    // Doublons (eslint ↔ unicorn / typescript) : on garde une seule version de chaque règle.
+    "unicorn/no-negated-condition": "off",
+    "require-await": "off",
+    // getElementById est plus direct que querySelector("#…").
+    "unicorn/prefer-query-selector": "off",
+    // `.map(idx.name)` ou `.sort(sortedMoments)` : références de fonctions aux signatures sûres.
+    "unicorn/no-array-callback-reference": "off",
+    // `.map((x) => ({ ...x, y }))` : idiome immuable, sans enjeu de performance ici.
+    "oxc/no-map-spread": "off",
+    // Identifiant injecté par Vite (vite.config.ts) ; feuille de style importée pour effet.
+    "no-underscore-dangle": ["error", { "allow": ["__BUILD_ID__"] }],
+    "import/no-unassigned-import": ["error", { "allow": ["**/*.css"] }],
+    // Tout bouton déclare son type : sans lui, un bouton dans un formulaire le soumet.
+    "react/button-has-type": "error",
+    "typescript/no-non-null-assertion": "error",
+    "no-console": ["error", { "allow": ["warn", "error"] }]
+  },
+  "overrides": [
+    {
+      "files": ["src/**/*.test.ts"],
+      "plugins": ["vitest"],
+      "rules": {
+        // Doublures et faux événements : les assertions de type sont le moyen de les construire.
+        "typescript/no-unsafe-type-assertion": "off"
+      }
+    },
+    {
+      "files": ["e2e/**"],
+      "rules": {
+        // Scénarios séquentiels par nature.
+        "no-await-in-loop": "off",
+        "typescript/no-unsafe-type-assertion": "off"
+      }
+    },
+    {
+      "files": ["scripts/**"],
+      "rules": { "no-await-in-loop": "off", "no-console": "off" }
+    }
+  ]
+}

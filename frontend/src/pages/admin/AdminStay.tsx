@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
-import type { Meal } from "../../api";
 import CoverCard from "../../components/CoverCard";
 import PlaceCard from "../../components/PlaceCard";
 import { CopyButton, Toggle } from "../../components/ui";
-import { MEALS, MOMENT_LABEL } from "../../lib";
+import { MEALS, MOMENT_LABEL, oneOf } from "../../lib";
 import { useStay } from "../../stay";
 import { toast } from "../../toast";
 
@@ -21,12 +20,12 @@ export default function AdminStay() {
   const publicLink = `${origin}/s/${slug}`;
   const adminLink = `${origin}/s/${slug}/admin?key=${adminKey}`;
 
-  async function save(e: React.FormEvent) {
+  async function save(e: React.SubmitEvent) {
     e.preventDefault();
     const { name, start_date, end_date, first_meal, last_meal } = form;
     const shrinking = start_date > snap.stay.start_date || end_date < snap.stay.end_date;
     if (shrinking && !confirm("Les présences, menus et corvées hors de la nouvelle période seront supprimés. Continuer ?")) return;
-    if (await call("PATCH", "/stay", { name, start_date, end_date, first_meal, last_meal }, { admin: true })) toast("Séjour enregistré");
+    if ((await call("PATCH", "/stay", { name, start_date, end_date, first_meal, last_meal }, { admin: true })) !== undefined) toast("Séjour enregistré");
   }
 
   const stats = {
@@ -84,7 +83,7 @@ export default function AdminStay() {
 
       <section className="card">
         <h2>Dates du séjour</h2>
-        <form className="form" onSubmit={save}>
+        <form className="form" onSubmit={(e) => void save(e)}>
           <label>
             Nom
             <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
@@ -96,7 +95,7 @@ export default function AdminStay() {
             </label>
             <label>
               Premier repas
-              <select value={form.first_meal} onChange={(e) => setForm({ ...form, first_meal: e.target.value as Meal })}>
+              <select value={form.first_meal} onChange={(e) => setForm({ ...form, first_meal: oneOf(MEALS, e.target.value) })}>
                 {MEALS.map((m) => (
                   <option key={m} value={m}>
                     {MOMENT_LABEL[m]}
@@ -112,7 +111,7 @@ export default function AdminStay() {
             </label>
             <label>
               Dernier repas
-              <select value={form.last_meal} onChange={(e) => setForm({ ...form, last_meal: e.target.value as Meal })}>
+              <select value={form.last_meal} onChange={(e) => setForm({ ...form, last_meal: oneOf(MEALS, e.target.value) })}>
                 {MEALS.map((m) => (
                   <option key={m} value={m}>
                     {MOMENT_LABEL[m]}
@@ -121,7 +120,7 @@ export default function AdminStay() {
               </select>
             </label>
           </div>
-          <button className="btn btn-primary">Enregistrer</button>
+          <button type="submit" className="btn btn-primary">Enregistrer</button>
         </form>
       </section>
 
@@ -130,7 +129,7 @@ export default function AdminStay() {
         <Toggle
           label="Séparer les couples (jamais sur la même corvée)"
           checked={snap.stay.separate_couples}
-          onChange={(v) => call("PATCH", "/stay", { separate_couples: v }, { admin: true })}
+          onChange={(v) => void call("PATCH", "/stay", { separate_couples: v }, { admin: true })}
         />
       </section>
     </div>

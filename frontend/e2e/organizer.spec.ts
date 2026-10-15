@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { createStay, openAdmin } from "./helpers";
+import { createStay, json, openAdmin } from "./helpers";
 
 test("créer un séjour puis le configurer comme organisateur", async ({ page, context }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
@@ -13,7 +13,7 @@ test("créer un séjour puis le configurer comme organisateur", async ({ page, c
   await expect(page.getByRole("heading", { name: "Liens de partage" })).toBeVisible();
   await expect(page.locator(".stay-name")).toHaveText("Noël chez Papi");
   const publicLink = await page.locator(".share code").first().textContent();
-  expect(publicLink).toMatch(/\/s\/[\w-]{12}$/);
+  expect(publicLink).toMatch(/\/s\/[\w-]{12}$/u);
 
   // Foyers : Florent ajouté seul (nouveau foyer), puis Claire en couple et Léo dans son foyer.
   await page.locator(".subtabs").getByRole("link", { name: "Foyers" }).click();
@@ -26,7 +26,7 @@ test("créer un séjour puis le configurer comme organisateur", async ({ page, c
   await expect(foyer.getByLabel("En couple avec Florent")).toBeChecked();
   await foyer.getByRole("button", { name: "Ajouter au foyer" }).click();
   await expect(foyer.getByLabel("Nom du foyer")).toHaveAttribute("placeholder", "Florent & Claire");
-  await expect(foyer.getByLabel("Couple de Florent")).toHaveValue(/\d+/);
+  await expect(foyer.getByLabel("Couple de Florent")).toHaveValue(/\d+/u);
   await foyer.getByLabel("Prénom du nouveau membre").fill("Léo");
   await foyer.getByLabel("Adulte ou enfant", { exact: true }).selectOption("child");
   await foyer.getByRole("button", { name: "Ajouter au foyer" }).click();
@@ -98,7 +98,7 @@ test("l'organisateur inscrit tout le monde, chacun peut se retirer", async ({ pa
   const row = page.locator(".list-row").filter({ hasText: "Pétanque" });
   await expect(row.getByText("2 inscrits")).toBeVisible();
   await row.getByText("2 inscrits").click();
-  await expect(row.locator(".chip")).toHaveText([/^Alice/, /^Bob/]);
+  await expect(row.locator(".chip")).toHaveText([/^Alice/u, /^Bob/u]);
 
   // Bob se retire, Camille arrive : le bouton n'inscrit que Camille.
   const { activities } = await stay.snap();
@@ -109,28 +109,28 @@ test("l'organisateur inscrit tout le monde, chacun peut se retirer", async ({ pa
   await row.getByRole("button", { name: "Inscrire tout le monde" }).click();
   await expect(page.locator(".toast")).toContainText("1 personne inscrite à « Pétanque »");
   await row.getByText("2 inscrits").click();
-  await expect(row.locator(".chip")).toHaveText([/^Alice/, /^Camille/]);
+  await expect(row.locator(".chip")).toHaveText([/^Alice/u, /^Camille/u]);
   await row.getByRole("button", { name: "Inscrire tout le monde" }).click();
   await expect(page.locator(".toast").last()).toContainText("déjà inscrits");
 
   // L'organisateur retire Camille d'un clic ; « inscrire tout le monde » ne la réinscrit pas.
   await row.getByRole("button", { name: "Retirer Camille" }).click();
   await expect(row.getByText("1 inscrit")).toBeVisible();
-  await expect(row.locator(".chip")).toHaveText([/^Alice/]);
+  await expect(row.locator(".chip")).toHaveText([/^Alice/u]);
   await row.getByRole("button", { name: "Inscrire tout le monde" }).click();
   await expect(page.locator(".toast").last()).toContainText("déjà inscrits");
-  await expect(row.locator(".chip")).toHaveText([/^Alice/]);
+  await expect(row.locator(".chip")).toHaveText([/^Alice/u]);
 });
 
 test("l'espace organisateur exige la clé", async ({ page, request }) => {
   const res = await request.post("/api/stays", {
     data: { name: "Privé", start_date: "2026-10-30", end_date: "2026-10-31" },
   });
-  const { slug, admin_key } = await res.json();
+  const { slug, admin_key } = await json<{ slug: string; admin_key: string }>(res);
 
   await page.goto(`/s/${slug}/admin`);
   await expect(page.getByPlaceholder("Clé organisateur")).toBeVisible();
-  await expect(page.getByRole("link", { name: /Organisation/ })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: /Organisation/u })).toHaveCount(0);
 
   await page.getByPlaceholder("Clé organisateur").fill("mauvaise");
   await page.getByRole("button", { name: "Entrer" }).click();
@@ -139,7 +139,7 @@ test("l'espace organisateur exige la clé", async ({ page, request }) => {
   // Lien organisateur : la clé est mémorisée puis retirée de l'URL.
   await page.goto(`/s/${slug}/admin?key=${admin_key}`);
   await expect(page.getByRole("heading", { name: "Liens de partage" })).toBeVisible();
-  await expect(page).toHaveURL(new RegExp(`/s/${slug}/admin$`));
+  await expect(page).toHaveURL(new RegExp(`/s/${slug}/admin$`, "u"));
   await page.goto(`/s/${slug}/admin/foyers`);
   await expect(page.getByRole("heading", { name: "Ajouter une personne" })).toBeVisible();
 });
@@ -155,7 +155,7 @@ test("une erreur de l'API s'affiche", async ({ page, request }) => {
   const res = await request.post("/api/stays", {
     data: { name: "Erreurs", start_date: "2026-10-30", end_date: "2026-10-31" },
   });
-  const { slug, admin_key } = await res.json();
+  const { slug, admin_key } = await json<{ slug: string; admin_key: string }>(res);
   await openAdmin(page, slug, admin_key, "Activités");
   await page.getByRole("button", { name: "+ Activité" }).click();
   await page.getByLabel("Nom").fill("À l'envers");

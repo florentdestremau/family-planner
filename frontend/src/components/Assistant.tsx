@@ -16,13 +16,19 @@ interface MicRec {
   lang: string;
   interimResults: boolean;
   maxAlternatives: number;
-  onresult: ((e: { results: Array<Array<{ transcript: string }>> }) => void) | null;
-  onend: (() => void) | null;
-  onerror: (() => void) | null;
+  addEventListener: ((type: "result", listener: (e: { results: Array<Array<{ transcript: string }>> }) => void) => void) &
+    ((type: "end" | "error", listener: () => void) => void);
   start: () => void;
   stop: () => void;
 }
 type MicCtor = new () => MicRec;
+
+declare global {
+  interface Window {
+    SpeechRecognition?: MicCtor;
+    webkitSpeechRecognition?: MicCtor;
+  }
+}
 
 /** Panneau de discussion avec l'assistant : bouton flottant ✨, micro, propositions à valider. */
 export default function AssistantFab() {
@@ -61,8 +67,7 @@ export default function AssistantFab() {
 
   if (!me || enabled !== true || !isOnline) return null;
 
-  const win = window as unknown as { SpeechRecognition?: MicCtor; webkitSpeechRecognition?: MicCtor };
-  const Mic = win.SpeechRecognition ?? win.webkitSpeechRecognition;
+  const Mic = window.SpeechRecognition ?? window.webkitSpeechRecognition;
   const micSupported = Mic !== undefined;
 
   const send = async (text: string) => {
@@ -89,7 +94,7 @@ export default function AssistantFab() {
 
   /** Enlève des cartes (validées ou ignorées) d'un message, ou les y remet si l'enregistrement échoue. */
   const setActions = (i: number, update: (actions: AssistantAction[]) => AssistantAction[]) =>
-    setMessages((ms) => ms.map((m, idx) => (idx !== i ? m : { ...m, actions: update(m.actions) })));
+    setMessages((ms) => ms.map((m, idx) => (idx === i ? { ...m, actions: update(m.actions) } : m)));
   const settle = (i: number, personIds: number[]) => setActions(i, (as) => as.filter((a) => !personIds.includes(a.person_id)));
 
   /** Un seul envoi pour toutes les cartes validées ensemble : tout est enregistré, ou rien. */
@@ -119,15 +124,15 @@ export default function AssistantFab() {
     rec.lang = "fr-FR";
     rec.interimResults = false;
     rec.maxAlternatives = 1;
-    rec.onresult = (e) => {
+    rec.addEventListener("result", (e) => {
       const transcript = e.results?.[0]?.[0]?.transcript ?? "";
       if (transcript) setInput((t) => (t ? `${t} ${transcript}` : transcript));
-    };
-    rec.onend = () => setRecording(false);
-    rec.onerror = () => {
+    });
+    rec.addEventListener("end", () => setRecording(false));
+    rec.addEventListener("error", () => {
       setRecording(false);
       toast("Le micro n'a pas pu démarrer.", "error");
-    };
+    });
     recRef.current = rec;
     try {
       rec.start();

@@ -14,13 +14,13 @@ function setOnline(value: boolean) {
 
 function fakePrompt(outcome: "accepted" | "dismissed") {
   const e = new Event("beforeinstallprompt", { cancelable: true }) as InstallPromptEvent;
-  e.prompt = vi.fn(async () => {});
+  e.prompt = vi.fn<() => Promise<void>>(() => Promise.resolve());
   e.userChoice = Promise.resolve({ outcome });
   return e;
 }
 
 function matchMedia(standalone: boolean) {
-  return vi.fn(() => ({ matches: standalone }) as MediaQueryList);
+  return vi.fn<(query: string) => MediaQueryList>(() => ({ matches: standalone }) as MediaQueryList);
 }
 
 afterEach(() => {
@@ -32,7 +32,7 @@ afterEach(() => {
 describe("online", () => {
   it("suit les événements online / offline", async () => {
     const { online } = await load();
-    const listener = vi.fn();
+    const listener = vi.fn<() => void>();
     const unsubscribe = online.subscribe(listener);
     expect(online.get()).toBe(true);
     setOnline(false);
@@ -85,7 +85,7 @@ describe("install", () => {
     expect(install.mode()).toBe("none");
     await expect(install.prompt()).resolves.toBe(false);
 
-    const listener = vi.fn();
+    const listener = vi.fn<() => void>();
     install.subscribe(listener);
     const e = fakePrompt("accepted");
     window.dispatchEvent(e);
@@ -125,7 +125,7 @@ describe("savedAtLabel", () => {
     const ts = new Date(2026, 9, 14, 15, 32).getTime();
     expect(savedAtLabel(ts, new Date(2026, 9, 14, 20, 0).getTime())).toBe("à 15:32");
     expect(savedAtLabel(ts, new Date(2026, 9, 16, 9, 0).getTime())).toBe("le 14/10 à 15:32");
-    expect(savedAtLabel(Date.now())).toMatch(/^à \d\d:\d\d$/);
+    expect(savedAtLabel(Date.now())).toMatch(/^à \d\d:\d\d$/u);
   });
 });
 

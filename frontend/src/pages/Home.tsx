@@ -2,8 +2,8 @@ import { useIsRestoring, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { InstallButton, OfflineBanner, useOnline } from "../components/Pwa";
-import { api, type Meal, type Stay, type StaySummary } from "../api";
-import { addDays, coverThumbUrl, groupStays, MEALS, MOMENT_LABEL, shortRange, toIso } from "../lib";
+import { api, type Stay, type StaySummary } from "../api";
+import { addDays, coverThumbUrl, groupStays, MEALS, MOMENT_LABEL, oneOf, shortRange, toIso } from "../lib";
 import { storage } from "../storage";
 import { ThemeToggle } from "../theme";
 import { toast } from "../toast";
@@ -18,18 +18,18 @@ export default function Home() {
   const navigate = useNavigate();
   const [form, setForm] = useState(() => {
     const start = nextFriday();
-    return { name: "", start_date: start, end_date: addDays(start, 2), first_meal: "dinner" as Meal, last_meal: "lunch" as Meal };
+    return { name: "", start_date: start, end_date: addDays(start, 2), first_meal: "dinner", last_meal: "lunch" };
   });
   const [busy, setBusy] = useState(false);
   const isOnline = useOnline();
 
-  async function submit(e: React.FormEvent) {
+  async function submit(e: React.SubmitEvent) {
     e.preventDefault();
     setBusy(true);
     try {
       const stay = await api<Stay & { admin_key: string }>("POST", "/stays", form);
       storage.setAdminKey(stay.slug, stay.admin_key);
-      navigate(`/s/${stay.slug}/admin`);
+      void navigate(`/s/${stay.slug}/admin`);
     } catch (err) {
       toast(err instanceof Error ? err.message : "Erreur", "error");
     } finally {
@@ -53,7 +53,7 @@ export default function Home() {
 
       <section className="card">
         <h2>✨ Organiser un nouveau séjour</h2>
-        <form onSubmit={submit} className="form">
+        <form onSubmit={(e) => void submit(e)} className="form">
           <label>
             Nom du séjour
             <input
@@ -75,7 +75,7 @@ export default function Home() {
             </label>
             <label>
               Premier repas
-              <select value={form.first_meal} onChange={(e) => setForm({ ...form, first_meal: e.target.value as Meal })}>
+              <select value={form.first_meal} onChange={(e) => setForm({ ...form, first_meal: oneOf(MEALS, e.target.value) })}>
                 {MEALS.map((m) => (
                   <option key={m} value={m}>
                     {MOMENT_LABEL[m]}
@@ -97,7 +97,7 @@ export default function Home() {
             </label>
             <label>
               Dernier repas
-              <select value={form.last_meal} onChange={(e) => setForm({ ...form, last_meal: e.target.value as Meal })}>
+              <select value={form.last_meal} onChange={(e) => setForm({ ...form, last_meal: oneOf(MEALS, e.target.value) })}>
                 {MEALS.map((m) => (
                   <option key={m} value={m}>
                     {MOMENT_LABEL[m]}
@@ -106,7 +106,7 @@ export default function Home() {
               </select>
             </label>
           </div>
-          <button className="btn btn-primary" disabled={busy || !isOnline}>
+          <button type="submit" className="btn btn-primary" disabled={busy || !isOnline}>
             🚀 Créer le séjour
           </button>
           {!isOnline && <p className="hint">📴 Hors ligne : la création d'un séjour attendra le retour du réseau.</p>}
@@ -130,8 +130,9 @@ function StayList() {
     return <p className="muted center-text">📴 Hors ligne : la liste des séjours n'est pas encore sur cet appareil.</p>;
   if (isPending) return <p className="muted center-text">Chargement des séjours…</p>;
   if (!data) return <p className="warn center-text">Impossible de charger les séjours.</p>;
-  if (!data.length) return null;
+  if (data.length === 0) return null;
 
+  // oxlint-disable-next-line react/purity -- la date du jour, relue à chaque rendu
   const { current, upcoming, past } = groupStays(data, toIso(new Date()));
   return (
     <section className="card">

@@ -7,14 +7,14 @@ export default function Planning() {
   const { snap, idx, me, call } = useStay();
   const household = idx.household(me);
 
-  if (!snap.activities.length) return <Empty>Aucune activité prévue pour l'instant.</Empty>;
+  if (snap.activities.length === 0) return <Empty>Aucune activité prévue pour l'instant.</Empty>;
 
   return (
     <div className="stack">
       <h1 className="page-title">Activités</h1>
       {snap.days.map((day) => {
         const activities = snap.activities.filter((a) => a.date === day);
-        if (!activities.length) return null;
+        if (activities.length === 0) return null;
         return (
           <section key={day} className="card">
             <h2>{dayLabel(day, true)}</h2>
@@ -46,7 +46,7 @@ export default function Planning() {
                                   </>
                                 }
                                 checked={idx.signups.has(`${a.id}|${p.id}`)}
-                                onChange={(v) => call(v ? "PUT" : "DELETE", `/activities/${a.id}/signups/${p.id}`)}
+                                onChange={(v) => void call(v ? "PUT" : "DELETE", `/activities/${a.id}/signups/${p.id}`)}
                               />
                             ))}
                           </div>

@@ -80,7 +80,7 @@ function Shell({ savedAt, failed }: { savedAt: number; failed: boolean }) {
             <InstallButton compact />
             <ThemeToggle />
             {me && (
-              <button className="who" onClick={() => setMe(null)} title="Changer de personne">
+              <button type="button" className="who" onClick={() => setMe(null)} title="Changer de personne">
                 <span className="avatar">{me.name.charAt(0).toUpperCase()}</span>
                 <span className="who-name">{me.name}</span>
               </button>

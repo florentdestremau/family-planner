@@ -16,7 +16,7 @@ export function OfflineBanner({ savedAt, failed = false }: { savedAt?: number; f
   return (
     <div className="offline-banner no-print" role="status">
       📴 {isOnline ? "Connexion impossible" : "Hors ligne"}
-      {savedAt ? ` · données ${savedAtLabel(savedAt)}` : ""} · consultation seule
+      {savedAt === undefined ? "" : ` · données ${savedAtLabel(savedAt)}`} · consultation seule
     </div>
   );
 }
@@ -41,6 +41,7 @@ export function InstallButton({ compact = false }: { compact?: boolean }) {
   return (
     <>
       <button
+        type="button"
         className={compact ? "theme-toggle" : "btn btn-small install-btn"}
         onClick={() => (mode === "prompt" ? void install.prompt() : setHelp(true))}
         title="Installer l'appli sur cet appareil"
@@ -57,8 +58,14 @@ export function InstallButton({ compact = false }: { compact?: boolean }) {
 function IosInstallHelp({ onClose }: { onClose: () => void }) {
   // Hors de la barre du haut (sticky, flou) qui piégerait la fenêtre dans son empilement.
   return createPortal(
-    <div className="install-help-backdrop" onClick={onClose}>
-      <div className="card install-help" role="dialog" aria-label="Installer l'appli" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="install-help-backdrop"
+      role="presentation"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="card install-help" role="dialog" aria-label="Installer l'appli">
         <h2>📲 Installer l'appli</h2>
         <ol>
           <li>
@@ -69,7 +76,7 @@ function IosInstallHelp({ onClose }: { onClose: () => void }) {
           </li>
         </ol>
         <p className="hint">L'appli s'ouvrira en plein écran et restera consultable hors ligne.</p>
-        <button className="btn btn-primary" onClick={onClose}>
+        <button type="button" className="btn btn-primary" onClick={onClose}>
           Compris
         </button>
       </div>
@@ -101,7 +108,10 @@ export function InstallNudge() {
   const later = () => save(dismissNudge(state));
 
   async function accept() {
-    if (install.mode() === "ios") return setHelp(true);
+    if (install.mode() === "ios") {
+      setHelp(true);
+      return;
+    }
     if (await install.prompt()) save({ ...state, done: true });
     else later();
   }
@@ -121,10 +131,10 @@ export function InstallNudge() {
   return (
     <div className="install-nudge no-print" role="status">
       <span>📲 L'appli, même hors ligne</span>
-      <button className="btn btn-small btn-primary" onClick={() => void accept()}>
+      <button type="button" className="btn btn-small btn-primary" onClick={() => void accept()}>
         Installer
       </button>
-      <button className="install-nudge-close" onClick={later} aria-label="Plus tard" title="Plus tard">
+      <button type="button" className="install-nudge-close" onClick={later} aria-label="Plus tard" title="Plus tard">
         ✕
       </button>
     </div>
@@ -148,10 +158,10 @@ export function UpdatePrompt() {
   return (
     <div className="update-prompt no-print" role="status">
       <span>✨ Nouvelle version disponible</span>
-      <button className="btn btn-small btn-primary" onClick={() => void updateServiceWorker(true)}>
+      <button type="button" className="btn btn-small btn-primary" onClick={() => void updateServiceWorker(true)}>
         Recharger
       </button>
-      <button className="btn btn-small btn-ghost" onClick={() => setNeedRefresh(false)} aria-label="Plus tard">
+      <button type="button" className="btn btn-small btn-ghost" onClick={() => setNeedRefresh(false)} aria-label="Plus tard">
         ✕
       </button>
     </div>

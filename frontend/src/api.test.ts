@@ -1,11 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { api, ApiError, assistantAsk, assistantStatus } from "./api";
 
-function mockFetch(status: number, body: unknown, statusText = "Erreur") {
-  const fetchMock = vi.fn(async () =>
-    typeof body === "string"
-      ? new Response(body, { status, statusText })
-      : new Response(body === undefined ? null : JSON.stringify(body), { status, statusText }),
+function mockFetch(status: number, body?: unknown, statusText = "Erreur") {
+  const fetchMock = vi.fn<(input: string, init?: RequestInit) => Promise<Response>>(() =>
+    Promise.resolve(
+      typeof body === "string"
+        ? new Response(body, { status, statusText })
+        : new Response(body === undefined ? null : JSON.stringify(body), { status, statusText }),
+    ),
   );
   vi.stubGlobal("fetch", fetchMock);
   return fetchMock;
@@ -42,7 +44,7 @@ describe("api", () => {
   });
 
   it("204 : pas de corps", async () => {
-    mockFetch(204, undefined);
+    mockFetch(204);
     await expect(api("DELETE", "/x")).resolves.toBeUndefined();
   });
 
@@ -50,6 +52,10 @@ describe("api", () => {
     [{ detail: "Ce lit est déjà complet" }, "Ce lit est déjà complet"],
     [{ detail: [{ msg: "champ requis" }, { msg: "trop long" }] }, "champ requis, trop long"],
     [{ autre: 1 }, "Erreur"],
+    [{ detail: 5 }, "Erreur"],
+    [{ detail: [{ msg: "a" }, 1, null, { msg: 2 }, {}] }, "a, ?, ?, ?, ?"],
+    [null, "Erreur"],
+    [42, "Erreur"],
     ["<html>proxy</html>", "Erreur"],
   ])("erreur %j → message « %s »", async (body, message) => {
     mockFetch(409, body);
@@ -78,7 +84,7 @@ describe("api hors ligne", () => {
   });
 
   it("réseau injoignable : message clair plutôt que « Failed to fetch »", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => Promise.reject(new TypeError("Failed to fetch"))));
+    vi.stubGlobal("fetch", vi.fn<() => Promise<Response>>(() => Promise.reject(new TypeError("Failed to fetch"))));
     const error = (await api("PUT", "/x").catch((e: unknown) => e)) as ApiError;
     expect(error).toBeInstanceOf(ApiError);
     expect(error.message).toBe("Connexion impossible, réessayez.");

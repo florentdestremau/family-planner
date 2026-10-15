@@ -34,16 +34,26 @@ export interface InstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 }
 
+declare global {
+  interface Navigator {
+    /** Safari iOS : lancée depuis l'écran d'accueil. */
+    standalone?: boolean;
+  }
+  interface WindowEventMap {
+    beforeinstallprompt: InstallPromptEvent;
+  }
+}
+
 export type InstallMode = "installed" | "prompt" | "ios" | "none";
 
 /** Déjà lancée comme appli (écran d'accueil, fenêtre dédiée). */
 export function isStandalone(win: Window = window): boolean {
-  return win.matchMedia?.("(display-mode: standalone)").matches || (win.navigator as { standalone?: boolean }).standalone === true;
+  return win.matchMedia?.("(display-mode: standalone)").matches || win.navigator.standalone === true;
 }
 
 /** iPhone, iPad (qui se présente comme un Mac tactile) : installation manuelle depuis Safari. */
 export function isIos(nav: Pick<Navigator, "userAgent" | "maxTouchPoints"> = navigator): boolean {
-  return /iphone|ipad|ipod/i.test(nav.userAgent) || (/macintosh/i.test(nav.userAgent) && nav.maxTouchPoints > 1);
+  return /iphone|ipad|ipod/iu.test(nav.userAgent) || (/macintosh/iu.test(nav.userAgent) && nav.maxTouchPoints > 1);
 }
 
 export function installMode(standalone: boolean, prompt: InstallPromptEvent | null, ios: boolean): InstallMode {
@@ -60,7 +70,7 @@ export const install = (() => {
   const s = store<{ prompt: InstallPromptEvent | null; installed: boolean }>({ prompt: null, installed: isStandalone() });
   window.addEventListener("beforeinstallprompt", (e) => {
     e.preventDefault();
-    s.set({ ...s.get(), prompt: e as InstallPromptEvent });
+    s.set({ ...s.get(), prompt: e });
   });
   window.addEventListener("appinstalled", () => s.set({ prompt: null, installed: true }));
   return {

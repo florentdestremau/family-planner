@@ -11,9 +11,9 @@ test("tirage au sort, visibilité pour chacun, ajustement manuel", async ({ page
 
   await openAdmin(page, stay.slug, stay.key, "Corvées");
   page.once("dialog", (d) => d.accept());
-  await page.getByRole("button", { name: /Tirer au sort/ }).click();
+  await page.getByRole("button", { name: /Tirer au sort/u }).click();
   await expect(page.locator(".toast")).toContainText("affectations");
-  await expect(page.getByRole("button", { name: /Re-répartir/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Re-répartir/u })).toBeVisible();
   await expect(page.locator(".badge-warn")).toHaveCount(0);
 
   // Règles vérifiées sur les données.
@@ -55,7 +55,7 @@ test("re-répartir demande confirmation", async ({ page, request }) => {
 
   await openAdmin(page, stay.slug, stay.key, "Corvées");
   page.once("dialog", (d) => d.dismiss());
-  await page.getByRole("button", { name: /Re-répartir/ }).click();
+  await page.getByRole("button", { name: /Re-répartir/u }).click();
   await page.waitForTimeout(300);
   expect((await stay.snap()).chore_assignments).toEqual(before);
 });

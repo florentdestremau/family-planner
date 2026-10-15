@@ -1,4 +1,4 @@
-import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
+import { createAsyncStoragePersister } from "@tanstack/query-async-storage-persister";
 import { QueryClient } from "@tanstack/react-query";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { StrictMode } from "react";
@@ -25,9 +25,11 @@ const queryClient = new QueryClient({
   },
 });
 
-const persister = createSyncStoragePersister({ storage: window.localStorage, key: "fp:cache" });
+const persister = createAsyncStoragePersister({ storage: window.localStorage, key: "fp:cache" });
 
-createRoot(document.getElementById("root")!).render(
+const root = document.getElementById("root");
+if (!root) throw new Error("Élément #root introuvable");
+createRoot(root).render(
   <StrictMode>
     <PersistQueryClientProvider client={queryClient} persistOptions={{ persister, maxAge: WEEK, buster: __BUILD_ID__ }}>
       <BrowserRouter>

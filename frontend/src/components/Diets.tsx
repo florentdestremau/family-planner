@@ -14,9 +14,9 @@ export function DietSummary({ persons, expanded = false }: { persons: Person[]; 
   if (!label) return null;
   const list = (
     <ul className="diet-list">
-      {groups.byDiet.map(({ diet, persons }) => (
+      {groups.byDiet.map(({ diet, persons: people }) => (
         <li key={diet}>
-          {dietIcon(diet)} <strong>{DIET_LABEL[diet]}</strong> : {persons.map((p) => p.name).join(", ")}
+          {dietIcon(diet)} <strong>{DIET_LABEL[diet]}</strong> : {people.map((p) => p.name).join(", ")}
         </li>
       ))}
       {groups.notes.map((p) => (
@@ -41,9 +41,9 @@ export function DietEditor({ person, onClose }: { person: Person; onClose: () =>
   const [diets, setDiets] = useState<Diet[]>(person.diets);
   const [note, setNote] = useState(person.diet_note);
 
-  async function save(e: React.FormEvent) {
+  async function save(e: React.SubmitEvent) {
     e.preventDefault();
-    if (await call("PUT", `/persons/${person.id}/diet`, { diets, diet_note: note.trim() })) onClose();
+    if ((await call("PUT", `/persons/${person.id}/diet`, { diets, diet_note: note.trim() })) !== undefined) onClose();
   }
 
   const box = (diet: Diet) => (
@@ -54,7 +54,7 @@ export function DietEditor({ person, onClose }: { person: Person; onClose: () =>
   );
 
   return (
-    <form className="form diet-editor" onSubmit={save} aria-label={`Régimes et allergies de ${person.name}`}>
+    <form className="form diet-editor" onSubmit={(e) => void save(e)} aria-label={`Régimes et allergies de ${person.name}`}>
       <fieldset>
         <legend>Régime</legend>
         <div className="checks">{REGIMES.map(box)}</div>
@@ -71,7 +71,7 @@ export function DietEditor({ person, onClose }: { person: Person; onClose: () =>
         aria-label={`Précision pour ${person.name}`}
       />
       <div className="inline-form">
-        <button className="btn btn-primary">Enregistrer</button>
+        <button type="submit" className="btn btn-primary">Enregistrer</button>
         <button type="button" className="btn btn-ghost" onClick={onClose}>
           Annuler
         </button>
@@ -91,7 +91,7 @@ export function DietRow({ person }: { person: Person }) {
           <div className="muted small">{dietLabel(person)}</div>
         </div>
         {!editing && (
-          <button className="btn btn-small" onClick={() => setEditing(true)} aria-label={`Modifier les régimes et allergies de ${person.name}`}>
+          <button type="button" className="btn btn-small" onClick={() => setEditing(true)} aria-label={`Modifier les régimes et allergies de ${person.name}`}>
             Modifier
           </button>
         )}

@@ -54,7 +54,7 @@ export default function AdminLayout() {
           }}
         >
           <input value={input} onChange={(e) => setInput(e.target.value)} placeholder="Clé organisateur" required />
-          <button className="btn btn-primary">Entrer</button>
+          <button type="submit" className="btn btn-primary">Entrer</button>
         </form>
       </section>
     );

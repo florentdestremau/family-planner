@@ -9,7 +9,7 @@ export default function WhoAmI() {
   const [name, setName] = useState("");
   const adults = snap.persons.filter((p) => p.kind === "adult");
 
-  async function add(e: React.FormEvent) {
+  async function add(e: React.SubmitEvent) {
     e.preventDefault();
     const p = await call<Person>("POST", "/persons", { name: name.trim(), kind: "adult" });
     if (p) setMe(p.id);
@@ -22,7 +22,7 @@ export default function WhoAmI() {
       {adults.length > 0 && (
         <div className="who-list">
           {adults.map((p) => (
-            <button key={p.id} className="who-pick" onClick={() => setMe(p.id)}>
+            <button type="button" key={p.id} className="who-pick" onClick={() => setMe(p.id)}>
               <span className="avatar">{p.name.charAt(0).toUpperCase()}</span>
               <span>
                 {p.name}
@@ -35,9 +35,9 @@ export default function WhoAmI() {
         </div>
       )}
       <OfflineLock>
-        <form onSubmit={add} className="inline-form">
+        <form onSubmit={(e) => void add(e)} className="inline-form">
           <input placeholder="Je ne suis pas dans la liste : mon prénom" value={name} onChange={(e) => setName(e.target.value)} required />
-          <button className="btn btn-primary">M'ajouter</button>
+          <button type="submit" className="btn btn-primary">M'ajouter</button>
         </form>
       </OfflineLock>
     </section>

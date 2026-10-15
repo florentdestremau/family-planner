@@ -5,7 +5,10 @@ import { NUDGE_START, type NudgeState } from "./pwa";
 function read<T>(key: string, fallback: T): T {
   try {
     const raw = localStorage.getItem(key);
-    return raw === null ? fallback : (JSON.parse(raw) as T);
+    if (raw === null) return fallback;
+    // Données écrites par cette appli (`write`) : on leur fait confiance.
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+    return JSON.parse(raw) as T;
   } catch {
     return fallback;
   }

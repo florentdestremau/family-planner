@@ -20,7 +20,7 @@ export function PresenceTable() {
       <table className="grid-table">
         <thead>
           <tr>
-            <th />
+            <th aria-label="Personne" />
             {snap.days.map((d) => (
               <th key={d} colSpan={columns.filter((c) => c.date === d).length} className="th-day">
                 {dayLabel(d)}
@@ -28,7 +28,7 @@ export function PresenceTable() {
             ))}
           </tr>
           <tr>
-            <th />
+            <th aria-label="Personne" />
             {columns.map((c) => (
               <th key={colKey(c)} className={`th-meal ${c.meal ? "" : "cell-night"}`} title={c.meal ? undefined : "Dort sur place"}>
                 {c.meal ? `${MOMENT_LABEL[c.meal].slice(0, 4)}.` : "Nuit"}

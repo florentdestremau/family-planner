@@ -126,7 +126,7 @@ test("l'organisateur voit les contraintes du séjour, les corrige, les imprime e
   // Export LLM : des nombres et la précision, aucun nom (le cache hors ligne peut s'afficher d'abord).
   await page.goto(`${stay.url}/imprimer`);
   const exported = page.locator("textarea.export");
-  await expect(exported).toHaveValue(/Ven\. 30 oct\., dîner — 2 adultes, dont 1 sans gluten, 1 sans lactose : Raclette/);
-  await expect(exported).toHaveValue(/Autres précisions alimentaires : Cœliaque$/);
-  expect(await exported.inputValue()).not.toMatch(/Anne|Paul/);
+  await expect(exported).toHaveValue(/Ven\. 30 oct\., dîner — 2 adultes, dont 1 sans gluten, 1 sans lactose : Raclette/u);
+  await expect(exported).toHaveValue(/Autres précisions alimentaires : Cœliaque$/u);
+  expect(await exported.inputValue()).not.toMatch(/Anne|Paul/u);
 });

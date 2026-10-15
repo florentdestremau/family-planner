@@ -50,10 +50,10 @@ test("« Tout valider » enregistre tout le foyer en un envoi", async ({ page, r
   await page.getByRole("button", { name: "Tout valider (2)" }).click();
   await expect(page.getByText("Présences enregistrées pour Alice, Bob")).toBeVisible();
   await expect(page.locator(".assistant-card")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: /Tout valider/ })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Tout valider/u })).toHaveCount(0);
 
-  const presences = (await stay.snap()).presences.map((p: { person_id: number }) => p.person_id).sort();
-  expect(presences).toEqual([alice, bob].sort());
+  const presences = (await stay.snap()).presences.map((p: { person_id: number }) => p.person_id).toSorted((a, b) => a - b);
+  expect(presences).toEqual([alice, bob].toSorted((a, b) => a - b));
 });
 
 test("l'assistant reste hors de portée sans identité choisie", async ({ page, request }) => {

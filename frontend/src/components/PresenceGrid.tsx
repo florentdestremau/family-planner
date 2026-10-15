@@ -23,7 +23,10 @@ export default function PresenceGrid({
 
   const update = (keys: string[], on: boolean) => {
     const next = new Set(selected);
-    keys.forEach((k) => (on ? next.add(k) : next.delete(k)));
+    for (const k of keys) {
+      if (on) next.add(k);
+      else next.delete(k);
+    }
     onChange(followMeals(snap.nights, selected, next));
   };
   /** Une nuit se coche ou se décoche seule, sans toucher aux repas. */
@@ -42,15 +45,15 @@ export default function PresenceGrid({
     <div className="presence-editor">
       <div className="presence-actions">
         <span className="muted small">
-          {selected.size
-            ? `${meals} repas sur ${snap.slots.length}${snap.nights.length ? ` · ${nights} nuit${nights > 1 ? "s" : ""} sur ${snap.nights.length}` : ""}`
+          {selected.size > 0
+            ? `${meals} repas sur ${snap.slots.length}${snap.nights.length > 0 ? ` · ${nights} nuit${nights > 1 ? "s" : ""} sur ${snap.nights.length}` : ""}`
             : "Aucune présence déclarée"}
         </span>
         <span className="spacer" />
-        <button className="btn btn-small" onClick={() => onChange(everything())}>
+        <button type="button" className="btn btn-small" onClick={() => onChange(everything())}>
           Tout le séjour
         </button>
-        <button className="btn btn-small btn-ghost" onClick={() => onChange(new Set())}>
+        <button type="button" className="btn btn-small btn-ghost" onClick={() => onChange(new Set())}>
           Aucun
         </button>
       </div>
@@ -68,7 +71,7 @@ export default function PresenceGrid({
           const nightOn = selected.has(nightKey(day));
           return (
             <div className="pg-row" key={day}>
-              <button className={`pg-day ${allOn ? "on" : ""}`} onClick={() => update(keys, !allOn)} title="Toute la journée et la nuit">
+              <button type="button" className={`pg-day ${allOn ? "on" : ""}`} onClick={() => update(keys, !allOn)} title="Toute la journée et la nuit">
                 {dayLabel(day)}
               </button>
               {MEALS.map((meal) => {
@@ -76,6 +79,7 @@ export default function PresenceGrid({
                 const on = selected.has(key(day, meal));
                 return (
                   <button
+                    type="button"
                     key={meal}
                     className={`pg-cell ${on ? "on" : ""}`}
                     onClick={() => update([key(day, meal)], !on)}
@@ -88,6 +92,7 @@ export default function PresenceGrid({
               })}
               {hasNight.has(day) ? (
                 <button
+                  type="button"
                   className={`pg-cell pg-night ${nightOn ? "on" : ""}`}
                   onClick={() => toggleNight(day)}
                   aria-pressed={nightOn}

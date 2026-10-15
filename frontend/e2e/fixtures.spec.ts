@@ -32,7 +32,7 @@ test("impressions et export LLM", async ({ page, context }) => {
   await page.goto("/s/demo/imprimer");
   const exportText = await page.locator("textarea.export").inputValue();
   expect(exportText).toContain("« Grand week-end chez Mamie »");
-  expect(exportText).toMatch(/dîner — \d+ adultes · \d+ enfants : Soupe de potiron ; Quiche lorraine ; Salade verte/);
+  expect(exportText).toMatch(/dîner — \d+ adultes · \d+ enfants : Soupe de potiron ; Quiche lorraine ; Salade verte/u);
   await page.getByRole("button", { name: "Copier" }).click();
   await expect(page.getByRole("button", { name: "Copié ✓" })).toBeVisible();
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(exportText);
@@ -59,7 +59,7 @@ test("impressions et export LLM", async ({ page, context }) => {
 test("le tableau des présences totalise les couverts", async ({ page }) => {
   await page.goto("/s/demo/presences");
   const totals = page.locator("tfoot .row-total td");
-  await expect(totals.first()).toHaveText(/^\d+$/);
+  await expect(totals.first()).toHaveText(/^\d+$/u);
   const adults = await page.locator("tfoot tr").nth(0).locator("td").allTextContents();
   const children = await page.locator("tfoot tr").nth(1).locator("td").allTextContents();
   const total = await totals.allTextContents();

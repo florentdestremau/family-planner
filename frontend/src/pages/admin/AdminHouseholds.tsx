@@ -3,7 +3,7 @@ import type { Person, PersonKind } from "../../api";
 import AddMember from "../../components/AddMember";
 import { DietEditor } from "../../components/Diets";
 import { Toggle } from "../../components/ui";
-import { dietLabel, hasDiet } from "../../lib";
+import { dietLabel, hasDiet, oneOf, PERSON_KINDS } from "../../lib";
 import { useStay } from "../../stay";
 
 export default function AdminHouseholds() {
@@ -29,18 +29,18 @@ function NewPerson() {
   const { idx, call } = useStay();
   const [form, setForm] = useState({ name: "", kind: "adult" as PersonKind, household: "" });
 
-  async function add(e: React.FormEvent) {
+  async function add(e: React.SubmitEvent) {
     e.preventDefault();
     const body = { name: form.name.trim(), kind: form.kind, household_id: form.household ? Number(form.household) : null };
-    if (await call("POST", "/persons", body, { admin: true })) setForm({ ...form, name: "" });
+    if ((await call("POST", "/persons", body, { admin: true })) !== undefined) setForm({ ...form, name: "" });
   }
 
   return (
     <section className="card">
       <h2>Ajouter une personne</h2>
-      <form className="inline-form wrap" onSubmit={add}>
+      <form className="inline-form wrap" onSubmit={(e) => void add(e)}>
         <input placeholder="Prénom" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-        <select value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value as PersonKind })} aria-label="Adulte ou enfant">
+        <select value={form.kind} onChange={(e) => setForm({ ...form, kind: oneOf(PERSON_KINDS, e.target.value) })} aria-label="Adulte ou enfant">
           <option value="adult">Adulte</option>
           <option value="child">Enfant</option>
         </select>
@@ -52,7 +52,7 @@ function NewPerson() {
             </option>
           ))}
         </select>
-        <button className="btn btn-primary">Ajouter</button>
+        <button type="submit" className="btn btn-primary">Ajouter</button>
       </form>
       <p className="hint">Pour ajouter un conjoint ou un enfant, utilisez plutôt « Ajouter au foyer » sur la carte du foyer.</p>
     </section>
@@ -75,7 +75,9 @@ function HouseholdCard({ id, members }: { id: number; members: Person[] }) {
           value={name}
           placeholder={label}
           onChange={(e) => setName(e.target.value)}
-          onBlur={() => name.trim() !== (household?.name ?? "") && call("PATCH", `/households/${id}`, { name: name.trim() })}
+          onBlur={() => {
+            if (name.trim() !== (household?.name ?? "")) void call("PATCH", `/households/${id}`, { name: name.trim() });
+          }}
           aria-label="Nom du foyer"
         />
         <span className="badge">{members.length}</span>
@@ -108,11 +110,11 @@ function HouseholdCard({ id, members }: { id: number; members: Person[] }) {
           </select>
         )}
         <button
+          type="button"
           className="btn btn-small btn-danger"
-          onClick={() =>
-            confirm(`Supprimer le foyer ${label} et ses ${members.length} membre(s) ?`) &&
-            call("DELETE", `/households/${id}`, undefined, { admin: true })
-          }
+          onClick={() => {
+            if (confirm(`Supprimer le foyer ${label} et ses ${members.length} membre(s) ?`)) void call("DELETE", `/households/${id}`, undefined, { admin: true });
+          }}
         >
           Supprimer le foyer
         </button>
@@ -136,10 +138,12 @@ function MemberRow({ person: p, members }: { person: Person; members: Person[] }
           className="input-name"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          onBlur={() => name.trim() && name !== p.name && patch({ name: name.trim() })}
+          onBlur={() => {
+            if (name.trim() && name !== p.name) void patch({ name: name.trim() });
+          }}
           aria-label="Prénom"
         />
-        <select value={p.kind} onChange={(e) => patch({ kind: e.target.value as PersonKind })} aria-label={`${p.name} : adulte ou enfant`}>
+        <select value={p.kind} onChange={(e) => void patch({ kind: oneOf(PERSON_KINDS, e.target.value) })} aria-label={`${p.name} : adulte ou enfant`}>
           <option value="adult">Adulte</option>
           <option value="child">Enfant</option>
         </select>
@@ -148,7 +152,7 @@ function MemberRow({ person: p, members }: { person: Person; members: Person[] }
             value={p.partner_id ?? ""}
             aria-label={`Couple de ${p.name}`}
             onChange={(e) =>
-              call("PUT", `/persons/${p.id}/partner`, { partner_id: e.target.value ? Number(e.target.value) : null }, { admin: true })
+              void call("PUT", `/persons/${p.id}/partner`, { partner_id: e.target.value ? Number(e.target.value) : null }, { admin: true })
             }
           >
             <option value="">Pas de couple</option>
@@ -163,8 +167,8 @@ function MemberRow({ person: p, members }: { person: Person; members: Person[] }
         )}
       </div>
       <div className="person-admin-flags">
-        <Toggle label="Corvées" checked={p.does_chores} onChange={(v) => patch({ does_chores: v })} />
-        <button className="btn btn-small" onClick={() => setDiet(!diet)} aria-label={`Régimes et allergies de ${p.name}`}>
+        <Toggle label="Corvées" checked={p.does_chores} onChange={(v) => void patch({ does_chores: v })} />
+        <button type="button" className="btn btn-small" onClick={() => setDiet(!diet)} aria-label={`Régimes et allergies de ${p.name}`}>
           🥗 Régimes
         </button>
         <select
@@ -186,8 +190,11 @@ function MemberRow({ person: p, members }: { person: Person; members: Person[] }
           ))}
         </select>
         <button
+          type="button"
           className="btn btn-small btn-danger"
-          onClick={() => confirm(`Supprimer ${p.name} et toutes ses données ?`) && call("DELETE", `/persons/${p.id}`, undefined, { admin: true })}
+          onClick={() => {
+            if (confirm(`Supprimer ${p.name} et toutes ses données ?`)) void call("DELETE", `/persons/${p.id}`, undefined, { admin: true });
+          }}
         >
           Supprimer
         </button>
