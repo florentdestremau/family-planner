@@ -2,19 +2,26 @@ import { useEffect, useState } from "react";
 import type { Person, PersonKind } from "../../api";
 import AddMember from "../../components/AddMember";
 import { DietEditor } from "../../components/Diets";
+import { TimesRow, useTimesSaver } from "../../components/Times";
 import { Toggle } from "../../components/ui";
-import { dietLabel, hasDiet, oneOf, PERSON_KINDS } from "../../lib";
+import { dietLabel, hasDiet, oneOf, PERSON_KINDS, timesSummary } from "../../lib";
 import { useStay } from "../../stay";
 
 export default function AdminHouseholds() {
   const { idx, snap } = useStay();
   const households = idx.households();
+  const withoutTimes = idx.withoutTimes();
   return (
     <div className="stack">
       <NewPerson />
       <p className="muted small">
         {households.length} foyer{households.length > 1 ? "s" : ""} · {snap.persons.length} personne{snap.persons.length > 1 ? "s" : ""}
       </p>
+      {withoutTimes.length > 0 && (
+        <p className="small times-missing">
+          🕒 <strong>Sans heure d'arrivée ou de départ :</strong> {withoutTimes.map((p) => p.name).join(", ")}
+        </p>
+      )}
       <div className="household-grid">
         {households.map((h) => (
           <HouseholdCard key={h.id} id={h.id} members={h.members} />
@@ -127,6 +134,9 @@ function MemberRow({ person: p, members }: { person: Person; members: Person[] }
   const { idx, call } = useStay();
   const [name, setName] = useState(p.name);
   const [diet, setDiet] = useState(false);
+  const [times, setTimes] = useState(false);
+  const range = idx.stayRange(p.id);
+  const saveTimes = useTimesSaver(p.household_id);
   const patch = (body: Partial<Person>) => call("PATCH", `/persons/${p.id}`, body, { admin: true });
   const adults = members.filter((m) => m.kind === "adult" && m.id !== p.id);
   const others = idx.households().filter((h) => h.id !== p.household_id);
@@ -171,6 +181,11 @@ function MemberRow({ person: p, members }: { person: Person; members: Person[] }
         <button type="button" className="btn btn-small" onClick={() => setDiet(!diet)} aria-label={`Régimes et allergies de ${p.name}`}>
           🥗 Régimes
         </button>
+        {range && (
+          <button type="button" className="btn btn-small" onClick={() => setTimes(!times)} aria-label={`Heures d'arrivée et de départ de ${p.name}`}>
+            🕒 Heures
+          </button>
+        )}
         <select
           className="add-select"
           value=""
@@ -204,6 +219,12 @@ function MemberRow({ person: p, members }: { person: Person; members: Person[] }
       ) : (
         hasDiet(p) && <div className="muted small">🥗 {dietLabel(p)}</div>
       )}
+      {range &&
+        (times ? (
+          <TimesRow person={p} range={range} onSave={(values) => saveTimes([{ person_id: p.id, ...values }])} />
+        ) : (
+          <div className="muted small">🕒 {timesSummary(p, range)}</div>
+        ))}
     </li>
   );
 }

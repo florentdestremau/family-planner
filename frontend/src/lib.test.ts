@@ -1,9 +1,18 @@
 import { describe, expect, it } from "vitest";
-import type { Slot } from "./api";
+import type { Person, Slot } from "./api";
 import {
   actionSummary,
   addDays,
   buildIndex,
+  clockLabel,
+  dayTimeline,
+  hourLabel,
+  isNightTime,
+  sameDay,
+  TIME_OPTIONS,
+  timeLabel,
+  timeOrder,
+  timesSummary,
   countLabel,
   coverThumbUrl,
   coverUrl,
@@ -37,6 +46,7 @@ import {
   toSlots,
   updatedLabel,
 } from "./lib";
+import type { TimelineItem } from "./lib";
 import { makeSnapshot } from "./testing";
 
 describe("dates", () => {
@@ -518,5 +528,112 @@ describe("oneOf", () => {
   it("type la valeur d'un <select>, et refuse une valeur hors liste", () => {
     expect(oneOf(MEALS, "lunch")).toBe("lunch");
     expect(() => oneOf(MEALS, "brunch")).toThrow("Valeur inattendue : brunch");
+  });
+});
+
+const withTimes = (times: Record<number, Partial<Person>>) =>
+  makeSnapshot({ persons: makeSnapshot().persons.map((p) => ({ ...p, ...times[p.id] })) });
+const itemLabel = (item: TimelineItem) => (item.activity ? item.activity.name : `${item.movement.kind} ${item.movement.time}`);
+
+describe("heures d'arrivée et de départ", () => {
+  it("propose le quart d'heure de 5 h à 23 h 45, puis la nuit jusqu'à 4 h", () => {
+    expect(TIME_OPTIONS).toHaveLength(93);
+    expect(TIME_OPTIONS.slice(0, 2)).toEqual(["05:00", "05:15"]);
+    expect(TIME_OPTIONS.slice(75, 78)).toEqual(["23:45", "00:00", "00:15"]);
+    expect(TIME_OPTIONS.at(-1)).toBe("04:00");
+    expect(new Set(TIME_OPTIONS).size).toBe(93);
+  });
+
+  it("libelle les heures, la nuit rattachée à la veille", () => {
+    expect(hourLabel("18:30")).toBe("18 h 30");
+    expect(hourLabel("09:00")).toBe("9 h");
+    expect(timeLabel("18:00")).toBe("vers 18 h");
+    expect(timeLabel("00:15")).toBe("vers 0 h 15 (dans la nuit)");
+    expect(timeLabel("")).toBe("heure non donnée");
+    expect(isNightTime("04:00")).toBe(true);
+    expect(isNightTime("05:00")).toBe(false);
+    expect(isNightTime("")).toBe(false);
+    expect(timeOrder("23:45")).toBeLessThan(timeOrder("00:00"));
+    expect(timeOrder("05:00")).toBeLessThan(timeOrder("23:45"));
+  });
+
+  it("date un changement à l'heure de l'appareil", () => {
+    const iso = new Date(2026, 9, 31, 16, 5).toISOString();
+    expect(clockLabel(iso)).toBe("16 h 05");
+    expect(sameDay(iso, "2026-10-31")).toBe(true);
+    expect(sameDay(iso, "2026-10-30")).toBe(false);
+  });
+
+  it("déduit les jours d'arrivée et de départ des repas et des nuits", () => {
+    const idx = buildIndex(makeSnapshot());
+    // Alice : dîner de vendredi, nuit de samedi → départ dimanche matin.
+    expect(idx.stayRange(1)).toEqual({ arrival: "2026-10-30", departure: "2026-11-01" });
+    expect(idx.stayRange(3)).toEqual({ arrival: "2026-10-30", departure: "2026-10-31" });
+    expect(idx.stayRange(4)).toEqual({ arrival: "2026-10-31", departure: "2026-10-31" });
+    expect(idx.stayRange(5)).toBeUndefined();
+  });
+
+  it("regroupe arrivées et départs par jour et par heure, sans heure en fin de jour", () => {
+    const friday = new Date(2026, 9, 30, 16, 12).toISOString();
+    const earlier = new Date(2026, 9, 15, 9, 0).toISOString();
+    const note = "Nous aurons déjà dîné";
+    const snap = withTimes({
+      1: { arrival_time: "18:30", departure_time: "15:00", times_note: note, times_updated_at: friday },
+      2: { arrival_time: "18:30", departure_time: "15:00", times_note: note, times_updated_at: earlier },
+      4: { arrival_time: "01:00", departure_time: "12:00", times_note: "Porte ouverte", times_updated_at: earlier },
+    });
+    const idx = buildIndex(snap);
+    const summary = idx.movements().map((m) => [m.day, m.kind, m.time, m.persons.map((p) => p.name).join(","), m.updatedAt]);
+    expect(summary).toEqual([
+      ["2026-10-30", "arrival", "18:30", "Alice,Bob", friday],
+      ["2026-10-30", "arrival", "", "Léo", null],
+      ["2026-10-31", "departure", "12:00", "Mamie", null],
+      ["2026-10-31", "arrival", "01:00", "Mamie", null], // dans la nuit, après 23 h 45
+      ["2026-10-31", "departure", "", "Léo", null],
+      ["2026-11-01", "departure", "15:00", "Alice,Bob", null], // changé un autre jour
+    ]);
+    // Une note recopiée sur le foyer n'est donnée qu'une fois, avec les noms.
+    expect(idx.movements()[0].notes.map((n) => [n.text, n.persons.map((p) => p.name)])).toEqual([[note, ["Alice", "Bob"]]]);
+    expect(idx.movements()[1].notes).toEqual([]);
+    expect(idx.withoutTimes().map((p) => p.name)).toEqual(["Léo"]);
+  });
+
+  it("à la même heure, les arrivées avant les départs", () => {
+    const idx = buildIndex(withTimes({ 1: { departure_time: "12:00" }, 4: { arrival_time: "12:00", departure_time: "12:00" } }));
+    const saturday = idx.movements().filter((m) => m.day === "2026-10-31");
+    expect(saturday.map((m) => `${m.kind} ${m.time}`)).toEqual(["arrival 12:00", "departure 12:00", "departure "]);
+  });
+
+  it("garde le changement le plus récent du jour", () => {
+    const morning = new Date(2026, 9, 30, 9, 0).toISOString();
+    const evening = new Date(2026, 9, 30, 19, 0).toISOString();
+    const idx = buildIndex(
+      withTimes({ 1: { arrival_time: "18:30", times_updated_at: evening }, 2: { arrival_time: "18:30", times_updated_at: morning } }),
+    );
+    expect(idx.movements()[0].updatedAt).toBe(evening);
+  });
+
+  it("mêle activités, arrivées et départs dans l'ordre des heures", () => {
+    const snap = withTimes({ 4: { arrival_time: "01:00", departure_time: "12:00" } });
+    const idx = buildIndex(snap);
+    const day = "2026-10-31";
+    const items = dayTimeline(
+      snap.activities.filter((a) => a.date === day),
+      idx.movements().filter((m) => m.day === day),
+    );
+    expect(items.map(itemLabel)).toEqual([
+      "Jeux", // sans heure, en tête comme avant
+      "Rando",
+      "departure 12:00",
+      "arrival 01:00",
+      "departure ",
+    ]);
+  });
+
+  it("résume les heures d'une personne", () => {
+    const [alice] = withTimes({ 1: { arrival_time: "18:30" } }).persons;
+    expect(timesSummary(alice, { arrival: "2026-10-30", departure: "2026-11-01" })).toBe(
+      "Arrivée ven. 30 oct. vers 18 h 30 · Départ dim. 1 nov. heure non donnée",
+    );
   });
 });

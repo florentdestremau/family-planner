@@ -2,6 +2,7 @@ import { Link, useParams } from "react-router";
 import { Linkified } from "../components/ui";
 import { BED_LABEL, countLabel, dayLabel, MOMENT_LABEL, MOMENTS, rangeLabel, sortedMoments } from "../lib";
 import { DietSummary } from "../components/Diets";
+import { MovementsPrint } from "../components/Times";
 import { useStay } from "../stay";
 import { PresenceTable } from "./Presences";
 
@@ -33,7 +34,12 @@ export default function Print() {
           {snap.stay.name} — {rangeLabel(snap.stay.start_date, snap.stay.end_date)}
         </div>
       </header>
-      {kind === "presences" && <PresenceTable />}
+      {kind === "presences" && (
+        <>
+          <MovementsPrint />
+          <PresenceTable />
+        </>
+      )}
       {kind === "corvees" && <ChoresPrint />}
       {kind === "menus" && <MenusPrint />}
       {kind === "chambres" && <RoomsPrint />}

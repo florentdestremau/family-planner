@@ -1,6 +1,6 @@
 """Règles des foyers et des couples, partagées par l'espace participant et l'espace organisateur."""
 
-from datetime import date
+from datetime import date, datetime, timezone
 from typing import NamedTuple
 
 from fastapi import HTTPException
@@ -119,6 +119,22 @@ def household_members(db: Session, stay: Stay, household_id: int, body: s.Househ
         members.append(Member(p, member.slots, member.nights))
     check_slots(stay, members)
     return members
+
+
+def replace_times(db: Session, stay: Stay, household_id: int, body: s.HouseholdTimesIn) -> None:
+    """Heures d'arrivée et de départ de membres d'un foyer ; l'heure du changement n'est notée que
+    pour ceux dont quelque chose change vraiment."""
+    found = household(db, household_id, stay)
+    now = datetime.now(timezone.utc)
+    for member in body.members:
+        p = person(db, member.person_id, stay)
+        if p.household_id != found.id:
+            raise HTTPException(422, f"{p.name} n'appartient pas à ce foyer")
+        wanted = (member.arrival_time, member.departure_time, member.times_note)
+        if (p.arrival_time, p.departure_time, p.times_note) != wanted:
+            p.arrival_time, p.departure_time, p.times_note = wanted
+            p.times_updated_at = now
+    db.commit()
 
 
 def check_slots(stay: Stay, members: list[Member]) -> None:

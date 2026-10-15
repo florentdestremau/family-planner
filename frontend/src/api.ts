@@ -51,6 +51,22 @@ export interface Person {
   diets: Diet[];
   /** Précision libre, affichée mais non comptée. */
   diet_note: string;
+  /** Heures d'arrivée et de départ (HH:MM, au quart d'heure ; vide : non donnée), le jour étant
+   * déduit des présences ; avant 5 h : dans la nuit, rattachée à la veille. */
+  arrival_time: string;
+  departure_time: string;
+  /** Note libre, valable pour l'arrivée comme pour le départ. */
+  times_note: string;
+  /** Dernier changement des heures ou de la note (ISO, UTC) ; null : jamais données. */
+  times_updated_at: string | null;
+}
+
+/** Heures d'une personne, telles qu'envoyées pour son foyer. */
+export interface MemberTimes {
+  person_id: number;
+  arrival_time: string;
+  departure_time: string;
+  times_note: string;
 }
 
 export interface Slot {

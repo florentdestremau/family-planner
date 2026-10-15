@@ -143,6 +143,94 @@ export function updatedLabel(iso: string, now = new Date()): string {
   return `le ${pad(d.getDate())}/${pad(d.getMonth() + 1)}${year} à ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+const minutes = (time: string) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5));
+const clock = (total: number) => `${pad(Math.floor(total / 60))}:${pad(total % 60)}`;
+
+/**
+ * Heures d'arrivée et de départ proposées, au quart d'heure : de 5 h à 23 h 45, puis « dans la nuit »
+ * de minuit à 4 h, rattachées à la veille (même liste côté serveur).
+ */
+export const TIME_OPTIONS: string[] = [
+  ...Array.from({ length: 76 }, (_, i) => clock(5 * 60 + i * 15)),
+  ...Array.from({ length: 17 }, (_, i) => clock(i * 15)),
+];
+
+/** Longueur maximale de la note d'arrivée et de départ (même limite côté serveur). */
+export const MAX_TIMES_NOTE = 200;
+
+/** Heure de la nuit (avant 5 h), rattachée à la veille. */
+export const isNightTime = (time: string) => time !== "" && time < "05:00";
+
+/** Rang d'une heure dans la journée d'arrivée ou de départ : la nuit vient après 23 h 45. */
+export const timeOrder = (time: string) => minutes(time) + (isNightTime(time) ? 24 * 60 : 0);
+/** Rang d'une arrivée ou d'un départ sans heure : après toutes les heures, nuit comprise. */
+const UNTIMED = 48 * 60;
+
+/** « 18 h 30 », « 18 h », « 0 h 15 ». */
+export function hourLabel(time: string): string {
+  const m = time.slice(3, 5);
+  return `${Number(time.slice(0, 2))} h${m === "00" ? "" : ` ${m}`}`;
+}
+
+/** « vers 18 h 30 », « vers 1 h (dans la nuit) » ; « heure non donnée » si vide. */
+export function timeLabel(time: string): string {
+  if (!time) return "heure non donnée";
+  return `vers ${hourLabel(time)}${isNightTime(time) ? " (dans la nuit)" : ""}`;
+}
+
+/** Heure de l'appareil d'un instant ISO : « 16 h 12 ». */
+export function clockLabel(iso: string): string {
+  const d = new Date(iso);
+  return hourLabel(`${pad(d.getHours())}:${pad(d.getMinutes())}`);
+}
+
+/** L'instant ISO tombe-t-il ce jour-là, à l'heure de l'appareil ? */
+export const sameDay = (iso: string, day: string) => toIso(new Date(iso)) === day;
+
+const timePart = (label: string, day: string, time: string) => `${label} ${dayLabel(day).toLowerCase()} ${timeLabel(time)}`;
+
+/** Arrivée et départ d'une personne, en une ligne : « Arrivée ven. 30 oct. vers 18 h 30 · Départ … ». */
+export function timesSummary(p: Person, range: { arrival: string; departure: string }): string {
+  return `${timePart("Arrivée", range.arrival, p.arrival_time)} · ${timePart("Départ", range.departure, p.departure_time)}`;
+}
+
+export type MovementKind = "arrival" | "departure";
+
+export const MOVEMENT_LABEL: Record<MovementKind, string> = { arrival: "Arrivée", departure: "Départ" };
+
+/** Arrivées ou départs d'un même jour à une même heure. */
+export interface Movement {
+  day: string;
+  kind: MovementKind;
+  /** Vide : heure non donnée. */
+  time: string;
+  persons: Person[];
+  /** Notes, chacune avec les personnes qui la partagent (recopiée sur le foyer). */
+  notes: { text: string; persons: Person[] }[];
+  /** Dernier changement d'heure ou de note, s'il date de ce jour-là ; sinon null. */
+  updatedAt: string | null;
+}
+
+/** Ordre d'affichage : par jour, par heure (sans heure en fin de jour), arrivées avant départs. */
+function movementOrder(a: Movement, b: Movement): number {
+  const rank = (m: Movement) => (m.time ? timeOrder(m.time) : UNTIMED);
+  const departs = (m: Movement) => Number(m.kind === "departure");
+  return a.day.localeCompare(b.day) || rank(a) - rank(b) || departs(a) - departs(b);
+}
+
+export type TimelineItem = { activity: Activity; movement?: undefined } | { movement: Movement; activity?: undefined };
+
+/**
+ * Activités et arrivées ou départs d'un jour, dans l'ordre des heures : les activités sans heure en
+ * tête (comme avant), les arrivées et départs sans heure à la fin.
+ */
+export function dayTimeline(activities: Activity[], movements: Movement[]): TimelineItem[] {
+  const rank = (item: TimelineItem) =>
+    item.activity ? (item.activity.start_time ? minutes(item.activity.start_time) : -1) : item.movement.time ? timeOrder(item.movement.time) : UNTIMED;
+  const items: TimelineItem[] = [...movements.map((movement) => ({ movement })), ...activities.map((activity) => ({ activity }))];
+  return items.toSorted((a, b) => rank(a) - rank(b));
+}
+
 /** Morceau de texte, avec sa cible quand c'est un lien ou un numéro de téléphone. */
 export interface TextPart {
   text: string;
@@ -242,6 +330,17 @@ export function buildIndex(snap: Snapshot) {
   const members = (householdId: number): Person[] => membersByHousehold.get(householdId) ?? [];
   const presence = new Set(snap.presences.map((p) => presenceKey(p.person_id, p.date, p.meal)));
   const presentDays = new Set(snap.presences.map((p) => `${p.person_id}|${p.date}`));
+  // Premier et dernier jour sur place : repas, nuits, et lendemain de la dernière nuit.
+  const range = new Map<number, { arrival: string; departure: string }>();
+  const extend = (personId: number, first: string, last: string) => {
+    const known = range.get(personId);
+    range.set(personId, {
+      arrival: known && known.arrival < first ? known.arrival : first,
+      departure: known && known.departure > last ? known.departure : last,
+    });
+  };
+  for (const p of snap.presences) extend(p.person_id, p.date, p.date);
+  for (const n of snap.person_nights) extend(n.person_id, n.date, addDays(n.date, 1));
   const slotSet = new Set(snap.slots.map((s) => `${s.date}|${s.meal}`));
   const choreById = new Map(snap.chore_types.map((c) => [c.id, c]));
   const bedById = new Map(snap.rooms.flatMap((r) => r.beds.map((b) => [b.id, { ...b, room: r }] as const)));
@@ -325,6 +424,35 @@ export function buildIndex(snap: Snapshot) {
     return [...plan].map(([bedId, nights]) => ({ bed: bedId === null ? undefined : bedById.get(bedId), nights }));
   };
 
+  /** Jours d'arrivée et de départ, déduits des présences ; undefined sans aucune présence. */
+  const stayRange = (personId: number) => range.get(personId);
+
+  /** Arrivées et départs du séjour, regroupés par jour et par heure, dans l'ordre d'affichage. */
+  const movements = (): Movement[] => {
+    const groups = new Map<string, Movement>();
+    for (const p of snap.persons) {
+      const days = range.get(p.id);
+      if (!days) continue;
+      for (const [kind, day, time] of [
+        ["arrival", days.arrival, p.arrival_time],
+        ["departure", days.departure, p.departure_time],
+      ] as const) {
+        const key = `${day}|${kind}|${time}`;
+        const group = groups.get(key) ?? { day, kind, time, persons: [], notes: [], updatedAt: null };
+        groups.set(key, group);
+        group.persons.push(p);
+        if (p.times_note) {
+          const note = group.notes.find((n) => n.text === p.times_note);
+          if (note) note.persons.push(p);
+          else group.notes.push({ text: p.times_note, persons: [p] });
+        }
+        const updated = p.times_updated_at;
+        if (updated !== null && sameDay(updated, day) && (group.updatedAt === null || updated > group.updatedAt)) group.updatedAt = updated;
+      }
+    }
+    return [...groups.values()].toSorted(movementOrder);
+  };
+
   /** Inscrits à une activité (toutes les activités sont sur inscription). */
   const activityParticipants = (activity: Activity): Person[] =>
     snap.persons.filter((p) => signups.has(`${activity.id}|${p.id}`));
@@ -375,6 +503,10 @@ export function buildIndex(snap: Snapshot) {
     nightsNote,
     nightsSuffix,
     bedPlan,
+    stayRange,
+    movements,
+    /** Personnes présentes à qui il manque l'heure d'arrivée ou de départ. */
+    withoutTimes: () => snap.persons.filter((p) => range.has(p.id) && (!p.arrival_time || !p.departure_time)),
     /** Personnes qui n'ont déclaré aucune nuit. */
     withoutNights: () => snap.persons.filter((p) => nightsOf(p.id).length === 0),
     activityParticipants,

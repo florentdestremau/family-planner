@@ -39,6 +39,8 @@ CASES = [
     ("pub", "PATCH", "/households/{household}", {"name": "Piraté"}),
     ("pub", "PUT", "/households/{household}/presences", {"members": [{"person_id": "{adult}", "slots": []}]}),
     ("pub", "PUT", "/households/{b_household}/presences", {"members": [{"person_id": "{adult}", "slots": []}]}),
+    ("pub", "PUT", "/households/{household}/times", {"members": [{"person_id": "{adult}", "arrival_time": "18:00"}]}),
+    ("pub", "PUT", "/households/{b_household}/times", {"members": [{"person_id": "{adult}", "arrival_time": "18:00"}]}),
     ("adm", "PUT", "/persons/{adult}/household", {"household_id": None}),
     ("adm", "PUT", "/persons/{b_adult}/household", {"household_id": "{household}"}),
     ("adm", "POST", "/households/{household}/merge", {"into_id": "{b_household}"}),

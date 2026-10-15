@@ -2033,3 +2033,87 @@ body:has(.update-prompt) .install-nudge {
 .print-url {
   overflow-wrap: anywhere;
 }
+
+/* --- Heures d'arrivée et de départ -------------------------------------- */
+
+.times {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 2px dashed var(--border);
+}
+.times h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+.times-invite {
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  color: var(--text);
+}
+.times-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem 0.75rem;
+  align-items: end;
+}
+.times-row + .times-row {
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+.times-name,
+.times-note,
+.times-copy {
+  grid-column: 1 / -1;
+}
+.times-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+.times-field select {
+  width: 100%;
+}
+.times-copy {
+  justify-self: start;
+}
+.person-admin .times-row {
+  margin-top: 0.5rem;
+}
+@media (min-width: 720px) {
+  .times-row {
+    grid-template-columns: 9rem repeat(2, minmax(0, 10rem)) minmax(0, 1fr);
+  }
+  .times-name {
+    grid-column: auto;
+    align-self: center;
+  }
+  .times-note {
+    grid-column: auto;
+  }
+  .times-copy {
+    grid-column: 2 / -1;
+  }
+}
+.times-updated {
+  color: var(--accent);
+  font-weight: 700;
+}
+.times-missing {
+  margin: 0;
+}
+.timeline-move .timeline-body {
+  border-left-style: dashed;
+  border-left-color: var(--accent);
+}
+.timeline-move .timeline-time {
+  color: var(--accent);
+}
+.print-moves h3 {
+  margin: 0.6rem 0 0.2rem;
+  font-size: 1rem;
+}

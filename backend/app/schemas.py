@@ -11,6 +11,19 @@ BedKind = Literal["double", "single", "bunk", "extra"]
 Diet = Literal["vegetarian", "vegan", "gluten_free", "lactose_free", "nut_allergy", "seafood_allergy"]
 DIETS: tuple[str, ...] = get_args(Diet)
 Time = Field(default="", pattern=r"^(([01]\d|2[0-3]):[0-5]\d)?$")
+# Heure d'arrivée ou de départ, au quart d'heure, de 5 h à minuit puis « dans la nuit » jusqu'à 4 h
+# (rattachée à la veille) ; vide : non donnée.
+QuarterTime = Field(default="", pattern=r"^((0[0-35-9]|1\d|2[0-3]):(00|15|30|45)|04:00)?$")
+
+
+def one_line(v: object) -> object:
+    """Texte libre ramené sur une ligne, avant de vérifier sa longueur."""
+    return " ".join(v.split()) if isinstance(v, str) else v
+
+
+def as_utc(v: datetime | None) -> datetime | None:
+    # SQLite rend l'heure sans fuseau : c'est de l'UTC, à dire au front.
+    return v and v.replace(tzinfo=timezone.utc)
 
 
 class ORM(BaseModel):
@@ -74,11 +87,8 @@ class DietIn(In):
             raise ValueError("Végétarien et végan s'excluent : choisir l'un ou l'autre")
         return [d for d in DIETS if d in v]  # sans doublon, dans l'ordre d'affichage
 
-    @field_validator("diet_note", mode="before")
-    @classmethod
-    def _one_line(cls, v: object) -> object:
-        # Une seule ligne (recopiée telle quelle dans l'export), avant de vérifier la longueur.
-        return " ".join(v.split()) if isinstance(v, str) else v
+    # Une seule ligne (recopiée telle quelle dans l'export).
+    _one_line = field_validator("diet_note", mode="before")(one_line)
 
 
 class HouseholdIn(In):
@@ -101,6 +111,21 @@ class MemberPresences(In):
 
 class HouseholdPresencesIn(In):
     members: list[MemberPresences] = Field(min_length=1)
+
+
+class MemberTimes(In):
+    """Heures d'arrivée et de départ d'une personne, et sa note, remplacées en bloc."""
+
+    person_id: int
+    arrival_time: str = QuarterTime
+    departure_time: str = QuarterTime
+    times_note: str = Field(default="", max_length=200)
+
+    _one_line = field_validator("times_note", mode="before")(one_line)
+
+
+class HouseholdTimesIn(In):
+    members: list[MemberTimes] = Field(min_length=1, max_length=100)
 
 
 class PartnerIn(In):
@@ -204,11 +229,7 @@ class StayOut(ORM):
     practical_info: str
     info_updated_at: datetime | None
 
-    @field_validator("info_updated_at")
-    @classmethod
-    def _utc(cls, v: datetime | None) -> datetime | None:
-        # SQLite rend l'heure sans fuseau : c'est de l'UTC, à dire au front.
-        return v and v.replace(tzinfo=timezone.utc)
+    _utc = field_validator("info_updated_at")(as_utc)
 
 
 class StaySummary(BaseModel):
@@ -239,6 +260,12 @@ class PersonOut(ORM):
     partner_id: int | None
     diets: list[Diet]
     diet_note: str
+    arrival_time: str
+    departure_time: str
+    times_note: str
+    times_updated_at: datetime | None
+
+    _utc = field_validator("times_updated_at")(as_utc)
 
     @field_validator("diets", mode="before")
     @classmethod

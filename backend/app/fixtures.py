@@ -47,6 +47,8 @@ class Family:
     nights: list[int] | None = None
     diets: dict[str, list[str]] = field(default_factory=dict)  # régimes et allergies
     diet_notes: dict[str, str] = field(default_factory=dict)  # précisions libres
+    times: dict[str, tuple[str, str]] = field(default_factory=dict)  # heures (arrivée, départ) ; vide : non donnée
+    times_notes: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -80,7 +82,8 @@ FIXTURES = [
         last_meal="dinner",
         families=[
             # Florent et Claire dînent au restaurant samedi soir ; les enfants restent.
-            Family(["Florent", "Claire"], ["Léo", "Emma"], leave=(3, "lunch"), away={"Florent": [(2, "dinner")], "Claire": [(2, "dinner")]}),
+            Family(["Florent", "Claire"], ["Léo", "Emma"], leave=(3, "lunch"), away={"Florent": [(2, "dinner")], "Claire": [(2, "dinner")]},
+                   times={n: ("18:30", "15:00") for n in ["Florent", "Claire", "Léo", "Emma"]}),
             # Mamie reçoit : son foyer est là tout le temps, sauf Julien (arrive vendredi soir, il
             # travaille) et Zoé (match de hand samedi matin).
             Family(
@@ -90,13 +93,19 @@ FIXTURES = [
                 no_chores=["Mamie"],
                 members={"Julien": ((1, "dinner"), None), "Zoé (15 ans)": ((2, "lunch"), None)},
                 diet_notes={"Hugo": "N'aime pas les champignons"},
+                times={"Mamie": ("15:00", "18:00"), "Sophie": ("17:00", "18:00"), "Hugo": ("17:00", "18:00"),
+                       "Julien": ("20:45", "18:00"), "Zoé (15 ans)": ("12:00", "18:00")},
+                times_notes={"Julien": "Il travaille jusqu'à 19 h : ne l'attendez pas pour dîner"},
             ),
             Family(["Marc", "Anne"], ["Lina"], arrive=(1, "lunch"), leave=(2, "breakfast"),  # aller-retour
                    diets={"Anne": ["gluten_free"]}, diet_notes={"Anne": "Cœliaque : pas même une miette de pain"}),
-            Family(["Thomas"], arrive=(2, "lunch"), leave=(3, "breakfast"), diets={"Thomas": ["vegetarian"]}),
-            Family(["Camille"], arrive=(2, "dinner"), leave=(3, "breakfast")),  # célibataire, pour la soirée
+            Family(["Thomas"], arrive=(2, "lunch"), leave=(3, "breakfast"), diets={"Thomas": ["vegetarian"]},
+                   times={"Thomas": ("12:00", "09:30")}),
+            Family(["Camille"], arrive=(2, "dinner"), leave=(3, "breakfast"), times={"Camille": ("19:00", "10:00")}),  # pour la soirée
             # Arrivés jeudi après le dîner : ils dorment là dès jeudi soir.
-            Family(["Antoine", "Lucie"], arrive=(1, "breakfast"), nights=[0, 1, 2]),
+            Family(["Antoine", "Lucie"], arrive=(1, "breakfast"), nights=[0, 1, 2],
+                   times={"Antoine": ("00:30", "17:00"), "Lucie": ("00:30", "17:00")},
+                   times_notes={"Antoine": "Ne nous attendez pas : nous avons les clés", "Lucie": "Ne nous attendez pas : nous avons les clés"}),
             # Hélène dîne et dort là vendredi ; samedi midi et soir chez une amie, où elle dort ; de
             # retour dimanche pour le petit-déjeuner (qui ne dit pas qu'elle a dormi là samedi).
             Family(["Hélène"], arrive=(1, "dinner"), away={"Hélène": [(2, "lunch"), (2, "dinner")]}, nights=[1]),
@@ -155,7 +164,8 @@ FIXTURES = [
         last_meal="lunch",
         families=[
             # Montée en charge : grands-parents et Florent d'abord, pic en milieu de semaine, départs étalés.
-            Family(["Florent", "Claire"], ["Léo", "Emma"], leave=(6, "lunch")),
+            Family(["Florent", "Claire"], ["Léo", "Emma"], leave=(6, "lunch"),
+                   times={n: ("17:30", "15:00") for n in ["Florent", "Claire", "Léo", "Emma"]}),
             Family(["Julien", "Sophie"], ["Hugo", "Zoé"], teens=["Zoé"], arrive=(1, "dinner"), leave=(5, "breakfast"),
                    diets={"Sophie": ["vegetarian"]}),
             # Jules part en colonie avant le reste de sa famille.
@@ -168,11 +178,13 @@ FIXTURES = [
                 members={"Jules (16 ans)": (None, (2, "lunch"))},
             ),
             # Paul et Léa se sont inscrits chacun de leur côté : deux foyers à fusionner.
-            Family(["Paul"], arrive=(2, "dinner"), diets={"Paul": ["lactose_free"]}),
+            Family(["Paul"], arrive=(2, "dinner"), diets={"Paul": ["lactose_free"]}, times={"Paul": ("23:30", "")},
+                   times_notes={"Paul": "Laissez-moi un matelas au salon"}),
             Family(["Léa"], ["Rose"], arrive=(3, "lunch"),
                    diets={"Rose": ["seafood_allergy"]}, diet_notes={"Rose": "Allergie grave : stylo d'adrénaline dans son sac"}),
             # Les grands-parents déjeunent chez des amis mercredi.
-            Family(["Bertrand", "Odile"], no_chores=["Bertrand", "Odile"], away={"Bertrand": [(4, "lunch")], "Odile": [(4, "lunch")]}),
+            Family(["Bertrand", "Odile"], no_chores=["Bertrand", "Odile"], away={"Bertrand": [(4, "lunch")], "Odile": [(4, "lunch")]},
+                   times={"Bertrand": ("16:00", "11:00"), "Odile": ("16:00", "11:00")}),
             Family(["Camille"], arrive=(1, "lunch"), leave=(2, "breakfast")),  # célibataire, une nuit
             Family(["Sarah"], ["Tom", "Jade"], arrive=(2, "lunch"), leave=(5, "lunch")),  # parent seul
             # Nicolas arrive le soir, Inès le lendemain midi.
@@ -261,6 +273,13 @@ def load(db: Session, fx: Fixture) -> Stay:
             if name in fam.diets or name in fam.diet_notes:
                 body = s.DietIn(diets=fam.diets.get(name, []), diet_note=fam.diet_notes.get(name, ""))
                 public.set_diet(ids[name], body, stay, db)
+        if fam.times or fam.times_notes:
+            members = [
+                s.MemberTimes(person_id=ids[name], arrival_time=arrival, departure_time=departure, times_note=fam.times_notes.get(name, ""))
+                for name in [*fam.adults, *fam.children]
+                for arrival, departure in [fam.times.get(name, ("", ""))]
+            ]
+            public.set_household_times(household_id, s.HouseholdTimesIn(members=members), stay, db)
 
     for room_name, beds in fx.rooms:
         room = admin.create_room(s.RoomIn(name=room_name), stay, db)

@@ -73,6 +73,12 @@ class Person(Base):
     # Régimes et allergies : codes séparés par des virgules (voir schemas.Diet) ; vide : aucun.
     diets: Mapped[str] = mapped_column(String(128), default="")
     diet_note: Mapped[str] = mapped_column(String(200), default="")  # précision libre, non comptée
+    # Heures d'arrivée et de départ (HH:MM, au quart d'heure ; vide : non donnée). Le jour se déduit
+    # des présences ; une heure avant 5 h est « dans la nuit », rattachée à la veille.
+    arrival_time: Mapped[str] = mapped_column(String(5), default="")
+    departure_time: Mapped[str] = mapped_column(String(5), default="")
+    times_note: Mapped[str] = mapped_column(String(200), default="")  # « nous aurons déjà dîné »…
+    times_updated_at: Mapped[datetime | None]  # dernier changement des heures ou de la note
 
 
 class Presence(Base):
