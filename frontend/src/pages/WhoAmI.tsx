@@ -3,8 +3,8 @@ import type { Person } from "../api";
 import { OfflineLock } from "../components/Pwa";
 import { useStay } from "../stay";
 
-/** Sélection de son identité, mémorisée localement (pas de compte). */
-export default function WhoAmI() {
+/** Sélection de son identité, mémorisée localement (pas de compte) ; elle signe les modifications au journal. */
+export default function WhoAmI({ organizer = false }: { organizer?: boolean }) {
   const { snap, idx, setMe, call } = useStay();
   const [name, setName] = useState("");
   const adults = snap.persons.filter((p) => p.kind === "adult");
@@ -18,7 +18,11 @@ export default function WhoAmI() {
   return (
     <section className="card whoami">
       <h2>Qui êtes-vous ?</h2>
-      <p className="muted">Choisissez votre nom : vous pourrez ensuite renseigner vos présences et celles de vos enfants.</p>
+      <p className="muted">
+        {organizer
+          ? "Chaque modification du séjour est notée au journal, au nom de la personne qui la fait. Choisissez votre nom ; si vous ne venez pas au séjour, ajoutez-vous quand même, sans présences."
+          : "Choisissez votre nom : vous pourrez ensuite renseigner vos présences et celles de vos enfants."}
+      </p>
       {adults.length > 0 && (
         <div className="who-list">
           {adults.map((p) => (

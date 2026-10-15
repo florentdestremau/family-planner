@@ -4,6 +4,7 @@ import type { Person } from "../api";
 import AddMember from "../components/AddMember";
 import { DietCard, DietSummary } from "../components/Diets";
 import HouseholdPresences from "../components/HouseholdPresences";
+import { RecentActivity } from "../components/Journal";
 import PlaceInfo from "../components/PlaceInfo";
 import { OfflineLock } from "../components/Pwa";
 import { Chip, Empty } from "../components/ui";
@@ -147,6 +148,8 @@ function Dashboard({ me }: { me: Person }) {
           })}
         </ul>
       </section>
+
+      <RecentActivity />
 
       <button type="button" className="btn btn-ghost" onClick={() => setMe(null)}>
         Je ne suis pas {me.name}

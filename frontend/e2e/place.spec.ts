@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { createStay, expectNoHorizontalScroll, openAdmin, whoButton } from "./helpers";
+import { createStay, expectNoHorizontalScroll, forgetMe, openAdmin, whoButton } from "./helpers";
 
 const ADDRESS = "Les Granges, 12 chemin des Vignes, 26110 Nyons";
 const INFO = "Portail : code 1984\nClés chez Gérard : 06 12 34 56 78\nMétéo : https://meteofrance.com.";
@@ -30,8 +30,9 @@ test("l'organisateur renseigne le lieu, la famille le retrouve en tête de « Mo
   await expect(page.getByText("Infos pratiques enregistrées 📍")).toBeVisible();
   expect((await stay.snap()).stay).toMatchObject({ address: ADDRESS, practical_info: INFO, map_url: "" });
 
-  // Côté famille, avant même d'avoir choisi son nom.
+  // Côté famille, avant même d'avoir choisi son nom (l'organisateur s'était désigné).
   await page.goto(stay.url);
+  await forgetMe(page);
   const place = page.getByRole("region", { name: "Lieu et infos pratiques" });
   await expect(place.getByText(`📍 ${ADDRESS}`)).toBeVisible();
   const map = place.getByRole("link", { name: /Ouvrir dans Google Maps/u });

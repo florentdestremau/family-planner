@@ -17,7 +17,9 @@ test("un séjour créé apparaît sur l'accueil, marqué organisateur pour son c
   const name = `Pâques ${Date.now()}`;
   await page.getByLabel("Nom du séjour").fill(name);
   await page.getByRole("button", { name: "Créer le séjour" }).click();
-  await expect(page.getByRole("heading", { name: "Liens de partage" })).toBeVisible();
+  // L'espace organisateur demande d'abord qui l'on est (journal) ; on n'y répond pas ici.
+  await expect(page.getByRole("heading", { name: "Qui êtes-vous ?" })).toBeVisible();
+  await expect(page.locator(".subtabs")).toHaveCount(0);
 
   await page.goto("/");
   const mine = page.getByRole("link", { name: new RegExp(name, "u") });
