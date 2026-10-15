@@ -30,10 +30,15 @@ test("chacun voit qui a changé quoi ; l'organisateur a le détail", async ({ pa
   await expect(page.getByText("Détail")).toHaveCount(0);
   await expectNoHorizontalScroll(page);
 
-  // L'organisatrice (Marie, déjà désignée) relance le tirage : le détail garde les équipes d'avant.
+  // L'organisatrice (Marie, déjà désignée) tire au sort, vide un créneau à la main, puis relance le
+  // tirage : il remplit ce créneau, et le détail garde l'équipe d'avant.
   await openAdmin(page, stay.slug, stay.key, "Corvées");
   await page.getByRole("button", { name: /Tirer au sort/u }).click();
   await expect(page.locator(".toast").last()).toContainText(/créneau/u);
+  const first = (await stay.snap()).chore_assignments.at(0);
+  if (first === undefined) throw new Error("tirage vide");
+  await stay.adm("PUT", "/chores/occurrence", { chore_type_id: first.chore_type_id, date: first.date, moment: first.moment, person_ids: [] });
+  await page.reload();
   page.once("dialog", (d) => void d.accept());
   await page.getByRole("button", { name: /Re-répartir/u }).click();
   await expect.poll(async () => (await adminJournal()).entries[0]?.text ?? "").toMatch(/^a relancé le tirage des corvées/u);
@@ -41,12 +46,8 @@ test("chacun voit qui a changé quoi ; l'organisateur a le détail", async ({ pa
   await expect(page.getByRole("heading", { name: /Journal du séjour/u })).toBeVisible();
   const redraw = page.locator(".journal-entry").first();
   await expect(redraw).toContainText("Marie a relancé le tirage des corvées");
-  const changed = (await adminJournal()).entries[0]?.detail ?? [];
-  if (changed.length > 0) {
-    // Le tirage est aléatoire : il arrive qu'aucun créneau ne change.
-    await redraw.getByText("Détail").click();
-    await expect(redraw.locator(".pre")).toContainText(changed[0] ?? "");
-  }
+  await redraw.getByText("Détail").click();
+  await expect(redraw.locator(".pre")).toContainText("personne → ");
   await expect(page.locator(".journal-entry").filter({ hasText: "a tiré au sort les corvées" })).toHaveCount(1);
   await expectNoHorizontalScroll(page);
 
