@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { api, ApiError, assistantAsk, assistantStatus } from "./api";
+import { actorHeaders, api, ApiError, assistantAsk, assistantStatus } from "./api";
 
 function mockFetch(status: number, body?: unknown, statusText = "Erreur") {
   const fetchMock = vi.fn<(input: string, init?: RequestInit) => Promise<Response>>(() =>
@@ -105,6 +105,24 @@ describe("assistant", () => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: '{"person_id":3,"message":"On mange ?","history":["Bonjour"]}',
+    });
+  });
+});
+
+describe("auteur déclaré", () => {
+  it("annonce la personne choisie et l'assistant", () => {
+    expect(actorHeaders(null)).toEqual({});
+    expect(actorHeaders(0)).toEqual({ "X-Actor": "0" });
+    expect(actorHeaders(7, "assistant")).toEqual({ "X-Actor": "7", "X-Via": "assistant" });
+  });
+
+  it("ajoute ces en-têtes à l'appel", async () => {
+    const fetchMock = mockFetch(204);
+    await api("PUT", "/stays/x/persons/7/presences", { slots: [] }, null, actorHeaders(7));
+    expect(fetchMock).toHaveBeenCalledWith("/api/stays/x/persons/7/presences", {
+      method: "PUT",
+      headers: { "X-Actor": "7", "Content-Type": "application/json" },
+      body: '{"slots":[]}',
     });
   });
 });

@@ -3,9 +3,10 @@ import { NavLink, Outlet, useSearchParams } from "react-router";
 import { api } from "../../api";
 import { useOnline } from "../../components/Pwa";
 import { useStay } from "../../stay";
+import WhoAmI from "../WhoAmI";
 
 export default function AdminLayout() {
-  const { slug, adminKey, setAdminKey } = useStay();
+  const { slug, adminKey, setAdminKey, me } = useStay();
   const [params, setParams] = useSearchParams();
   const [status, setStatus] = useState<"checking" | "ok" | "denied">("checking");
   const [input, setInput] = useState("");
@@ -20,9 +21,11 @@ export default function AdminLayout() {
     }
   }, [params, setParams, setAdminKey]);
 
+  // Vérifiée une fois par clé : retirer la clé de l'URL (même clé, mémorisée) ne repasse pas par
+  // « Vérification… », ce qui ferait disparaître l'écran sous le doigt.
+  const key = params.get("key") ?? adminKey;
   useEffect(() => {
     if (!isOnline) return;
-    const key = params.get("key") ?? adminKey;
     if (!key) {
       setStatus("denied");
       return;
@@ -31,7 +34,7 @@ export default function AdminLayout() {
     api("GET", `/stays/${slug}/admin`, undefined, key)
       .then(() => setStatus("ok"))
       .catch(() => setStatus("denied"));
-  }, [slug, adminKey, params, isOnline]);
+  }, [slug, key, isOnline]);
 
   if (!isOnline)
     return (
@@ -59,6 +62,9 @@ export default function AdminLayout() {
       </section>
     );
 
+  // Chaque geste de l'organisateur est signé au journal : on sait d'abord qui il est.
+  if (!me) return <WhoAmI organizer />;
+
   const base = `/s/${slug}/admin`;
   return (
     <div className="stack">
@@ -71,6 +77,7 @@ export default function AdminLayout() {
         <NavLink to={`${base}/corvees`}>Corvées</NavLink>
         <NavLink to={`${base}/activites`}>Activités</NavLink>
         <NavLink to={`${base}/menus`}>Menus</NavLink>
+        <NavLink to={`${base}/journal`}>Journal</NavLink>
       </nav>
       <Outlet />
     </div>

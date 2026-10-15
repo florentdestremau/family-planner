@@ -1,4 +1,4 @@
-import type { Activity, AssistantAction, BedKind, Diet, Meal, Moment, Person, PersonKind, PersonNight, Slot, Snapshot, Stay, StaySummary } from "./api";
+import type { Activity, AssistantAction, BedKind, Diet, JournalEntry, Meal, Moment, Person, PersonKind, PersonNight, Slot, Snapshot, Stay, StaySummary } from "./api";
 
 export const MEALS: Meal[] = ["breakfast", "lunch", "dinner"];
 export const MOMENTS: Moment[] = [...MEALS, "day"];
@@ -141,6 +141,33 @@ export function updatedLabel(iso: string, now = new Date()): string {
   const d = new Date(iso);
   const year = d.getFullYear() === now.getFullYear() ? "" : `/${d.getFullYear()}`;
   return `le ${pad(d.getDate())}/${pad(d.getMonth() + 1)}${year} à ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+const midnight = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+const capitalized = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+const LONG_WEEKDAYS = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
+const DAY_MS = 24 * 3600 * 1000;
+
+/** Moment d'une ligne du journal : « à l'instant », « il y a 2 h », « hier à 21:14 », « mardi à 09:30 »… */
+export function journalTime(iso: string, now = new Date()): string {
+  const d = new Date(iso);
+  const minutes = Math.floor((now.getTime() - d.getTime()) / 60_000);
+  if (minutes < 1) return "à l'instant";
+  if (minutes < 60) return `il y a ${minutes} min`;
+  if (minutes < 6 * 60) return `il y a ${Math.floor(minutes / 60)} h`;
+  const hour = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  // Arrondi : un changement d'heure donne des journées de 23 ou 25 h.
+  const days = Math.round((midnight(now) - midnight(d)) / DAY_MS);
+  if (days === 0) return `aujourd'hui à ${hour}`;
+  if (days === 1) return `hier à ${hour}`;
+  if (days < 7) return `${LONG_WEEKDAYS[d.getDay()]} à ${hour}`;
+  return updatedLabel(iso, now);
+}
+
+/** Ligne du journal en deux temps : qui (en gras), puis ce qui a été fait. */
+export function journalSentence(entry: Pick<JournalEntry, "actor" | "via_assistant" | "text">): { who: string; what: string } {
+  if (!entry.actor) return { who: "", what: capitalized(entry.text) };
+  return { who: capitalized(entry.actor) + (entry.via_assistant ? ", via l'assistant," : ""), what: entry.text };
 }
 
 /** Morceau de texte, avec sa cible quand c'est un lien ou un numéro de téléphone. */
