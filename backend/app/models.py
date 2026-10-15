@@ -29,6 +29,11 @@ class Stay(Base):
     # Change à chaque nouvelle image de couverture, sans jamais reprendre une valeur passée (cache
     # navigateur de longue durée sur l'URL qui la porte) ; vide : pas d'image.
     cover_version: Mapped[int | None]
+    # Lieu et infos pratiques, publics comme tout le séjour.
+    address: Mapped[str] = mapped_column(String(300), default="")
+    map_url: Mapped[str] = mapped_column(String(500), default="")  # lien Google Maps collé ; vide : tiré de l'adresse
+    practical_info: Mapped[str] = mapped_column(Text, default="")
+    info_updated_at: Mapped[datetime | None]  # dernier changement du lieu ou des consignes
 
 
 class StayCover(Base):

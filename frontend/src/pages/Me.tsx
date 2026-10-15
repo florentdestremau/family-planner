@@ -4,6 +4,7 @@ import type { Person } from "../api";
 import AddMember from "../components/AddMember";
 import { DietCard, DietSummary } from "../components/Diets";
 import HouseholdPresences from "../components/HouseholdPresences";
+import PlaceInfo from "../components/PlaceInfo";
 import { OfflineLock } from "../components/Pwa";
 import { Chip, Empty } from "../components/ui";
 import { BED_LABEL, coverUrl, dayLabel, MOMENT_LABEL, sortedMoments } from "../lib";
@@ -16,6 +17,7 @@ export default function Me() {
   return (
     <>
       {version != null && <img className="stay-cover" src={coverUrl(slug, version)} alt={snap.stay.name} />}
+      <PlaceInfo />
       {me ? <Dashboard me={me} /> : <WhoAmI />}
     </>
   );

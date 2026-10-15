@@ -80,7 +80,7 @@ def test_fresh_database_matches_models(tmp_path) -> None:
         diff = compare_metadata(MigrationContext.configure(connection), Base.metadata)
     engine.dispose()
     assert diff == [], "les modèles et les migrations divergent : écrire une migration"
-    assert query(tmp_path / "new.db", "SELECT version_num FROM alembic_version") == [("0007",)]
+    assert query(tmp_path / "new.db", "SELECT version_num FROM alembic_version") == [("0008",)]
 
 
 def test_legacy_database_is_converted_without_loss(tmp_path) -> None:
@@ -115,8 +115,10 @@ def test_legacy_database_is_converted_without_loss(tmp_path) -> None:
         (5, "2026-10-30", None),  # dîner et petit-déjeuner du lendemain ; pas de petit-déj dimanche
     ]  # Léo, Tom, Camille : un repas isolé et pas de lit, aucune nuit
     assert query(path, "SELECT DISTINCT diets, diet_note FROM persons") == [("", "")], "aucune contrainte par défaut"
+    # Lieu et infos pratiques : vides pour les séjours existants.
+    assert query(path, "SELECT address, map_url, practical_info, info_updated_at FROM stays") == [("", "", "", None)] * 2
     assert query(path, "PRAGMA foreign_key_check") == []
-    assert query(path, "SELECT version_num FROM alembic_version") == [("0007",)]
+    assert query(path, "SELECT version_num FROM alembic_version") == [("0008",)]
 
 
 def test_everyone_activities_become_signups(tmp_path) -> None:

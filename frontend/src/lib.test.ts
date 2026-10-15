@@ -31,6 +31,9 @@ import {
   rangeLabel,
   sortedMoments,
   toIso,
+  linkify,
+  mapLink,
+  updatedLabel,
 } from "./lib";
 import { makeSnapshot } from "./testing";
 
@@ -435,5 +438,74 @@ describe("résumés de l'assistant", () => {
     expect(actionSummary(action("Marie", [...full, { date: "2026-10-31", meal: "dinner" }], ["2026-10-31", "2026-10-30"]))).toBe(
       "Marie : ven. dîner → dim. déjeuner · nuits : ven. 30, sam. 31",
     );
+  });
+});
+
+describe("lieu et infos pratiques", () => {
+  it("prend le lien collé, sinon une recherche Google Maps de l'adresse", () => {
+    expect(mapLink({ address: "", map_url: "" })).toBeNull();
+    expect(mapLink({ address: "12 chemin des Vignes, 26110 Nyons", map_url: "" })).toBe(
+      "https://www.google.com/maps/search/?api=1&query=12%20chemin%20des%20Vignes%2C%2026110%20Nyons",
+    );
+    expect(mapLink({ address: "Nyons", map_url: "https://maps.app.goo.gl/AbC" })).toBe("https://maps.app.goo.gl/AbC");
+    expect(mapLink({ address: "", map_url: "https://maps.app.goo.gl/AbC" })).toBe("https://maps.app.goo.gl/AbC");
+  });
+
+  it("date la mise à jour à l'heure de l'appareil", () => {
+    expect(updatedLabel(new Date(2026, 9, 15, 18, 5).toISOString())).toBe("le 15/10 à 18:05");
+    const now = new Date(2026, 9, 20);
+    expect(updatedLabel(new Date(2026, 0, 3, 9, 0).toISOString(), now)).toBe("le 03/01 à 09:00");
+    // Une autre année : on la précise, pour ne pas faire passer une vieille info pour récente.
+    expect(updatedLabel(new Date(2025, 11, 20, 18, 5).toISOString(), now)).toBe("le 20/12/2025 à 18:05");
+  });
+
+  it("laisse un texte sans lien tel quel", () => {
+    expect(linkify("")).toEqual([]);
+    expect(linkify("Portail : code 1984\nParking : le pré")).toEqual([{ text: "Portail : code 1984\nParking : le pré" }]);
+  });
+
+  it("rend les liens cliquables, sans la ponctuation qui les suit", () => {
+    expect(linkify("Météo : https://meteofrance.com/nyons.")).toEqual([
+      { text: "Météo : " },
+      { text: "https://meteofrance.com/nyons", href: "https://meteofrance.com/nyons" },
+      { text: "." },
+    ]);
+    // Parenthèse du lien gardée ; celle qui entoure le lien, retirée.
+    expect(linkify("Voir https://fr.wikipedia.org/wiki/Nyons_(Drôme).")).toEqual([
+      { text: "Voir " },
+      { text: "https://fr.wikipedia.org/wiki/Nyons_(Drôme)", href: "https://fr.wikipedia.org/wiki/Nyons_(Drôme)" },
+      { text: "." },
+    ]);
+    expect(linkify("(https://gite.fr/a)")).toEqual([
+      { text: "(" },
+      { text: "https://gite.fr/a", href: "https://gite.fr/a" },
+      { text: ")" },
+    ]);
+    expect(linkify("http://gite.fr (réservation)")).toEqual([
+      { text: "http://gite.fr", href: "http://gite.fr" },
+      { text: " (réservation)" },
+    ]);
+  });
+
+  it("rend les numéros français cliquables, quelle que soit leur écriture", () => {
+    expect(linkify("Gérard : 06 12 34 56 78")).toEqual([
+      { text: "Gérard : " },
+      { text: "06 12 34 56 78", href: "tel:0612345678" },
+    ]);
+    expect(linkify("0612345678 ou 04.75.26.10.00, sinon +33 6 12 34 56 78")).toEqual([
+      { text: "0612345678", href: "tel:0612345678" },
+      { text: " ou " },
+      { text: "04.75.26.10.00", href: "tel:0475261000" },
+      { text: ", sinon " },
+      { text: "+33 6 12 34 56 78", href: "tel:+33612345678" },
+    ]);
+    expect(linkify("+33 (0)6 12 34 56 78")).toEqual([{ text: "+33 (0)6 12 34 56 78", href: "tel:+33612345678" }]);
+  });
+
+  it("ignore les morceaux de nombres plus longs", () => {
+    // Code à 12 chiffres, numéro trop long : rien de cliquable.
+    expect(linkify("Code 120612345678")).toEqual([{ text: "Code 120612345678" }]);
+    expect(linkify("06123456789")).toEqual([{ text: "06123456789" }]);
+    expect(linkify("++0612345678")).toEqual([{ text: "++0612345678" }]);
   });
 });

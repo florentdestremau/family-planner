@@ -1,6 +1,7 @@
 """Espace organisateur : configuration du séjour, tirage des corvées, affectations."""
 
 import time
+from datetime import datetime, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -30,11 +31,17 @@ from ..models import (
     Stay,
     StayCover,
 )
+from ..places import is_google_maps_url
 from ..rooms import auto_assign_nights
 from ..slots import stay_days, stay_nights, stay_slots
 from .public import validate_dates
 
 router = APIRouter(prefix="/api/stays/{slug}/admin")
+
+# Leur changement date la mention « Mis à jour le … » des infos pratiques.
+PLACE_FIELDS = {"address", "map_url", "practical_info"}
+# Leur changement déclenche la vérification des dates et le nettoyage hors période.
+PERIOD_FIELDS = {"start_date", "end_date", "first_meal", "last_meal"}
 
 
 @router.get("", status_code=204)
@@ -47,9 +54,16 @@ def check_key(stay: AdminStay) -> None:
 
 @router.patch("/stay", response_model=s.StayOut)
 def update_stay(body: s.StayUpdate, stay: AdminStay, db: DB) -> Stay:
+    if body.map_url and not is_google_maps_url(body.map_url):
+        raise HTTPException(422, "Le lien de carte doit être un lien Google Maps (https://maps.app.goo.gl/… ou https://www.google.com/maps/…)")
     for key, value in body.model_dump(exclude_unset=True).items():
         if value is not None:
+            if key in PLACE_FIELDS and value != getattr(stay, key):
+                stay.info_updated_at = datetime.now(timezone.utc)
             setattr(stay, key, value)
+    if not body.model_fields_set & PERIOD_FIELDS:  # nom, règles, lieu : la période ne bouge pas
+        db.commit()
+        return stay
     validate_dates(stay.start_date, stay.end_date, stay.first_meal, stay.last_meal)
     # Nettoyage des données sorties de la nouvelle période.
     slots = set(stay_slots(stay.start_date, stay.end_date, stay.first_meal, stay.last_meal))

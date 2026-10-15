@@ -9,6 +9,7 @@ const PRINTS = [
   { kind: "menus", title: "Menus pour l'équipe cuisine", text: "Chaque repas avec ses plats, ses couverts, régimes et allergies." },
   { kind: "chambres", title: "Répartition des chambres", text: "Qui dort où, et quelles nuits quand ce n'est pas tout le séjour." },
   { kind: "activites", title: "Planning des activités", text: "Le programme jour par jour avec les inscrits." },
+  { kind: "infos", title: "Infos pratiques", text: "L'adresse et les consignes, à afficher à l'entrée ou sur le frigo." },
 ];
 
 export default function PrintMenu() {

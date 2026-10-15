@@ -61,6 +61,8 @@ class Fixture:
     rooms: list[tuple[str, list[str]]]
     activities: list[dict]  # day (index), name, start_time…, signups (absent : tous les présents)
     menus: list[tuple[int, str, str, str]]  # (jour, repas, plats, notes)
+    address: str = ""
+    practical_info: str = ""
 
 
 def _next_weekday(weekday: int) -> int:
@@ -128,6 +130,21 @@ FIXTURES = [
             (2, "dinner", "Pâtes bolognaise\nCompote", "Soirée des enfants"),
             (3, "lunch", "Gigot\nFlageolets\nTarte aux pommes", ""),
         ],
+        address="Les Granges, 12 chemin des Vignes, 26110 Nyons",
+        practical_info=(
+            "Portail : code 1984, à refermer derrière vous (les chiens de Mamie).\n"
+            "Parking : dans le pré après la grange, pas devant le portail.\n"
+            "Arrivée conseillée : à partir de 17 h ; Mamie fait la sieste avant.\n"
+            "\n"
+            "À apporter :\n"
+            "- draps et serviettes\n"
+            "- bottes pour la rando\n"
+            "- un jeu de société\n"
+            "\n"
+            "Wifi : Granges-Invites / mot de passe tartealapomme\n"
+            "Clés chez le voisin, Gérard : 06 12 34 56 78\n"
+            "Météo du coin : https://meteofrance.com"
+        ),
     ),
     Fixture(
         slug="ete",
@@ -189,6 +206,15 @@ FIXTURES = [
             (3, "dinner", "Barbecue\nSalade de pommes de terre\nGlaces", ""),
             (5, "dinner", "Paella", ""),
         ],
+        address="Villa Les Mouettes, 5 avenue de la Plage, 85100 Les Sables-d'Olonne",
+        practical_info=(
+            "Boîte à clés à gauche de la porte : code 0785.\n"
+            "Stationnement : deux places dans l'allée, les autres sur le parking de la plage (gratuit).\n"
+            "Arrivée à partir de 16 h, départ le dernier jour avant 11 h (ménage de fin de séjour).\n"
+            "\n"
+            "À apporter : draps, serviettes de plage, crème solaire, maillots.\n"
+            "Wifi : Mouettes-5G / mot de passe vivelesvacances"
+        ),
     ),
 ]
 
@@ -201,6 +227,7 @@ def load(db: Session, fx: Fixture) -> Stay:
     stay.slug = fx.slug
     stay.admin_key = os.environ.get("DEMO_ADMIN_KEY", "demo")
     db.commit()
+    admin.update_stay(s.StayUpdate(address=fx.address, practical_info=fx.practical_info), stay, db)
 
     slots = stay_slots(start, end, fx.first_meal, fx.last_meal)
     ids: dict[str, int] = {}

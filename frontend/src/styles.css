@@ -2004,3 +2004,32 @@ body:has(.update-prompt) .install-nudge {
   align-items: center;
   gap: 0.4rem;
 }
+
+/* --- Lieu et infos pratiques ------------------------------------------- */
+
+.place {
+  margin-bottom: 1.25rem;
+}
+.place-address {
+  margin: 0;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.place-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.place-info p,
+.print-info .pre {
+  margin: 0.6rem 0 0;
+  overflow-wrap: anywhere;
+}
+.print-address {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+.print-url {
+  overflow-wrap: anywhere;
+}

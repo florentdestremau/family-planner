@@ -1,4 +1,4 @@
-import type { Activity, AssistantAction, BedKind, Diet, Meal, Moment, Person, PersonNight, Snapshot, Slot, StaySummary } from "./api";
+import type { Activity, AssistantAction, BedKind, Diet, Meal, Moment, Person, PersonNight, Snapshot, Slot, Stay, StaySummary } from "./api";
 
 export const MEALS: Meal[] = ["breakfast", "lunch", "dinner"];
 export const MOMENTS: Moment[] = [...MEALS, "day"];
@@ -115,6 +115,64 @@ export const coverUrl = (slug: string, version: number) => `/api/stays/${slug}/c
 export const coverThumbUrl = (slug: string, version: number) => `/api/stays/${slug}/cover/thumb?v=${version}`;
 /** Taille maximale acceptée par le serveur. */
 export const MAX_COVER_BYTES = 5_000_000;
+
+/** Longueurs maximales du lieu (mêmes limites côté serveur, `StayUpdate`). */
+export const MAX_ADDRESS = 300;
+export const MAX_MAP_URL = 500;
+export const MAX_PRACTICAL_INFO = 2000;
+
+/** Lien de carte du séjour : le lien collé par l'organisateur, sinon une recherche Google Maps de l'adresse. */
+export function mapLink(stay: Pick<Stay, "address" | "map_url">): string | null {
+  if (stay.map_url) return stay.map_url;
+  return stay.address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(stay.address)}` : null;
+}
+
+/** « le 15/10 à 18:05 », à l'heure de l'appareil ; avec l'année si ce n'est pas celle en cours. */
+export function updatedLabel(iso: string, now = new Date()): string {
+  const d = new Date(iso);
+  const year = d.getFullYear() === now.getFullYear() ? "" : `/${d.getFullYear()}`;
+  return `le ${pad(d.getDate())}/${pad(d.getMonth() + 1)}${year} à ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/** Morceau de texte, avec sa cible quand c'est un lien ou un numéro de téléphone. */
+export interface TextPart {
+  text: string;
+  href?: string;
+}
+
+// Liens http(s), et numéros français : 06 12 34 56 78, 06.12.34.56.78, +33 6 12 34 56 78, +33 (0)6 12 34 56 78…
+const LINKS = /(https?:\/\/[^\s<>"]+)|((?:\+33[\s.-]?(?:\(0\)[\s.-]?)?|0)[1-9](?:[\s.-]?\d{2}){4})(?!\d)/g;
+// Ponctuation collée à la fin d'un lien (« voir https://exemple.fr. »), qui n'en fait pas partie.
+const TRAILING = /[.,;:!?)\]'"»]/;
+
+/** Retire la ponctuation finale d'un lien, sauf une parenthèse qui en ferme une du lien (…/wiki/Nyons_(Drôme)). */
+function trimUrl(url: string): string {
+  while (TRAILING.test(url.slice(-1))) {
+    if (url.endsWith(")") && url.split("(").length >= url.split(")").length) break;
+    url = url.slice(0, -1);
+  }
+  return url;
+}
+
+/**
+ * Découpe un texte libre en morceaux, avec les liens et les numéros rendus cliquables. Rien n'est
+ * interprété comme du HTML : l'affichage passe par React, qui échappe tout.
+ */
+export function linkify(text: string): TextPart[] {
+  const parts: TextPart[] = [];
+  let last = 0;
+  for (const m of text.matchAll(LINKS)) {
+    const start = m.index;
+    // Fin d'un nombre plus long (un code, un numéro étranger) : laissé tel quel.
+    if (!m[1] && /[\d+]/.test(text.charAt(start - 1))) continue;
+    const match = m[1] ? trimUrl(m[0]) : m[0];
+    if (start > last) parts.push({ text: text.slice(last, start) });
+    parts.push({ text: match, href: m[1] ? match : `tel:${match.replace(/\(0\)|[\s.-]/g, "")}` });
+    last = start + match.length;
+  }
+  if (last < text.length) parts.push({ text: text.slice(last) });
+  return parts;
+}
 
 export const presenceKey = (personId: number, date: string, meal: Meal) => `${personId}|${date}|${meal}`;
 /** Nuit dans un ensemble de présences, à côté des clés « date|repas ». */
