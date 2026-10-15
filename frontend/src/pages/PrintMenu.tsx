@@ -4,7 +4,7 @@ import { llmExport } from "../lib";
 import { useStay } from "../stay";
 
 const PRINTS = [
-  { kind: "presences", title: "Planning de présence", text: "Qui est là à chaque repas et chaque nuit, avec les couverts et les couchages." },
+  { kind: "presences", title: "Planning de présence", text: "Arrivées et départs, puis qui est là à chaque repas et chaque nuit, avec les couverts et les couchages." },
   { kind: "corvees", title: "Corvées par personne", text: "Une fiche par personne, plus le tableau jour par jour." },
   { kind: "menus", title: "Menus pour l'équipe cuisine", text: "Chaque repas avec ses plats, ses couverts, régimes et allergies." },
   { kind: "chambres", title: "Répartition des chambres", text: "Qui dort où, et quelles nuits quand ce n'est pas tout le séjour." },

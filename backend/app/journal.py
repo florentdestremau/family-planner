@@ -214,23 +214,65 @@ def presence_changes(before: Presences, after: Presences) -> str:
     return " ; ".join(parts)
 
 
-def record_presences(db: Session, stay: Stay, actor: Actor, before: dict[int, Presences], persons: list[Person]) -> None:
-    """Une phrase pour tout l'enregistrement ; les personnes aux mêmes changements sont regroupées."""
+def record_grouped(db: Session, stay: Stay, actor: Actor, what: str, changes: Iterable[tuple[Person, str]]) -> None:
+    """Une phrase pour tout l'enregistrement ; les personnes aux mêmes changements sont regroupées.
+    `what` : « présences », « heures d'arrivée et de départ »."""
     groups: dict[str, list[Person]] = {}
-    for p in persons:
-        changes = presence_changes(before[p.id], presences_of(db, p.id))
-        if changes:
-            groups.setdefault(changes, []).append(p)
+    for p, change in changes:
+        if change:
+            groups.setdefault(change, []).append(p)
     if not groups:
         return
     if len(groups) == 1:
-        [(changes, people)] = groups.items()
-        text = f"a modifié les présences {of(join(p.name for p in people))} — {changes}"
+        [(change, people)] = groups.items()
+        text = f"a modifié les {what} {of(join(p.name for p in people))} — {change}"
     else:
-        text = "a modifié les présences du foyer — " + " · ".join(
-            f"{join(p.name for p in people)} : {changes}" for changes, people in groups.items()
-        )
+        text = f"a modifié les {what} du foyer — " + " · ".join(f"{join(p.name for p in people)} : {change}" for change, people in groups.items())
     record(db, stay, actor, text, [p.id for people in groups.values() for p in people])
+
+
+def record_presences(db: Session, stay: Stay, actor: Actor, before: dict[int, Presences], persons: list[Person]) -> None:
+    record_grouped(db, stay, actor, "présences", ((p, presence_changes(before[p.id], presences_of(db, p.id))) for p in persons))
+
+
+# --- Heures d'arrivée et de départ -------------------------------------------
+
+
+@dataclass(frozen=True)
+class Times:
+    arrival: str
+    departure: str
+    note: str
+
+
+def times_of(p: Person) -> Times:
+    return Times(p.arrival_time, p.departure_time, p.times_note)
+
+
+def hour_label(time: str) -> str:
+    """« 18 h 30 », « 9 h », « 0 h 30 (dans la nuit) » ; « sans heure » si vide."""
+    if not time:
+        return "sans heure"
+    hours, minutes = time.split(":")
+    label = f"{int(hours)} h" + ("" if minutes == "00" else f" {minutes}")
+    return label + (" (dans la nuit)" if time < "05:00" else "")
+
+
+def times_changes(before: Times, after: Times) -> str:
+    """« arrivée : sans heure → 18 h 30 ; note modifiée » ; vide si rien ne change. La note, texte
+    libre, n'est pas reprise (comme la précision des régimes)."""
+    parts = [
+        f"{word} : {hour_label(old)} → {hour_label(new)}"
+        for word, old, new in (("arrivée", before.arrival, after.arrival), ("départ", before.departure, after.departure))
+        if old != new
+    ]
+    if before.note != after.note:
+        parts.append("note modifiée")
+    return " ; ".join(parts)
+
+
+def record_times(db: Session, stay: Stay, actor: Actor, before: dict[int, Times], persons: list[Person]) -> None:
+    record_grouped(db, stay, actor, "heures d'arrivée et de départ", ((p, times_changes(before[p.id], times_of(p))) for p in persons))
 
 
 # --- Personnes ---------------------------------------------------------------
@@ -262,6 +304,9 @@ def person_lines(db: Session, p: Person) -> list[str]:
     ).all()
     if chores:
         lines.append("  Corvées : " + ", ".join(f"{name} {moment_label(d, m)}" for name, d, m in chores))
+    if p.arrival_time or p.departure_time or p.times_note:
+        note = f", note {quoted(p.times_note)}" if p.times_note else ""
+        lines.append(f"  Arrivée {hour_label(p.arrival_time)}, départ {hour_label(p.departure_time)}{note}")
     if p.diets or p.diet_note:
         diets = [DIET_LABELS[d] for d in p.diets.split(",") if d in DIET_LABELS]
         lines.append("  Régimes et allergies : " + ", ".join([*diets, *([quoted(p.diet_note)] if p.diet_note else [])]))

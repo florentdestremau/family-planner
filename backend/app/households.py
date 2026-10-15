@@ -1,6 +1,6 @@
 """Règles des foyers et des couples, partagées par l'espace participant et l'espace organisateur."""
 
-from datetime import date
+from datetime import date, datetime, timezone
 from typing import NamedTuple
 
 from fastapi import HTTPException
@@ -120,6 +120,33 @@ def household_members(db: Session, stay: Stay, household_id: int, body: s.Househ
         members.append(Member(p, member.slots, member.nights))
     check_slots(stay, members)
     return members
+
+
+def times_members(db: Session, stay: Stay, household_id: int, body: s.HouseholdTimesIn) -> list[tuple[Person, s.MemberTimes]]:
+    """Heures d'un foyer, vérifiées sans rien écrire."""
+    found = household(db, household_id, stay)
+    if len({m.person_id for m in body.members}) < len(body.members):
+        raise HTTPException(422, "Une même personne apparaît deux fois")
+    members = []
+    for member in body.members:
+        p = person(db, member.person_id, stay)
+        if p.household_id != found.id:
+            raise HTTPException(422, f"{p.name} n'appartient pas à ce foyer")
+        members.append((p, member))
+    return members
+
+
+def replace_times(members: list[tuple[Person, s.MemberTimes]]) -> None:
+    """Heures d'arrivée et de départ de membres d'un foyer. L'heure du changement n'est notée que
+    pour ce qui change vraiment : l'arrivée, le départ, ou les deux quand la note change."""
+    now = datetime.now(timezone.utc)
+    for p, member in members:
+        note = member.times_note != p.times_note
+        if note or member.arrival_time != p.arrival_time:
+            p.arrival_updated_at = now
+        if note or member.departure_time != p.departure_time:
+            p.departure_updated_at = now
+        p.arrival_time, p.departure_time, p.times_note = member.arrival_time, member.departure_time, member.times_note
 
 
 def check_slots(stay: Stay, members: list[Member]) -> None:

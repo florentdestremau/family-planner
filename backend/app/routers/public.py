@@ -214,6 +214,19 @@ def set_household_presences(household_id: int, body: s.HouseholdPresencesIn, sta
     replace_presences(db, stay, h.household_members(db, stay, household_id, body), actor)
 
 
+@router.put("/stays/{slug}/households/{household_id}/times", response_model=list[s.PersonOut])
+def set_household_times(household_id: int, body: s.HouseholdTimesIn, stay: StayDep, db: DB, actor: ActorDep) -> list[Person]:
+    """Heures d'arrivée et de départ de membres d'un foyer (un seul, ou « même heure pour tout le
+    foyer »), saisies par un adulte du foyer ou corrigées par l'organisateur."""
+    members = h.times_members(db, stay, household_id, body)
+    persons = [p for p, _ in members]
+    before = {p.id: j.times_of(p) for p in persons}
+    h.replace_times(members)
+    j.record_times(db, stay, actor, before, persons)
+    db.commit()
+    return persons
+
+
 def _activity(db: DB, activity_id: int, stay: Stay) -> Activity:
     activity = db.get(Activity, activity_id)
     if activity is None or activity.stay_id != stay.id:

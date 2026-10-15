@@ -6,6 +6,7 @@ import { DietCard, DietSummary } from "../components/Diets";
 import HouseholdPresences from "../components/HouseholdPresences";
 import { RecentActivity } from "../components/Journal";
 import PlaceInfo from "../components/PlaceInfo";
+import { HouseholdTimes } from "../components/Times";
 import { OfflineLock } from "../components/Pwa";
 import { Chip, Empty } from "../components/ui";
 import { BED_LABEL, coverUrl, dayLabel, MOMENT_LABEL, sortedMoments } from "../lib";
@@ -54,6 +55,7 @@ function Dashboard({ me }: { me: Person }) {
         </div>
         <OfflineLock>
           <HouseholdPresences me={me} />
+          <HouseholdTimes me={me} />
         </OfflineLock>
       </section>
 

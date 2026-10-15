@@ -1,5 +1,7 @@
 import type { Snapshot } from "./api";
 
+const NO_TIMES = { arrival_time: "", departure_time: "", times_note: "", arrival_updated_at: null, departure_updated_at: null };
+
 /** Snapshot minimal et cohérent pour les tests : ven. dîner → dim. déjeuner. */
 export function makeSnapshot(overrides: Partial<Snapshot> = {}): Snapshot {
   return {
@@ -33,11 +35,11 @@ export function makeSnapshot(overrides: Partial<Snapshot> = {}): Snapshot {
       { id: 52, name: "" },
     ],
     persons: [
-      { id: 1, name: "Alice", kind: "adult", does_chores: true, household_id: 50, partner_id: 2, diets: [], diet_note: "" },
-      { id: 2, name: "Bob", kind: "adult", does_chores: true, household_id: 50, partner_id: 1, diets: [], diet_note: "" },
-      { id: 3, name: "Léo", kind: "child", does_chores: false, household_id: 50, partner_id: null, diets: [], diet_note: "" },
-      { id: 4, name: "Mamie", kind: "adult", does_chores: false, household_id: 51, partner_id: null, diets: [], diet_note: "" },
-      { id: 5, name: "Nina", kind: "child", does_chores: false, household_id: 52, partner_id: null, diets: [], diet_note: "" },
+      { id: 1, name: "Alice", kind: "adult", does_chores: true, household_id: 50, partner_id: 2, diets: [], diet_note: "", ...NO_TIMES },
+      { id: 2, name: "Bob", kind: "adult", does_chores: true, household_id: 50, partner_id: 1, diets: [], diet_note: "", ...NO_TIMES },
+      { id: 3, name: "Léo", kind: "child", does_chores: false, household_id: 50, partner_id: null, diets: [], diet_note: "", ...NO_TIMES },
+      { id: 4, name: "Mamie", kind: "adult", does_chores: false, household_id: 51, partner_id: null, diets: [], diet_note: "", ...NO_TIMES },
+      { id: 5, name: "Nina", kind: "child", does_chores: false, household_id: 52, partner_id: null, diets: [], diet_note: "", ...NO_TIMES },
     ],
     presences: [
       { person_id: 1, date: "2026-10-30", meal: "dinner" },

@@ -280,6 +280,33 @@ def test_signups(api) -> None:
     unchanged(api, lambda: pub(api, "DELETE", f"/activities/{activity}/signups/{anne}", status=204))
 
 
+def test_times(api) -> None:
+    anne = api.person("Anne")
+    paul, leo = api.person("Paul", with_=anne), api.person("Léo", kind="child", with_=anne)
+    hh = api.household_of(anne)
+
+    def times(members: list[dict], actor: int) -> None:
+        pub(api, "PUT", f"/households/{hh}/times", {"members": members}, actor=actor, status=200)
+
+    times([{"person_id": anne, "arrival_time": "18:30", "times_note": "Porte ouverte"}], anne)
+    assert last(api) == "Anne a modifié les heures d'arrivée et de départ d'Anne — arrivée : sans heure → 18 h 30 ; note modifiée"
+    assert "Porte" not in last(api)
+    # « Même heure pour tout le foyer » : une phrase, les personnes aux mêmes changements regroupées.
+    same = {"arrival_time": "18:30", "departure_time": "15:00", "times_note": "Porte ouverte"}
+    times([{"person_id": p, **same} for p in (anne, paul, leo)], paul)
+    assert last(api) == (
+        "Paul a modifié les heures d'arrivée et de départ du foyer — Anne : départ : sans heure → 15 h · "
+        "Paul et Léo : arrivée : sans heure → 18 h 30 ; départ : sans heure → 15 h ; note modifiée"
+    )
+    assert sorted(entries(api)[0]["subjects"]) == sorted([anne, paul, leo])
+    times([{"person_id": leo, **same, "arrival_time": "00:30"}], anne)
+    assert last(api) == "Anne a modifié les heures d'arrivée et de départ de Léo — arrivée : 18 h 30 → 0 h 30 (dans la nuit)"
+    unchanged(api, lambda: times([{"person_id": leo, **same, "arrival_time": "00:30"}], anne))
+    # Supprimée, la personne laisse de quoi redonner ses heures.
+    adm(api, "DELETE", f"/persons/{leo}", status=204)
+    assert "  Arrivée 0 h 30 (dans la nuit), départ 15 h, note « Porte ouverte »" in entries(api)[0]["detail"]
+
+
 # --- Séjour ------------------------------------------------------------------
 
 
