@@ -98,7 +98,7 @@ export default function Journal({ admin = false }: { admin?: boolean }) {
 
   return (
     <div className="stack">
-      <h1 className="page-title">🕘 {admin ? "Journal du séjour" : "Activité du séjour"}</h1>
+      <h1 className="page-title">{admin ? "Journal du séjour" : "Activité du séjour"}</h1>
       <p className="muted small">
         Chaque modification, au nom de la personne qui s'est désignée sur l'appareil.
         {admin ? " Le détail garde ce qu'un geste de masse a remplacé ou supprimé." : ""} Les consultations ne sont pas notées.
