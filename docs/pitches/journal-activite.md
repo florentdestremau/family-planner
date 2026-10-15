@@ -38,7 +38,7 @@ Le séjour tient un journal de toutes les modifications, avec leur auteur et leu
 **Organisateur**
 
 7. En tant qu'organisateur, je veux que mes actions de configuration figurent au journal (repas et menus, corvées et tirage au sort, activités, chambres et lits, foyers et personnes, régimes corrigés, réglages du séjour, lieu et infos pratiques, image de couverture), afin que les autres organisateurs et la famille sachent ce qui a bougé.
-   *Critère : faute de nom choisi sur l'appareil, l'auteur est « l'organisateur ».*
+   *Critère : l'espace organisateur demande « qui es-tu ? » avant toute modification ; un organisateur qui ne vient pas au séjour s'ajoute comme participant, sans présences.*
 8. En tant qu'organisateur, je veux retrouver l'état d'avant un geste de masse (tirage relancé, proposition automatique des lits, fusion ou suppression d'un foyer, suppression d'une personne), afin de reconstituer à la main ce qui a été écrasé.
    *Critère : la phrase résume le geste (« Anne a relancé le tirage des corvées : 3 ajustements manuels écrasés ») et le détail, réservé à l'organisateur, liste ce qui a changé.*
 9. En tant qu'organisateur, je veux que le journal couvre toute la vie du séjour, de sa création à son dernier jour, afin de pouvoir remonter à une modification faite des semaines avant le départ.
@@ -53,18 +53,20 @@ Le séjour tient un journal de toutes les modifications, avec leur auteur et leu
 - L'export du journal, et un journal qui suivrait la famille d'un séjour à l'autre.
 - Les modifications faites avant la mise en service : le journal commence à cette date.
 - L'interrogation du journal par l'assistant IA.
+- La consultation du journal hors ligne.
 
-## Questions ouvertes pour le grill-me
+## Décisions (grill-me du 15/10/2026)
 
-1. **Qui voit le journal ?** *Recommandation :* tout le monde, sous forme d'une « Activité récente » en phrases françaises, comme le reste du séjour ; l'organisateur a en plus le détail des gestes de masse (avant et après).
-2. **Comment nommer l'auteur ?** *Recommandation :* la personne désignée sur l'appareil ; « l'organisateur » pour un geste fait depuis l'espace organisateur sans nom choisi ; « quelqu'un » en dernier recours, ce qui ne devrait jamais arriver côté famille puisque la saisie exige déjà de s'être désigné.
-3. **Comment écrire les actions de l'assistant ?** *Recommandation :* « Claire, via l'assistant, a… », une ligne par proposition validée, sans reprendre le texte de la demande.
-4. **Quelle granularité ?** Décocher six repas, c'est six gestes. *Recommandation :* une phrase par modification enregistrée, qui regroupe tout ce qu'elle change (« Marie a modifié les présences de Paul : retiré des dîners de samedi et dimanche ») ; « tout le foyer » donne une phrase pour le foyer, pas une par personne.
-5. **Où l'afficher ?** *Recommandation :* quelques lignes « Activité récente » sur la page « Moi » avec « Tout voir », une page complète filtrable (« me concerne », « mon foyer », tout), et la même page dans l'espace organisateur avec le détail.
-6. **Combien de temps le garder ?** *Recommandation :* toute la vie du séjour, sans purge ; un séjour supprimé emporte son journal.
-7. **Que montrer de l'état d'avant ?** *Recommandation :* assez pour refaire à la main : les repas et nuits retirés ou ajoutés, l'ancien et le nouveau lit, l'ancien foyer, l'ancienne valeur d'un réglage ; pour un texte long (consignes, menu), seulement « a modifié », sans comparaison mot à mot.
-8. **Les données sensibles apparaissent-elles ?** *Recommandation :* le journal ne montre que ce que chacun voit déjà dans le séjour ; un régime corrigé s'écrit « a modifié les régimes et allergies de Rose », sans recopier la précision libre.
-9. **Hors ligne ?** *Recommandation :* le journal se consulte hors ligne comme le reste, à la date des données affichée par le bandeau.
+1. **Visibilité** : tout le monde voit l'« Activité récente » en phrases françaises, comme le reste du séjour ; l'organisateur voit en plus l'avant et l'après des gestes de masse (tirage, proposition automatique des lits, fusion ou suppression).
+2. **Auteur** : la personne désignée sur l'appareil. L'espace organisateur demande lui aussi « qui es-tu ? » avant toute modification, si bien que chaque ligne porte un nom, sans auteur générique.
+3. **Organisateur qui ne vient pas** : il s'ajoute comme participant, sans présences, pour pouvoir se désigner.
+4. **Assistant** : « Claire, via l'assistant, a… », une ligne par proposition validée, au nom de la personne qui valide, sans reprendre le texte de la demande.
+5. **Granularité** : une phrase par modification enregistrée, qui regroupe tout ce qu'elle change ; « tout le foyer » donne une phrase pour le foyer, pas une par personne.
+6. **Emplacement** : quelques lignes « Activité récente » sur la page « Moi » avec « Tout voir », une page complète filtrable (« me concerne », « mon foyer », tout), et la même page dans l'espace organisateur avec le détail.
+7. **Conservation** : toute la vie du séjour, sans purge ; un séjour supprimé emporte son journal.
+8. **État d'avant** : de quoi refaire à la main (repas et nuits retirés ou ajoutés, ancien et nouveau lit, ancien foyer, ancienne valeur d'un réglage) ; pour un texte long (consignes, menu), seulement « a modifié ».
+9. **Régimes et allergies** : les cases en clair (« Marie a coché sans gluten pour Rose »), déjà visibles de tous sur les repas ; pour la précision libre, seulement « a modifié la précision ».
+10. **Hors ligne** : le journal ne se consulte pas hors ligne ; la page indique « Disponible avec le réseau ».
 
 ## Pistes notées pour plus tard
 
