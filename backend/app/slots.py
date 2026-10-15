@@ -6,6 +6,8 @@ MEALS = ["breakfast", "lunch", "dinner"]
 MOMENTS = [*MEALS, "day"]
 BED_PLACES = {"double": 2, "single": 1, "bunk": 2, "extra": 1}
 MAX_STAY_DAYS = 60
+MEAL_LABELS = {"breakfast": "petit-déjeuner", "lunch": "déjeuner", "dinner": "dîner"}
+MOMENT_LABELS = {**MEAL_LABELS, "day": "journée"}
 WEEKDAYS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
 
 

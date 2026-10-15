@@ -9,16 +9,19 @@ test("créer un séjour puis le configurer comme organisateur", async ({ page, c
   await page.getByLabel("Départ").fill("2026-12-26");
   await page.getByRole("button", { name: "Créer le séjour" }).click();
 
-  // Arrivée sur l'espace organisateur, clé mémorisée.
+  // Arrivée sur l'espace organisateur, clé mémorisée : l'organisateur se désigne d'abord, chaque
+  // modification étant signée au journal ; personne n'est encore inscrit, il s'ajoute.
+  await expect(page.getByRole("heading", { name: "Qui êtes-vous ?" })).toBeVisible();
+  await expect(page.getByText(/notée au journal/u)).toBeVisible();
+  await page.getByPlaceholder("Je ne suis pas dans la liste : mon prénom").fill("Florent");
+  await page.getByRole("button", { name: "M'ajouter" }).click();
   await expect(page.getByRole("heading", { name: "Liens de partage" })).toBeVisible();
   await expect(page.locator(".stay-name")).toHaveText("Noël chez Papi");
   const publicLink = await page.locator(".share code").first().textContent();
   expect(publicLink).toMatch(/\/s\/[\w-]{12}$/u);
 
-  // Foyers : Florent ajouté seul (nouveau foyer), puis Claire en couple et Léo dans son foyer.
+  // Foyers : Florent, seul dans son foyer, puis Claire en couple et Léo dans son foyer.
   await page.locator(".subtabs").getByRole("link", { name: "Foyers" }).click();
-  await page.getByPlaceholder("Prénom").first().fill("Florent");
-  await page.getByRole("button", { name: "Ajouter", exact: true }).click();
   const foyer = page.locator(".household-card");
   await expect(foyer).toHaveCount(1);
   await expect(foyer.getByLabel("Nom du foyer")).toHaveAttribute("placeholder", "Florent");
@@ -137,9 +140,7 @@ test("l'espace organisateur exige la clé", async ({ page, request }) => {
   await expect(page.getByPlaceholder("Clé organisateur")).toBeVisible();
 
   // Lien organisateur : la clé est mémorisée puis retirée de l'URL.
-  await page.goto(`/s/${slug}/admin?key=${admin_key}`);
-  await expect(page.getByRole("heading", { name: "Liens de partage" })).toBeVisible();
-  await expect(page).toHaveURL(new RegExp(`/s/${slug}/admin$`, "u"));
+  await openAdmin(page, slug, admin_key);
   await page.goto(`/s/${slug}/admin/foyers`);
   await expect(page.getByRole("heading", { name: "Ajouter une personne" })).toBeVisible();
 });

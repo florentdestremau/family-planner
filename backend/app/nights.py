@@ -74,7 +74,7 @@ def assign_bed(db: Session, stay: Stay, p: Person, bed: Bed | None, dates: list[
         for night in dates if dates is not None else mine:
             if night in mine:
                 mine[night].bed_id = None
-        db.commit()
+        db.flush()
         return None
     targets = sorted(set(dates)) if dates is not None else sorted(mine) or possible
     if not targets:
@@ -88,7 +88,7 @@ def assign_bed(db: Session, stay: Stay, p: Person, bed: Bed | None, dates: list[
             mine[night].bed_id = bed.id
         else:
             db.add(Night(person_id=p.id, date=night, bed_id=bed.id))
-    db.commit()
+    db.flush()
     if not added:
         return None
     return f"{p.name} n'avait pas déclaré la nuit du {', '.join(short_day(n) for n in added)} : ajoutée à ses présences."

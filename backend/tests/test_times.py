@@ -121,3 +121,11 @@ def test_times_survive_household_changes(api) -> None:
     put(api, api.household_of(bob), [{"person_id": bob, "arrival_time": "20:00", "times_note": "En retard"}])
     api.adm("PUT", f"/persons/{bob}/household", {"household_id": api.household_of(alice)}, status=200)
     assert times_of(api, bob) == ("20:00", "", "En retard")
+
+
+def test_same_person_twice_is_refused(api) -> None:
+    alice = api.person("Alice")
+    members = [{"person_id": alice, "arrival_time": "18:00"}, {"person_id": alice, "arrival_time": "19:00"}]
+    r = put(api, api.household_of(alice), members, status=422)
+    assert r.json()["detail"] == "Une même personne apparaît deux fois"
+    assert times_of(api, alice) == ("", "", "")

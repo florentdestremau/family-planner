@@ -74,7 +74,7 @@ def create_person(db: Session, stay: Stay, body: s.PersonCreate) -> Person:
     db.flush()
     if body.partner_id is not None:
         link_partners(db, p, person(db, body.partner_id, stay))
-    db.commit()
+    db.flush()
     return p
 
 
@@ -92,7 +92,6 @@ def move(db: Session, stay: Stay, p: Person, household_id: int | None) -> Person
     unlink(db, p)
     p.household_id = target.id
     drop_if_empty(db, old)
-    db.commit()
     return p
 
 
@@ -104,13 +103,15 @@ def merge(db: Session, stay: Stay, source_id: int, into_id: int) -> Household:
         p.household_id = into.id
     db.flush()
     db.delete(source)
-    db.commit()
+    db.flush()
     return into
 
 
 def household_members(db: Session, stay: Stay, household_id: int, body: s.HouseholdPresencesIn) -> list[Member]:
     """Présences d'un foyer, vérifiées sans rien écrire (route du foyer, propositions de l'assistant)."""
     found = household(db, household_id, stay)
+    if len({m.person_id for m in body.members}) < len(body.members):
+        raise HTTPException(422, "Une même personne apparaît deux fois")
     members = []
     for member in body.members:
         p = person(db, member.person_id, stay)
@@ -121,25 +122,31 @@ def household_members(db: Session, stay: Stay, household_id: int, body: s.Househ
     return members
 
 
-def replace_times(db: Session, stay: Stay, household_id: int, body: s.HouseholdTimesIn) -> list[Person]:
-    """Heures d'arrivée et de départ de membres d'un foyer. L'heure du changement n'est notée que
-    pour ce qui change vraiment : l'arrivée, le départ, ou les deux quand la note change."""
+def times_members(db: Session, stay: Stay, household_id: int, body: s.HouseholdTimesIn) -> list[tuple[Person, s.MemberTimes]]:
+    """Heures d'un foyer, vérifiées sans rien écrire."""
     found = household(db, household_id, stay)
-    now = datetime.now(timezone.utc)
-    persons = []
+    if len({m.person_id for m in body.members}) < len(body.members):
+        raise HTTPException(422, "Une même personne apparaît deux fois")
+    members = []
     for member in body.members:
         p = person(db, member.person_id, stay)
         if p.household_id != found.id:
             raise HTTPException(422, f"{p.name} n'appartient pas à ce foyer")
+        members.append((p, member))
+    return members
+
+
+def replace_times(members: list[tuple[Person, s.MemberTimes]]) -> None:
+    """Heures d'arrivée et de départ de membres d'un foyer. L'heure du changement n'est notée que
+    pour ce qui change vraiment : l'arrivée, le départ, ou les deux quand la note change."""
+    now = datetime.now(timezone.utc)
+    for p, member in members:
         note = member.times_note != p.times_note
         if note or member.arrival_time != p.arrival_time:
             p.arrival_updated_at = now
         if note or member.departure_time != p.departure_time:
             p.departure_updated_at = now
         p.arrival_time, p.departure_time, p.times_note = member.arrival_time, member.departure_time, member.times_note
-        persons.append(p)
-    db.commit()
-    return persons
 
 
 def check_slots(stay: Stay, members: list[Member]) -> None:
@@ -164,4 +171,4 @@ def replace_presences(db: Session, stay: Stay, members: list[Member]) -> None:
         db.execute(delete(Presence).where(Presence.person_id == p.id))
         db.add_all(Presence(person_id=p.id, date=d, meal=m) for d, m in {(slot.date, slot.meal) for slot in slots})
         n.write(db, p, wanted)
-    db.commit()
+    db.flush()

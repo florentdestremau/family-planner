@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
-import { api, type Person, type Snapshot } from "./api";
+import { actorHeaders, api, type Person, type Snapshot } from "./api";
 import { buildIndex, type Index } from "./lib";
 import { storage } from "./storage";
 import { toast } from "./toast";
@@ -60,15 +60,19 @@ export function StayProvider({ slug, snap, children }: { slug: string; snap: Sna
       const prefix = opts?.admin ? `/stays/${slug}/admin` : `/stays/${slug}`;
       let result: T | undefined;
       try {
-        result = await api<T>(method, `${prefix}${path}`, body, opts?.admin ? adminKey : null);
+        // `me` plutôt que l'id mémorisé : une personne supprimée ne signe plus rien.
+        result = await api<T>(method, `${prefix}${path}`, body, opts?.admin ? adminKey : null, actorHeaders(me?.id));
       } catch (e) {
         toast(e instanceof Error ? e.message : "Erreur inattendue", "error");
       } finally {
-        await qc.invalidateQueries({ queryKey: ["stay", slug] });
+        await Promise.all([
+          qc.invalidateQueries({ queryKey: ["stay", slug] }),
+          qc.invalidateQueries({ queryKey: ["journal", slug] }),
+        ]);
       }
       return result;
     },
-    [slug, adminKey, qc],
+    [slug, adminKey, me, qc],
   );
 
   const value = useMemo(

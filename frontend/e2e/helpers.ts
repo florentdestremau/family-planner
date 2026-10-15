@@ -58,9 +58,19 @@ export function whoButton(page: Page, name: string) {
   return page.getByRole("button", { name: new RegExp(`^. ${escaped}( Foyer .*)?$`, "u") });
 }
 
+/** Revient au choix « Qui êtes-vous ? » si quelqu'un est déjà désigné sur l'appareil. */
+export async function forgetMe(page: Page) {
+  const picker = page.getByRole("heading", { name: "Qui êtes-vous ?" });
+  const change = page.getByTitle("Changer de personne");
+  await expect(picker.or(change)).toBeVisible();
+  if (await change.isVisible()) await change.click();
+  await expect(picker).toBeVisible();
+}
+
 /** Ouvre le séjour en tant que `name` (identité mémorisée localement). */
 export async function loginAs(page: Page, url: string, name: string) {
   await page.goto(url);
+  await forgetMe(page);
   await whoButton(page, name).click();
   await expect(page.getByRole("heading", { name: `Bonjour ${name}` })).toBeVisible();
 }
@@ -70,11 +80,25 @@ export async function expectNoHorizontalScroll(page: Page) {
   expect(overflow, "défilement horizontal de la page").toBeLessThanOrEqual(0);
 }
 
-/** Ouvre l'espace organisateur par le lien avec clé, et attend que la clé soit mémorisée. */
-export async function openAdmin(page: Page, slug: string, key: string, section?: string) {
+/**
+ * Ouvre l'espace organisateur par le lien avec clé, et attend que la clé soit mémorisée.
+ * L'organisateur se désigne d'abord (journal) : `as`, sinon le premier adulte de la liste, sinon « Orga », ajouté.
+ */
+export async function openAdmin(page: Page, slug: string, key: string, section?: string, as?: string) {
   await page.goto(`/s/${slug}/admin?key=${key}`);
-  await expect(page.getByRole("heading", { name: "Liens de partage" })).toBeVisible();
   await expect(page).toHaveURL(new RegExp(`/s/${slug}/admin$`, "u"));
+  const picker = page.getByRole("heading", { name: "Qui êtes-vous ?" });
+  const links = page.getByRole("heading", { name: "Liens de partage" });
+  await expect(picker.or(links)).toBeVisible();
+  if (await picker.isVisible()) {
+    const existing = as === undefined ? page.locator(".who-pick").first() : whoButton(page, as);
+    if ((await existing.count()) > 0) await existing.click();
+    else {
+      await page.getByPlaceholder("Je ne suis pas dans la liste : mon prénom").fill(as ?? "Orga");
+      await page.getByRole("button", { name: "M'ajouter" }).click();
+    }
+  }
+  await expect(links).toBeVisible();
   if (section) {
     await page.locator(".subtabs").getByRole("link", { name: section }).click();
   }

@@ -785,6 +785,26 @@ legend {
   gap: 0.25rem;
 }
 
+/* Journal d'activité : une phrase par ligne, son moment, et le détail repliable de l'organisateur. */
+.journal-entry {
+  padding: 0.6rem 0;
+  overflow-wrap: anywhere;
+}
+.journal-entry p {
+  margin: 0 0 0.15rem;
+}
+.journal-detail summary {
+  cursor: pointer;
+  color: var(--primary);
+  margin-top: 0.3rem;
+}
+.journal-detail .pre {
+  margin-top: 0.3rem;
+  padding: 0.5rem 0.7rem;
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+}
+
 .chips {
   display: flex;
   flex-wrap: wrap;

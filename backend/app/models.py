@@ -59,6 +59,8 @@ class Household(Base):
 
 class Person(Base):
     __tablename__ = "persons"
+    # Un identifiant n'est jamais redonné : le journal désigne les personnes par leur id, même supprimées.
+    __table_args__ = {"sqlite_autoincrement": True}
 
     id: Mapped[int] = mapped_column(primary_key=True)
     stay_id: Mapped[int] = mapped_column(ForeignKey("stays.id", ondelete="CASCADE"), index=True)
@@ -204,3 +206,24 @@ class AssistantCall(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     stay_id: Mapped[int] = mapped_column(ForeignKey("stays.id", ondelete="CASCADE"))
     created_at: Mapped[datetime] = mapped_column(default=_now)
+
+
+class LogEntry(Base):
+    """Journal d'activité : une modification du séjour, son auteur et sa phrase en français.
+
+    Sans clé étrangère vers les personnes : le journal survit à leur suppression, avec les noms
+    qu'elles portaient au moment de l'action.
+    """
+
+    __tablename__ = "log_entries"
+    __table_args__ = (Index("ix_log_entries_stay_id", "stay_id", "id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    stay_id: Mapped[int] = mapped_column(ForeignKey("stays.id", ondelete="CASCADE"))
+    created_at: Mapped[datetime] = mapped_column(default=_now)
+    actor_id: Mapped[int | None]  # personne désignée sur l'appareil, déclarée par le front
+    actor: Mapped[str] = mapped_column(String(100), default="")  # son nom ; vide : pas d'auteur (création du séjour)
+    via_assistant: Mapped[bool] = mapped_column(default=False)
+    text: Mapped[str] = mapped_column(Text)  # « a retiré Paul du dîner… », sans l'auteur
+    detail: Mapped[str] = mapped_column(Text, default="")  # lignes réservées à l'organisateur
+    subjects: Mapped[str] = mapped_column(Text, default="")  # personnes concernées : « ,3,5, »

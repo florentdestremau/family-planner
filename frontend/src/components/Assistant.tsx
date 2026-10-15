@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { api, ApiError, assistantAsk, assistantStatus, type AssistantAction } from "../api";
+import { actorHeaders, api, ApiError, assistantAsk, assistantStatus, type AssistantAction } from "../api";
 import { actionSummary } from "../lib";
 import { useOnline } from "./Pwa";
 import { useStay } from "../stay";
@@ -101,12 +101,11 @@ export default function AssistantFab() {
   const validate = async (i: number, actions: AssistantAction[]) => {
     settle(i, actions.map((a) => a.person_id));
     try {
-      await api("PUT", `/stays/${slug}/households/${me.household_id}/presences`, {
-        members: actions.map((a) => ({ person_id: a.person_id, slots: a.slots, nights: a.nights_explicit ? a.nights : undefined })),
-      });
+      const members = actions.map((a) => ({ person_id: a.person_id, slots: a.slots, nights: a.nights_explicit ? a.nights : undefined }));
+      await api("PUT", `/stays/${slug}/households/${me.household_id}/presences`, { members }, null, actorHeaders(me.id, "assistant"));
       const names = actions.map((a) => a.name);
       toast(names.length === 1 ? `Présences de ${names[0]} enregistrées` : `Présences enregistrées pour ${names.join(", ")}`);
-      await qc.invalidateQueries({ queryKey: ["stay", slug] });
+      await Promise.all([qc.invalidateQueries({ queryKey: ["stay", slug] }), qc.invalidateQueries({ queryKey: ["journal", slug] })]);
     } catch (e) {
       toast(e instanceof Error ? e.message : "Impossible d'enregistrer les présences.", "error");
       setActions(i, (as) => [...as, ...actions]);

@@ -2,15 +2,15 @@
 
 Les personnes existantes n'ont pas encore d'heure (champs vides).
 
-Revision ID: 0009
-Revises: 0008
+Revision ID: 0010
+Revises: 0009
 """
 
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0009"
-down_revision = "0008"
+revision = "0010"
+down_revision = "0009"
 branch_labels = None
 depends_on = None
 

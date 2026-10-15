@@ -212,6 +212,12 @@ class AssistantIn(In):
         return v
 
 
+class JournalQuery(BaseModel):
+    limit: int = Field(default=50, ge=1, le=200)
+    before: int | None = None  # page suivante : les lignes plus anciennes que celle-ci
+    persons: list[int] = Field(default_factory=list, max_length=50)  # filtre « me concerne », « mon foyer »
+
+
 # --- Sorties -----------------------------------------------------------------
 
 
@@ -405,3 +411,42 @@ class AssistantAction(BaseModel):
 class AssistantOut(BaseModel):
     text: str
     actions: list[AssistantAction]
+
+
+class JournalEntryOut(ORM):
+    id: int
+    created_at: datetime
+    actor: str  # vide : pas d'auteur (création du séjour)
+    actor_id: int | None
+    via_assistant: bool
+    text: str  # la phrase, sans l'auteur : « a retiré Paul… »
+    subjects: list[int]  # personnes concernées
+
+    @field_validator("created_at")
+    @classmethod
+    def _utc(cls, v: datetime) -> datetime:
+        return v.replace(tzinfo=timezone.utc)
+
+    @field_validator("subjects", mode="before")
+    @classmethod
+    def _split_subjects(cls, v: str) -> list[int]:
+        return [int(x) for x in v.split(",") if x]
+
+
+class JournalEntryAdminOut(JournalEntryOut):
+    detail: list[str]  # avant / après des gestes de masse, réservé à l'organisateur
+
+    @field_validator("detail", mode="before")
+    @classmethod
+    def _lines(cls, v: str) -> list[str]:
+        return v.split("\n") if v else []
+
+
+class JournalOut(BaseModel):
+    entries: list[JournalEntryOut]
+    more: bool  # des lignes plus anciennes restent à charger
+
+
+class JournalAdminOut(BaseModel):
+    entries: list[JournalEntryAdminOut]
+    more: bool

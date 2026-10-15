@@ -168,6 +168,29 @@ export interface AssistantReply {
   actions: AssistantAction[];
 }
 
+/** Une modification du séjour, telle que le journal la raconte. */
+export interface JournalEntry {
+  id: number;
+  /** ISO, UTC. */
+  created_at: string;
+  /** Personne désignée sur l'appareil, « l'organisateur » ou « quelqu'un » ; vide : pas d'auteur. */
+  actor: string;
+  actor_id: number | null;
+  via_assistant: boolean;
+  /** La phrase, sans l'auteur : « a retiré Paul… ». */
+  text: string;
+  /** Personnes concernées. */
+  subjects: number[];
+  /** Avant / après des gestes de masse, pour l'organisateur seulement. */
+  detail?: string[];
+}
+
+export interface JournalPage {
+  entries: JournalEntry[];
+  /** Des lignes plus anciennes restent à charger. */
+  more: boolean;
+}
+
 export interface Snapshot {
   stay: Stay;
   days: string[];
@@ -200,12 +223,13 @@ export async function api<T = unknown>(
   path: string,
   body?: unknown,
   adminKey?: string | null,
+  extraHeaders: Record<string, string> = {},
 ): Promise<T> {
   // Hors ligne, l'appli reste consultable (données en cache) mais rien ne s'enregistre.
   if (method !== "GET" && !navigator.onLine) throw new ApiError(0, "Hors ligne : modification impossible.");
   // Un Blob (image) part tel quel, avec son propre type ; le reste en JSON.
   const raw = body instanceof Blob;
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = { ...extraHeaders };
   if (body !== undefined && !raw) headers["Content-Type"] = "application/json";
   if (adminKey) headers["X-Admin-Key"] = adminKey;
   let res: Response;
@@ -239,6 +263,14 @@ function errorMessage(data: unknown): string | undefined {
   if (typeof detail === "string") return detail;
   if (!Array.isArray(detail)) return undefined;
   return detail.map((d: unknown) => (typeof d === "object" && d !== null && "msg" in d && typeof d.msg === "string" ? d.msg : "?")).join(", ");
+}
+
+/** Auteur déclaré d'une modification, pour le journal : la personne choisie sur l'appareil. */
+export function actorHeaders(personId: number | null | undefined, via?: "assistant"): Record<string, string> {
+  const headers: Record<string, string> = {};
+  if (personId != null) headers["X-Actor"] = String(personId);
+  if (via) headers["X-Via"] = via;
+  return headers;
 }
 
 export const assistantStatus = () => api<AssistantStatus>("GET", "/assistant");

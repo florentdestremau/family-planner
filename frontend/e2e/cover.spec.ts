@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { createStay, openAdmin, whoButton } from "./helpers";
+import { createStay, forgetMe, openAdmin, whoButton } from "./helpers";
 
 // PNG 1×1 : déjà petit, il part tel quel.
 const PNG = Buffer.from(
@@ -52,6 +52,7 @@ test("l'organisateur ajoute, voit puis retire l'image de couverture", async ({ p
 
   // En tête du séjour, avant comme après le choix de son nom.
   await page.goto(stay.url);
+  await forgetMe(page); // l'organisateur s'était désigné
   const banner = page.locator("img.stay-cover");
   await expect(banner).toBeVisible();
   await whoButton(page, "Alice").click();

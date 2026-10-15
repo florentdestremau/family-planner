@@ -47,6 +47,8 @@ import {
   toNights,
   toSlots,
   updatedLabel,
+  journalSentence,
+  journalTime,
 } from "./lib";
 import type { TimelineItem } from "./lib";
 import { makeSnapshot } from "./testing";
@@ -686,5 +688,39 @@ describe("heures d'arrivée et de départ", () => {
     expect(timesSpan({ ...alice, arrival_time: "18:30", departure_time: "15:00" })).toBe("18 h 30 → 15 h");
     expect(timesSpan({ ...alice, departure_time: "01:00" })).toBe("? → 1 h (nuit)");
     expect(timesSpan({ ...alice, arrival_time: "00:30" })).toBe("0 h 30 (nuit) → ?");
+  });
+});
+
+const at = (year: number, month: number, day: number, hour: number, minute: number, second = 0) =>
+  new Date(year, month, day, hour, minute, second).toISOString();
+
+describe("journal", () => {
+  const now = new Date(2026, 9, 15, 18, 0);
+
+  it("date chaque ligne simplement, de la plus récente à la plus ancienne", () => {
+    expect(journalTime(at(2026, 9, 15, 17, 59, 40), now)).toBe("à l'instant");
+    expect(journalTime(at(2026, 9, 15, 18, 5), now)).toBe("à l'instant"); // horloge de l'appareil en retard
+    expect(journalTime(at(2026, 9, 15, 17, 48), now)).toBe("il y a 12 min");
+    expect(journalTime(at(2026, 9, 15, 15, 30), now)).toBe("il y a 2 h");
+    expect(journalTime(at(2026, 9, 15, 9, 5), now)).toBe("aujourd'hui à 09:05");
+    expect(journalTime(at(2026, 9, 14, 21, 14), now)).toBe("hier à 21:14");
+    expect(journalTime(at(2026, 9, 13, 8, 0), now)).toBe("mardi à 08:00");
+    expect(journalTime(at(2026, 9, 8, 8, 0), now)).toBe("le 08/10 à 08:00");
+  });
+
+  it("compte les jours du calendrier, même autour d'un changement d'heure", () => {
+    // Passage à l'heure d'hiver le 25/10/2026 en France : la journée dure 25 h.
+    expect(journalTime(at(2026, 9, 24, 23, 30), new Date(2026, 9, 26, 9, 0))).toBe("samedi à 23:30");
+    expect(journalTime(at(2026, 9, 25, 0, 30), new Date(2026, 9, 26, 9, 0))).toBe("hier à 00:30");
+  });
+
+  it("met l'auteur en avant, et la mention de l'assistant", () => {
+    expect(journalSentence({ actor: "Marie", via_assistant: false, text: "a retiré Paul" })).toEqual({ who: "Marie", what: "a retiré Paul" });
+    expect(journalSentence({ actor: "l'organisateur", via_assistant: false, text: "a tiré au sort" })).toEqual({
+      who: "L'organisateur",
+      what: "a tiré au sort",
+    });
+    expect(journalSentence({ actor: "Claire", via_assistant: true, text: "a modifié" })).toEqual({ who: "Claire, via l'assistant,", what: "a modifié" });
+    expect(journalSentence({ actor: "", via_assistant: false, text: "séjour « Noël » créé" })).toEqual({ who: "", what: "Séjour « Noël » créé" });
   });
 });

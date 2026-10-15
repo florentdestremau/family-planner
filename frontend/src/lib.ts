@@ -1,4 +1,4 @@
-import type { Activity, AssistantAction, BedKind, Diet, Meal, Moment, Person, PersonKind, PersonNight, Slot, Snapshot, Stay, StaySummary } from "./api";
+import type { Activity, AssistantAction, BedKind, Diet, JournalEntry, Meal, Moment, Person, PersonKind, PersonNight, Slot, Snapshot, Stay, StaySummary } from "./api";
 
 export const MEALS: Meal[] = ["breakfast", "lunch", "dinner"];
 export const MOMENTS: Moment[] = [...MEALS, "day"];
@@ -254,6 +254,33 @@ export function dayTimeline(activities: Activity[], movements: Movement[]): Time
     item.activity ? (item.activity.start_time ? minutes(item.activity.start_time) : -1) : item.movement.time ? timeOrder(item.movement.time) : UNTIMED;
   const items: TimelineItem[] = [...movements.map((movement) => ({ movement })), ...activities.map((activity) => ({ activity }))];
   return items.toSorted((a, b) => rank(a) - rank(b));
+}
+
+const midnight = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+const capitalized = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+const LONG_WEEKDAYS = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
+const DAY_MS = 24 * 3600 * 1000;
+
+/** Moment d'une ligne du journal : « à l'instant », « il y a 2 h », « hier à 21:14 », « mardi à 09:30 »… */
+export function journalTime(iso: string, now = new Date()): string {
+  const d = new Date(iso);
+  const elapsed = Math.floor((now.getTime() - d.getTime()) / 60_000);
+  if (elapsed < 1) return "à l'instant";
+  if (elapsed < 60) return `il y a ${elapsed} min`;
+  if (elapsed < 6 * 60) return `il y a ${Math.floor(elapsed / 60)} h`;
+  const hour = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  // Arrondi : un changement d'heure donne des journées de 23 ou 25 h.
+  const days = Math.round((midnight(now) - midnight(d)) / DAY_MS);
+  if (days === 0) return `aujourd'hui à ${hour}`;
+  if (days === 1) return `hier à ${hour}`;
+  if (days < 7) return `${LONG_WEEKDAYS[d.getDay()]} à ${hour}`;
+  return updatedLabel(iso, now);
+}
+
+/** Ligne du journal en deux temps : qui (en gras), puis ce qui a été fait. */
+export function journalSentence(entry: Pick<JournalEntry, "actor" | "via_assistant" | "text">): { who: string; what: string } {
+  if (!entry.actor) return { who: "", what: capitalized(entry.text) };
+  return { who: capitalized(entry.actor) + (entry.via_assistant ? ", via l'assistant," : ""), what: entry.text };
 }
 
 /** Morceau de texte, avec sa cible quand c'est un lien ou un numéro de téléphone. */
