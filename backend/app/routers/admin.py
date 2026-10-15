@@ -37,7 +37,7 @@ from ..models import (
 from ..places import is_google_maps_url
 from ..rooms import auto_assign_nights
 from ..slots import MEAL_LABELS, MOMENT_LABELS, short_day, stay_days, stay_nights, stay_slots
-from .public import create_person as add_person
+from . import public
 from .public import validate_dates
 
 router = APIRouter(prefix="/api/stays/{slug}/admin")
@@ -105,7 +105,7 @@ def _clean_period(db: Session, stay: Stay) -> tuple[list[int], list[str]]:
     slots = set(stay_slots(stay.start_date, stay.end_date, stay.first_meal, stay.last_meal))
     days = set(stay_days(stay.start_date, stay.end_date))
     nights = set(stay_nights(stay.start_date, stay.end_date))
-    people = {p.id: p.name for p in db.scalars(select(Person).where(Person.stay_id == stay.id))}
+    people = _names(db, stay)
     lost_slots: dict[int, set] = defaultdict(set)
     lost_nights: dict[int, set] = defaultdict(set)
     for p in db.scalars(select(Presence).where(Presence.person_id.in_(people))):
@@ -194,7 +194,7 @@ def delete_cover(stay: AdminStay, db: DB, actor: AdminActorDep) -> Stay:
 @router.post("/persons", response_model=s.PersonOut, status_code=201)
 def create_person(body: s.PersonCreate, stay: AdminStay, db: DB, actor: AdminActorDep) -> Person:
     """Par défaut, la personne forme son propre foyer (célibataire en un geste)."""
-    return add_person(db, stay, body, actor)
+    return public.create_person(db, stay, body, actor)
 
 
 @router.patch("/persons/{person_id}", response_model=s.PersonOut)
@@ -238,16 +238,16 @@ def set_partner(person_id: int, body: s.PartnerIn, stay: AdminStay, db: DB, acto
     p = person(db, person_id, stay)
     new = person(db, body.partner_id, stay) if body.partner_id is not None else None
     if (new.id if new else None) != p.partner_id:
-        old = [db.get(Person, pid) for pid in dict.fromkeys([p.partner_id, new.partner_id if new else None]) if pid is not None]
+        # Couples défaits : l'ancien de p, et celui que la nouvelle personne formait avec quelqu'un d'autre.
+        undone = [(a, db.get(Person, a.partner_id)) for a in (p, new) if a is not None and a.partner_id is not None]
         h.link_partners(db, p, new)
-        undone = [o for o in old if new is None or o.id != new.id]
         if new is None:
-            text = f"a défait le couple {j.of(p.name)} et {undone[0].name}"
+            text = f"a défait le couple {j.of(p.name)} et {undone[0][1].name}"
         else:
             text = f"a mis {p.name} et {new.name} en couple"
-            if undone:
-                text += f" ; couple avec {j.join(o.name for o in undone)} défait"
-        j.record(db, stay, actor, text, [p.id, *([new.id] if new else []), *(o.id for o in undone)])
+            for a, b in undone:
+                text += f" ; couple {j.of(a.name)} et {b.name} défait"
+        j.record(db, stay, actor, text, [p.id, *([new.id] if new else []), *(b.id for _, b in undone)])
     db.commit()
     return p
 
@@ -265,7 +265,7 @@ def move_person(person_id: int, body: s.MoveIn, stay: AdminStay, db: DB, actor: 
         text = f"a déplacé {p.name} du foyer {j.quoted(old)} vers {target}"
         if partner is not None:
             text += f" ; couple avec {partner.name} défait"
-        j.record(db, stay, actor, text, [p.id])
+        j.record(db, stay, actor, text, [p.id, *([partner.id] if partner else [])])
     db.commit()
     return p
 
@@ -419,7 +419,7 @@ def rooms_auto_assign(stay: AdminStay, db: DB, actor: AdminActorDep) -> dict:
     for x in nights:
         x.bed_id = proposal.get((x.person_id, x.date), x.bed_id)
     if proposal:
-        names = {p.id: p.name for p in people}
+        names = _names(db, stay)
         placed: dict[tuple[int, int], list[date]] = defaultdict(list)
         for (pid, d), bed_id in sorted(proposal.items(), key=lambda kv: (names[kv[0][0]], kv[0][1])):
             placed[(pid, bed_id)].append(d)
@@ -550,6 +550,8 @@ def _record_draw(
     empty: frozenset[int] = frozenset()
     changed = {key: (before.get(key, empty), after.get(key, empty)) for key in before.keys() | after.keys()}
     changed = {key: teams for key, teams in changed.items() if teams[0] != teams[1]}
+    if not changed:  # même tirage, ou rien à tirer : rien à raconter
+        return
     if before:
         text = f"a relancé le tirage des corvées — {len(changed)} {j.plural(len(changed), 'créneau change', 'créneaux changent')} sur {len(after)}"
     else:

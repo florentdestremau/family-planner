@@ -60,7 +60,8 @@ export function StayProvider({ slug, snap, children }: { slug: string; snap: Sna
       const prefix = opts?.admin ? `/stays/${slug}/admin` : `/stays/${slug}`;
       let result: T | undefined;
       try {
-        result = await api<T>(method, `${prefix}${path}`, body, opts?.admin ? adminKey : null, actorHeaders(meId));
+        // `me` plutôt que l'id mémorisé : une personne supprimée ne signe plus rien.
+        result = await api<T>(method, `${prefix}${path}`, body, opts?.admin ? adminKey : null, actorHeaders(me?.id));
       } catch (e) {
         toast(e instanceof Error ? e.message : "Erreur inattendue", "error");
       } finally {
@@ -71,7 +72,7 @@ export function StayProvider({ slug, snap, children }: { slug: string; snap: Sna
       }
       return result;
     },
-    [slug, adminKey, meId, qc],
+    [slug, adminKey, me, qc],
   );
 
   const value = useMemo(

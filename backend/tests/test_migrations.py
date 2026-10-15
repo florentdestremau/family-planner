@@ -118,6 +118,9 @@ def test_legacy_database_is_converted_without_loss(tmp_path) -> None:
     # Lieu et infos pratiques : vides pour les séjours existants.
     assert query(path, "SELECT address, map_url, practical_info, info_updated_at FROM stays") == [("", "", "", None)] * 2
     assert query(path, "PRAGMA foreign_key_check") == []
+    # Personnes en AUTOINCREMENT : l'identifiant de la dernière supprimée n'est jamais redonné.
+    assert "AUTOINCREMENT" in query(path, "SELECT sql FROM sqlite_master WHERE name = 'persons'")[0][0]
+    assert query(path, "SELECT seq FROM sqlite_sequence WHERE name = 'persons'") == [(8,)]
     assert query(path, "SELECT version_num FROM alembic_version") == [("0009",)]
 
 

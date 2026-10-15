@@ -2,6 +2,10 @@
 
 Les séjours existants commencent avec un journal vide : rien n'est reconstitué.
 
+La table des personnes passe en AUTOINCREMENT (recréée, données et identifiants gardés) : sans
+cela, SQLite redonne l'identifiant de la dernière personne supprimée, et le journal (qui désigne
+les personnes par leur id) attribuerait l'histoire de l'une à l'autre.
+
 Revision ID: 0009
 Revises: 0008
 """
@@ -31,6 +35,8 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index("ix_log_entries_stay_id", "log_entries", ["stay_id", "id"])
+    with op.batch_alter_table("persons", recreate="always", table_kwargs={"sqlite_autoincrement": True}):
+        pass
 
 
 def downgrade() -> None:

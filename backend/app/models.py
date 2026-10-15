@@ -59,6 +59,8 @@ class Household(Base):
 
 class Person(Base):
     __tablename__ = "persons"
+    # Un identifiant n'est jamais redonné : le journal désigne les personnes par leur id, même supprimées.
+    __table_args__ = {"sqlite_autoincrement": True}
 
     id: Mapped[int] = mapped_column(primary_key=True)
     stay_id: Mapped[int] = mapped_column(ForeignKey("stays.id", ondelete="CASCADE"), index=True)

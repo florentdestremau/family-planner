@@ -144,7 +144,7 @@ def test_partners(api) -> None:
     assert last(api) == "Anne a mis Anne et Paul en couple"
     unchanged(api, lambda: adm(api, "PUT", f"/persons/{anne}/partner", {"partner_id": paul}, status=200))
     adm(api, "PUT", f"/persons/{jean}/partner", {"partner_id": anne}, actor=anne, status=200)
-    assert last(api) == "Anne a mis Jean et Anne en couple ; couple avec Paul défait"
+    assert last(api) == "Anne a mis Jean et Anne en couple ; couple d'Anne et Paul défait"
     assert sorted(entries(api)[0]["subjects"]) == sorted([anne, paul, jean])
     adm(api, "PUT", f"/persons/{anne}/partner", {"partner_id": None}, actor=anne, status=200)
     assert last(api) == "Anne a défait le couple d'Anne et Jean"
@@ -155,6 +155,7 @@ def test_move_person(api) -> None:
     api.couple(anne, paul)
     adm(api, "PUT", f"/persons/{paul}/household", {"household_id": None}, status=200)
     assert last(api) == "l'organisateur a déplacé Paul du foyer « Anne & Paul » vers un nouveau foyer ; couple avec Anne défait"
+    assert entries(api)[0]["subjects"] == [anne, paul]  # Anne aussi : son couple est défait
     adm(api, "PUT", f"/persons/{paul}/household", {"household_id": api.household_of(anne)}, status=200)
     assert last(api) == "l'organisateur a déplacé Paul du foyer « Paul » vers le foyer « Anne »"
     unchanged(api, lambda: adm(api, "PUT", f"/persons/{paul}/household", {"household_id": api.household_of(anne)}, status=200))
@@ -238,6 +239,24 @@ def test_household_presences_grouped_in_one_sentence(api) -> None:
         "Paul : repas ajouté : sam. 31/10 (petit-déjeuner) ; nuit ajoutée : ven. 30/10"
     )
     assert sorted(entries(api)[0]["subjects"]) == sorted([anne, paul])
+
+
+def test_same_person_twice_is_refused(api) -> None:
+    anne = api.person("Anne")
+    body = {"members": [{"person_id": anne, "slots": SLOTS[:1]}, {"person_id": anne, "slots": []}]}
+    r = pub(api, "PUT", f"/households/{api.household_of(anne)}/presences", body, status=422)
+    assert r.json()["detail"] == "Une même personne apparaît deux fois"
+
+
+def test_person_ids_are_never_reused(api) -> None:
+    """Le journal désigne les personnes par leur id : celui d'une personne supprimée ne revient pas."""
+    api.person("Anne")
+    paul = api.person("Paul")
+    adm(api, "DELETE", f"/persons/{paul}", status=204)
+    lea = api.person("Léa")
+    assert lea > paul
+    mine = api.client.get(f"{api.base}/journal", params={"persons": [lea]}).json()["entries"]
+    assert [e["text"] for e in mine] == ["a ajouté Léa, dans un nouveau foyer"]
 
 
 def test_diets(api) -> None:
@@ -403,6 +422,16 @@ def test_draw_then_redraw(api) -> None:
     # Le tirage est aléatoire : l'autre créneau peut changer aussi.
     assert said(entry) in [f"l'organisateur a relancé le tirage des corvées — {n} sur 2" for n in ("1 créneau change", "2 créneaux changent")]
     assert entry["detail"][0].startswith("Vaisselle ven. 30/10 (dîner) : Anne et Paul → ")
+
+
+def test_draw_without_change_is_not_logged(api) -> None:
+    for chore in api.snap()["chore_types"]:
+        adm(api, "DELETE", f"/chore-types/{chore['id']}", status=204)
+    unchanged(api, lambda: adm(api, "POST", "/chores/draw", status=200))  # rien à tirer
+    adm(api, "POST", "/chore-types", {"name": "Vaisselle", "moments": ["dinner"]}, status=201)
+    api.present(api.person("Anne"))
+    adm(api, "POST", "/chores/draw", status=200)
+    unchanged(api, lambda: adm(api, "POST", "/chores/draw", status=200))  # seule possible : même équipe
 
 
 def test_set_occurrence(api) -> None:

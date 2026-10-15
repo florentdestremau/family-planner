@@ -110,6 +110,8 @@ def merge(db: Session, stay: Stay, source_id: int, into_id: int) -> Household:
 def household_members(db: Session, stay: Stay, household_id: int, body: s.HouseholdPresencesIn) -> list[Member]:
     """Présences d'un foyer, vérifiées sans rien écrire (route du foyer, propositions de l'assistant)."""
     found = household(db, household_id, stay)
+    if len({m.person_id for m in body.members}) < len(body.members):
+        raise HTTPException(422, "Une même personne apparaît deux fois")
     members = []
     for member in body.members:
         p = person(db, member.person_id, stay)

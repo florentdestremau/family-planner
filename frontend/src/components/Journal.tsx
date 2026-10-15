@@ -23,7 +23,8 @@ function useJournal(persons: number[], admin: boolean, pageSize: number) {
     initialPageParam: undefined as number | undefined,
     getNextPageParam: (last) => (last.more ? last.entries.at(-1)?.id : undefined),
     enabled: isOnline,
-    refetchInterval: 30_000,
+    // Seule la première page bouge : on ne la relit que tant qu'on n'en a pas chargé d'autres.
+    refetchInterval: (query) => ((query.state.data?.pages.length ?? 0) > 1 ? false : 30_000),
   });
 }
 
