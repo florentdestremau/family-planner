@@ -204,19 +204,24 @@ export async function api<T = unknown>(
   if (!res.ok) {
     let message = res.statusText;
     try {
-      const data = await res.json();
-      message =
-        typeof data.detail === "string"
-          ? data.detail
-          : Array.isArray(data.detail)
-            ? data.detail.map((d: { msg: string }) => d.msg).join(", ")
-            : message;
+      message = errorMessage(await res.json()) ?? message;
     } catch {
       /* corps non JSON */
     }
     throw new ApiError(res.status, message);
   }
+  // Le serveur est la source de vérité des types : pas de validation à l'exécution.
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion
   return (res.status === 204 ? undefined : await res.json()) as T;
+}
+
+/** Message d'une erreur FastAPI : `detail` en chaîne, ou liste de validations `{ msg }`. */
+function errorMessage(data: unknown): string | undefined {
+  if (typeof data !== "object" || data === null || !("detail" in data)) return undefined;
+  const { detail } = data;
+  if (typeof detail === "string") return detail;
+  if (!Array.isArray(detail)) return undefined;
+  return detail.map((d: unknown) => (typeof d === "object" && d !== null && "msg" in d && typeof d.msg === "string" ? d.msg : "?")).join(", ");
 }
 
 export const assistantStatus = () => api<AssistantStatus>("GET", "/assistant");

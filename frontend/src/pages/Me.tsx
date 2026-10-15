@@ -28,7 +28,7 @@ function Dashboard({ me }: { me: Person }) {
   const household = idx.household(me);
   const householdIds = new Set(household.map((p) => p.id));
 
-  const myChores = snap.chore_assignments.filter((a) => householdIds.has(a.person_id)).sort(sortedMoments);
+  const myChores = snap.chore_assignments.filter((a) => householdIds.has(a.person_id)).toSorted(sortedMoments);
   // Activités où quelqu'un du foyer est inscrit, avec qui y va.
   const myActivities = snap.activities
     .map((a) => ({ activity: a, going: household.filter((p) => idx.signups.has(`${a.id}|${p.id}`)) }))
@@ -148,7 +148,7 @@ function Dashboard({ me }: { me: Person }) {
         </ul>
       </section>
 
-      <button className="btn btn-ghost" onClick={() => setMe(null)}>
+      <button type="button" className="btn btn-ghost" onClick={() => setMe(null)}>
         Je ne suis pas {me.name}
       </button>
     </div>

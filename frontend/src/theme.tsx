@@ -18,9 +18,9 @@ const THEME_ORDER: Theme[] = ["system", "light", "dark"];
 function applyTheme(theme: Theme) {
   const root = document.documentElement;
   if (theme === "system") {
-    root.removeAttribute("data-theme");
+    delete root.dataset.theme;
   } else {
-    root.setAttribute("data-theme", theme);
+    root.dataset.theme = theme;
   }
 }
 
@@ -53,7 +53,7 @@ export function useTheme() {
 export function ThemeToggle() {
   const { cycle, icon, label } = useTheme();
   return (
-    <button className="theme-toggle" onClick={cycle} title={`Thème : ${label} (cliquer pour changer)`} aria-label={`Thème : ${label}`}>
+    <button type="button" className="theme-toggle" onClick={cycle} title={`Thème : ${label} (cliquer pour changer)`} aria-label={`Thème : ${label}`}>
       <span className="theme-toggle-icon">{icon}</span>
     </button>
   );

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { ChoreType, Moment, Snapshot } from "../../api";
 import { AddPersonSelect, Chip, Empty } from "../../components/ui";
-import { dayLabel, type Index, MOMENT_LABEL, MOMENTS, sortedMoments } from "../../lib";
+import { dayLabel, type Index, MOMENT_LABEL, MOMENTS, oneOf, sortedMoments } from "../../lib";
 import { useStay } from "../../stay";
 import { toast } from "../../toast";
 
@@ -30,9 +30,9 @@ function computeOccurrences(snap: Snapshot, idx: Index): Occ[] {
   for (const [key, people] of idx.occurrences) {
     const [choreId, date, moment] = key.split("|");
     const chore = idx.choreById.get(Number(choreId));
-    if (chore) result.set(key, { chore, date, moment: moment as Moment, people });
+    if (chore) result.set(key, { chore, date, moment: oneOf(MOMENTS, moment), people });
   }
-  return [...result.values()].sort((a, b) => sortedMoments(a, b) || a.chore.id - b.chore.id);
+  return [...result.values()].toSorted((a, b) => sortedMoments(a, b) || a.chore.id - b.chore.id);
 }
 
 export default function AdminChores() {
@@ -41,10 +41,10 @@ export default function AdminChores() {
   const unfilled = occurrences.reduce((n, o) => n + Math.max(0, o.chore.people_needed - o.people.length), 0);
   const workers = snap.persons.filter((p) => p.does_chores);
   const load = new Map(workers.map((p) => [p.id, 0]));
-  snap.chore_assignments.forEach((a) => load.set(a.person_id, (load.get(a.person_id) ?? 0) + 1));
+  for (const a of snap.chore_assignments) load.set(a.person_id, (load.get(a.person_id) ?? 0) + 1);
 
   async function drawLots() {
-    if (snap.chore_assignments.length && !confirm("Re-répartir efface toutes les affectations actuelles, y compris les ajustements manuels. Continuer ?"))
+    if (snap.chore_assignments.length > 0 && !confirm("Re-répartir efface toutes les affectations actuelles, y compris les ajustements manuels. Continuer ?"))
       return;
     const r = await call<{ occurrences: number; assigned: number; unfilled: number }>("POST", "/chores/draw", undefined, { admin: true });
     if (r) toast(`${r.assigned} affectations sur ${r.occurrences} créneaux${r.unfilled ? ` — ${r.unfilled} place(s) non pourvue(s)` : ""}`);
@@ -57,20 +57,20 @@ export default function AdminChores() {
       <section className="card">
         <div className="card-head">
           <h2>Tirage au sort</h2>
-          <button className="btn btn-primary" onClick={drawLots} disabled={!snap.presences.length}>
-            🎲 {snap.chore_assignments.length ? "Re-répartir" : "Tirer au sort"}
+          <button type="button" className="btn btn-primary" onClick={() => void drawLots()} disabled={snap.presences.length === 0}>
+            🎲 {snap.chore_assignments.length > 0 ? "Re-répartir" : "Tirer au sort"}
           </button>
         </div>
         <p className="hint">
           Seules les personnes « Corvées » présentes au créneau sont tirées. Charge équilibrée selon le temps de présence
           {snap.stay.separate_couples ? ", couples séparés" : ""}. Ajustez ensuite chaque créneau à la main.
         </p>
-        {!snap.presences.length && <p className="warn small">Personne n'a encore déclaré sa présence.</p>}
+        {snap.presences.length === 0 && <p className="warn small">Personne n'a encore déclaré sa présence.</p>}
         {unfilled > 0 && snap.chore_assignments.length > 0 && <p className="warn small">{unfilled} place(s) non pourvue(s).</p>}
         {snap.chore_assignments.length > 0 && (
           <div className="chips load">
             {workers
-              .sort((a, b) => (load.get(b.id) ?? 0) - (load.get(a.id) ?? 0))
+              .toSorted((a, b) => (load.get(b.id) ?? 0) - (load.get(a.id) ?? 0))
               .map((p) => (
                 <span key={p.id} className="chip">
                   {p.name} <strong>{load.get(p.id)}</strong>
@@ -85,7 +85,7 @@ export default function AdminChores() {
       ) : (
         snap.days.map((day) => {
           const dayOccs = occurrences.filter((o) => o.date === day);
-          if (!dayOccs.length) return null;
+          if (dayOccs.length === 0) return null;
           return (
             <section key={day} className="card">
               <h2>{dayLabel(day, true)}</h2>
@@ -112,7 +112,7 @@ function OccurrenceRow({ occ }: { occ: Occ }) {
   // Les mieux placés d'abord : pas de conjoint déjà sur ce créneau, puis les moins chargés.
   const candidates = snap.persons
     .filter((p) => !occ.people.includes(p.id) && present(p.id) && p.does_chores)
-    .sort((a, b) => Number(conflict(a.id)) - Number(conflict(b.id)) || load(a.id) - load(b.id) || a.name.localeCompare(b.name));
+    .toSorted((a, b) => Number(conflict(a.id)) - Number(conflict(b.id)) || load(a.id) - load(b.id) || a.name.localeCompare(b.name));
   const missing = occ.chore.people_needed - occ.people.length;
   const partners = occ.people.some((id) => occ.people.includes(idx.personById.get(id)?.partner_id ?? -1));
 
@@ -125,17 +125,19 @@ function OccurrenceRow({ occ }: { occ: Occ }) {
       </div>
       <div className="chips">
         {occ.people.map((id) => (
-          <Chip key={id} person={idx.personById.get(id)} onRemove={() => set(occ.people.filter((x) => x !== id))} />
+          <Chip key={id} person={idx.personById.get(id)} onRemove={() => void set(occ.people.filter((x) => x !== id))} />
         ))}
         <AddPersonSelect
           people={candidates}
-          onPick={(id) => set([...occ.people, id])}
+          onPick={(id) => void set([...occ.people, id])}
           hint={(p) => `${load(p.id)} corvée${load(p.id) > 1 ? "s" : ""}${conflict(p.id) ? " · ♥ en couple avec un inscrit" : ""}`}
         />
       </div>
     </li>
   );
 }
+
+const rhythm = (c: { every_n_days: number }) => (c.every_n_days === 1 ? "tous les jours" : `tous les ${c.every_n_days} jours`);
 
 function ChoreTypes() {
   const { snap, call } = useStay();
@@ -148,32 +150,31 @@ function ChoreTypes() {
     setForm(chore ? { name: chore.name, moments: chore.moments, people_needed: chore.people_needed, every_n_days: chore.every_n_days } : empty);
   };
 
-  async function save(e: React.FormEvent) {
+  async function save(e: React.SubmitEvent) {
     e.preventDefault();
     const ok =
       editing === "new"
         ? await call("POST", "/chore-types", form, { admin: true })
         : await call("PATCH", `/chore-types/${editing}`, form, { admin: true });
-    if (ok) setEditing(null);
+    if (ok !== undefined) setEditing(null);
   }
 
   const toggleMoment = (m: Moment) =>
     setForm({ ...form, moments: form.moments.includes(m) ? form.moments.filter((x) => x !== m) : [...form.moments, m] });
 
-  const rhythm = (c: { every_n_days: number }) => (c.every_n_days === 1 ? "tous les jours" : `tous les ${c.every_n_days} jours`);
 
   return (
     <section className="card">
       <div className="card-head">
         <h2>Types de corvées</h2>
         {editing === null && (
-          <button className="btn btn-small" onClick={() => start()}>
+          <button type="button" className="btn btn-small" onClick={() => start()}>
             + Corvée
           </button>
         )}
       </div>
       {editing !== null && (
-        <form className="form chore-form" onSubmit={save}>
+        <form className="form chore-form" onSubmit={(e) => void save(e)}>
           <label>
             Nom
             <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required placeholder="Vaisselle" />
@@ -200,7 +201,7 @@ function ChoreTypes() {
             </label>
           </div>
           <div className="actions">
-            <button className="btn btn-primary" disabled={!form.moments.length}>
+            <button type="submit" className="btn btn-primary" disabled={form.moments.length === 0}>
               Enregistrer
             </button>
             <button type="button" className="btn btn-ghost" onClick={() => setEditing(null)}>
@@ -219,12 +220,15 @@ function ChoreTypes() {
               </div>
             </div>
             <div className="actions">
-              <button className="btn btn-small btn-ghost" onClick={() => start(c)}>
+              <button type="button" className="btn btn-small btn-ghost" onClick={() => start(c)}>
                 Modifier
               </button>
               <button
+                type="button"
                 className="btn btn-small btn-danger"
-                onClick={() => confirm(`Supprimer « ${c.name} » et ses affectations ?`) && call("DELETE", `/chore-types/${c.id}`, undefined, { admin: true })}
+                onClick={() => {
+                  if (confirm(`Supprimer « ${c.name} » et ses affectations ?`)) void call("DELETE", `/chore-types/${c.id}`, undefined, { admin: true });
+                }}
               >
                 ×
               </button>

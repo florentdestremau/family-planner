@@ -21,7 +21,7 @@ export function Chip({
       {person.name}
       {note && <span className="chip-note"> {note}</span>}
       {onRemove && (
-        <button className="chip-x" onClick={onRemove} aria-label={`Retirer ${person.name}`}>
+        <button type="button" className="chip-x" onClick={onRemove} aria-label={`Retirer ${person.name}`}>
           ×
         </button>
       )}
@@ -55,20 +55,17 @@ export function Toggle({
 
 export function CopyButton({ text, label = "Copier" }: { text: string; label?: string }) {
   const [done, setDone] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setDone(true);
+      setTimeout(() => setDone(false), 1500);
+    } catch {
+      toast("Copie impossible : sélectionnez le texte manuellement", "error");
+    }
+  };
   return (
-    <button
-      type="button"
-      className="btn btn-small"
-      onClick={async () => {
-        try {
-          await navigator.clipboard.writeText(text);
-          setDone(true);
-          setTimeout(() => setDone(false), 1500);
-        } catch {
-          toast("Copie impossible : sélectionnez le texte manuellement", "error");
-        }
-      }}
-    >
+    <button type="button" className="btn btn-small" onClick={() => void copy()}>
       {done ? "Copié ✓" : label}
     </button>
   );
@@ -104,7 +101,7 @@ export function AddPersonSelect({
   /** Précision affichée après le nom (charge, conflit…). */
   hint?: (p: Person) => string;
 }) {
-  if (!people.length) return null;
+  if (people.length === 0) return null;
   return (
     <select
       className="add-select"

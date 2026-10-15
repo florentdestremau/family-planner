@@ -23,7 +23,7 @@ export default function Print() {
         <Link to={`/s/${slug}/imprimer`} className="btn btn-ghost">
           ← Retour
         </Link>
-        <button className="btn btn-primary" onClick={() => window.print()}>
+        <button type="button" className="btn btn-primary" onClick={() => window.print()}>
           🖨 Imprimer
         </button>
       </div>
@@ -55,7 +55,7 @@ function ChoresPrint() {
             <ul className="compact">
               {snap.chore_assignments
                 .filter((a) => a.person_id === p.id)
-                .sort(sortedMoments)
+                .toSorted(sortedMoments)
                 .map((a, i) => (
                   <li key={i}>
                     ☐ {dayLabel(a.date)} · {MOMENT_LABEL[a.moment]} — <strong>{idx.choreById.get(a.chore_type_id)?.name}</strong>
@@ -171,7 +171,7 @@ function ActivitiesPrint() {
     <>
       {snap.days.map((day) => {
         const activities = snap.activities.filter((a) => a.date === day);
-        if (!activities.length) return null;
+        if (activities.length === 0) return null;
         return (
           <section key={day} className="print-block">
             <h2>{dayLabel(day, true)}</h2>

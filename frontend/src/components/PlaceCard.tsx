@@ -18,9 +18,9 @@ export default function PlaceCard() {
   // Repris du serveur seulement quand le lieu change : un autre formulaire enregistré ne vide pas la saisie en cours.
   useEffect(() => setForm({ address, map_url, practical_info }), [address, map_url, practical_info]);
 
-  async function save(e: React.FormEvent) {
+  async function save(e: React.SubmitEvent) {
     e.preventDefault();
-    if (await call("PATCH", "/stay", form, { admin: true })) toast("Infos pratiques enregistrées 📍");
+    if ((await call("PATCH", "/stay", form, { admin: true })) !== undefined) toast("Infos pratiques enregistrées 📍");
   }
 
   return (
@@ -29,7 +29,7 @@ export default function PlaceCard() {
       <p className="hint">
         ⚠️ Visible par toute personne qui ouvre l'application. N'y mettez pas un code que vous ne donneriez pas à un inconnu.
       </p>
-      <form className="form" onSubmit={save}>
+      <form className="form" onSubmit={(e) => void save(e)}>
         <label>
           Adresse
           <input
@@ -63,7 +63,7 @@ export default function PlaceCard() {
             Les liens et les numéros de téléphone deviennent cliquables. {form.practical_info.length} / {MAX_PRACTICAL_INFO}
           </span>
         </label>
-        <button className="btn btn-primary">Enregistrer</button>
+        <button type="submit" className="btn btn-primary">Enregistrer</button>
       </form>
     </section>
   );

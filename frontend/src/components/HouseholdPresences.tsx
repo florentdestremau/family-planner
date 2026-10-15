@@ -25,6 +25,7 @@ export default function HouseholdPresences({ me }: { me: Person }) {
   // pendant nos propres enregistrements.
   useEffect(() => {
     if (!queue.current.running) setState(fromServer());
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- seules les données du foyer déclenchent la resynchronisation
   }, [snap.presences, snap.person_nights, memberIds]);
 
   async function flush() {
@@ -34,6 +35,7 @@ export default function HouseholdPresences({ me }: { me: Person }) {
     while (q.next) {
       const next = q.next;
       q.next = null;
+      // oxlint-disable-next-line no-await-in-loop -- un seul envoi à la fois, c'est le rôle de la file
       await call("PUT", `/households/${me.household_id}/presences`, {
         members: [...next].map(([person_id, keys]) => ({ person_id, slots: toSlots(snap, keys), nights: toNights(snap, keys) })),
       });

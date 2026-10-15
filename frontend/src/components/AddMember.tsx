@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { Person, PersonKind } from "../api";
+import { oneOf, PERSON_KINDS } from "../lib";
 import { useStay } from "../stay";
 import { DietInvite } from "./Diets";
 
@@ -18,7 +19,7 @@ export default function AddMember({ householdId, admin = false }: { householdId:
   const [couple, setCouple] = useState(true);
   const [added, setAdded] = useState<Person | undefined>();
 
-  async function submit(e: React.FormEvent) {
+  async function submit(e: React.SubmitEvent) {
     e.preventDefault();
     const body = {
       name: name.trim(),
@@ -36,14 +37,14 @@ export default function AddMember({ householdId, admin = false }: { householdId:
 
   return (
     <>
-      <form onSubmit={submit} className="add-member">
+      <form onSubmit={(e) => void submit(e)} className="add-member">
         <div className="inline-form wrap">
           <input placeholder="Prénom" value={name} onChange={(e) => setName(e.target.value)} required aria-label="Prénom du nouveau membre" />
-          <select value={kind} onChange={(e) => setKind(e.target.value as PersonKind)} aria-label="Adulte ou enfant">
+          <select value={kind} onChange={(e) => setKind(oneOf(PERSON_KINDS, e.target.value))} aria-label="Adulte ou enfant">
             <option value="adult">Adulte</option>
             <option value="child">Enfant</option>
           </select>
-          <button className="btn">Ajouter au foyer</button>
+          <button type="submit" className="btn">Ajouter au foyer</button>
         </div>
         {kind === "adult" && partner && (
           <label className="check small">

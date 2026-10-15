@@ -1,5 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-import { createStay, loginAs } from "./helpers";
+import { createStay, json, loginAs } from "./helpers";
 
 /** Attend que l'interface soit en cache (service worker actif) et que les données soient sauvegardées. */
 async function readyForOffline(page: Page, slug?: string) {
@@ -12,12 +12,12 @@ async function readyForOffline(page: Page, slug?: string) {
 test("l'appli est installable : manifest, icônes, service worker", async ({ page, request }) => {
   await page.goto("/");
   const href = await page.locator('link[rel="manifest"]').getAttribute("href");
-  const res = await request.get(href!);
+  const res = await request.get(href ?? "");
   expect(res.headers()["content-type"]).toBe("application/manifest+json");
-  const manifest = await res.json();
+  const manifest = await json<{ icons: { src: string; purpose?: string }[] }>(res);
   expect(manifest).toMatchObject({ name: "Week-end en famille", display: "standalone", start_url: "/" });
   for (const icon of manifest.icons) expect((await request.get(icon.src)).ok(), icon.src).toBeTruthy();
-  expect(manifest.icons.some((i: { purpose?: string }) => i.purpose === "maskable")).toBe(true);
+  expect(manifest.icons.some((i) => i.purpose === "maskable")).toBe(true);
 
   await expect.poll(() => page.evaluate(async () => (await navigator.serviceWorker.ready).active?.state)).toBe("activated");
 });
@@ -34,7 +34,7 @@ test("hors ligne, un séjour déjà ouvert reste consultable, sans modification 
   await context.setOffline(true);
   await page.reload();
   await expect(page.getByRole("heading", { name: "Bonjour Alice" })).toBeVisible();
-  await expect(page.getByText(/Hors ligne · données à \d\d:\d\d · consultation seule/)).toBeVisible();
+  await expect(page.getByText(/Hors ligne · données à \d\d:\d\d · consultation seule/u)).toBeVisible();
   await expect(page.getByText("6 repas sur 6")).toBeVisible();
   await expect(page.getByRole("button", { name: "Aucun" })).toBeDisabled();
   await expect(page.getByLabel("Nom du foyer")).toBeDisabled();
@@ -49,7 +49,7 @@ test("hors ligne, un séjour déjà ouvert reste consultable, sans modification 
   // Retour du réseau : bandeau retiré, modifications possibles.
   await context.setOffline(false);
   await page.getByRole("link", { name: "Moi" }).click();
-  await expect(page.getByText(/Hors ligne/)).toHaveCount(0);
+  await expect(page.getByText(/Hors ligne/u)).toHaveCount(0);
   await page.getByRole("button", { name: "Aucun" }).click();
   await expect(page.getByText("Aucune présence déclarée")).toBeVisible();
   await expect.poll(async () => (await stay.snap()).presences.length).toBe(0);
@@ -57,13 +57,13 @@ test("hors ligne, un séjour déjà ouvert reste consultable, sans modification 
 
 test("hors ligne, l'accueil garde la liste et ne crée pas de séjour", async ({ page, context }) => {
   await page.goto("/");
-  await expect(page.getByRole("link", { name: /Grand week-end chez Mamie/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Grand week-end chez Mamie/u })).toBeVisible();
   await readyForOffline(page);
 
   await context.setOffline(true);
   await page.reload();
-  await expect(page.getByRole("link", { name: /Grand week-end chez Mamie/ })).toBeVisible();
-  await expect(page.getByText(/Hors ligne · données/)).toBeVisible();
+  await expect(page.getByRole("link", { name: /Grand week-end chez Mamie/u })).toBeVisible();
+  await expect(page.getByText(/Hors ligne · données/u)).toBeVisible();
   await expect(page.getByRole("button", { name: "Créer le séjour" })).toBeDisabled();
 
   // Un séjour jamais ouvert sur cet appareil n'est pas disponible.
@@ -76,7 +76,10 @@ test("bouton « Installer l'appli » : rejoue l'invite du navigateur", async ({ 
   await expect(page.getByRole("heading", { name: "Week-end en famille" })).toBeVisible();
   await page.evaluate(() => {
     const e = new Event("beforeinstallprompt", { cancelable: true }) as Event & Record<string, unknown>;
-    e.prompt = async () => void ((window as unknown as Record<string, boolean>).prompted = true);
+    e.prompt = () => {
+      (window as unknown as Record<string, boolean>).prompted = true;
+      return Promise.resolve();
+    };
     e.userChoice = Promise.resolve({ outcome: "accepted" });
     window.dispatchEvent(e);
   });
@@ -103,7 +106,10 @@ test.describe("sur iPhone", () => {
 async function fakeInstallPrompt(page: Page) {
   await page.evaluate(() => {
     const e = new Event("beforeinstallprompt", { cancelable: true }) as Event & Record<string, unknown>;
-    e.prompt = async () => void ((window as unknown as Record<string, boolean>).prompted = true);
+    e.prompt = () => {
+      (window as unknown as Record<string, boolean>).prompted = true;
+      return Promise.resolve();
+    };
     e.userChoice = Promise.resolve({ outcome: "accepted" });
     window.dispatchEvent(e);
   });
@@ -113,7 +119,7 @@ async function fakeInstallPrompt(page: Page) {
 async function browseThreePages(page: Page, { beforeLast, prompt = true }: { beforeLast?: () => Promise<void>; prompt?: boolean } = {}) {
   await page.goto("/");
   if (prompt) await fakeInstallPrompt(page);
-  await page.getByRole("link", { name: /Grand week-end chez Mamie/ }).click();
+  await page.getByRole("link", { name: /Grand week-end chez Mamie/u }).click();
   await expect(page.getByRole("heading", { name: "Qui êtes-vous ?" })).toBeVisible();
   await beforeLast?.();
   await page.getByRole("link", { name: "Repas" }).click();
@@ -132,7 +138,7 @@ test("suggestion d'installation : sur mobile, à la 3ᵉ page, « Plus tard » e
   await page.reload();
   await fakeInstallPrompt(page);
   await page.getByRole("link", { name: "Activités" }).click();
-  await expect(page.getByRole("heading", { name: /Activités|Planning/ }).first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Activités|Planning/u }).first()).toBeVisible();
   await expect(nudge(page)).toHaveCount(0);
 });
 

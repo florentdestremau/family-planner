@@ -2,37 +2,39 @@ import { describe, expect, it } from "vitest";
 import type { Slot } from "./api";
 import {
   actionSummary,
-  followMeals,
-  nightKey,
-  nightsLabel,
-  toNights,
   addDays,
-  groupStays,
-  shortRange,
-  sameSets,
-  slotShortLabel,
-  slotsOf,
-  toSlots,
   buildIndex,
   countLabel,
-  DIETS,
+  coverThumbUrl,
+  coverUrl,
+  dayLabel,
   dietCountLabel,
   dietGroups,
   dietIcon,
   dietLabel,
+  DIETS,
+  followMeals,
+  groupStays,
   hasDiet,
-  toggleDiet,
-  coverThumbUrl,
-  coverUrl,
-  dayLabel,
+  linkify,
   llmExport,
+  mapLink,
+  MEALS,
+  nightKey,
+  nightsLabel,
   occurrenceKey,
+  oneOf,
   presenceKey,
   rangeLabel,
+  sameSets,
+  shortRange,
+  slotShortLabel,
+  slotsOf,
   sortedMoments,
+  toggleDiet,
   toIso,
-  linkify,
-  mapLink,
+  toNights,
+  toSlots,
   updatedLabel,
 } from "./lib";
 import { makeSnapshot } from "./testing";
@@ -68,7 +70,7 @@ describe("clés et tri", () => {
       { date: "2026-10-30", moment: "dinner" as const },
       { date: "2026-10-31", moment: "dinner" as const },
     ];
-    expect([...items].sort(sortedMoments)).toEqual([
+    expect(items.toSorted(sortedMoments)).toEqual([
       { date: "2026-10-30", moment: "dinner" },
       { date: "2026-10-31", moment: "breakfast" },
       { date: "2026-10-31", moment: "dinner" },
@@ -102,7 +104,7 @@ describe("buildIndex", () => {
     expect(idx.name(1)).toBe("Alice");
     expect(idx.name(999)).toBe("?");
     expect(idx.name(null)).toBe("");
-    expect(idx.name(undefined)).toBe("");
+    expect(idx.name()).toBe("");
   });
 
   it("présences par repas et par jour", () => {
@@ -128,7 +130,7 @@ describe("buildIndex", () => {
   });
 
   it("foyer : soi-même d'abord, puis les adultes, puis les enfants", () => {
-    expect(idx.household(undefined)).toEqual([]);
+    expect(idx.household()).toEqual([]);
     expect(idx.household(snap.persons[0]).map((p) => p.name)).toEqual(["Alice", "Bob", "Léo"]);
     expect(idx.household(snap.persons[2]).map((p) => p.name)).toEqual(["Léo", "Alice", "Bob"]);
     expect(idx.members(50).map((p) => p.name)).toEqual(["Alice", "Bob", "Léo"]);
@@ -274,7 +276,7 @@ describe("nuits", () => {
   const SUN_BREAKFAST = "2026-11-01|breakfast";
   const FRI = nightKey("2026-10-30");
   const SAT = nightKey("2026-10-31");
-  const follow = (before: string[], after: string[]) => [...followMeals(nights, new Set(before), new Set(after))].sort();
+  const follow = (before: string[], after: string[]) => [...followMeals(nights, new Set(before), new Set(after))].toSorted();
 
   it("libelle les nuits", () => {
     expect(FRI).toBe("2026-10-30|night");
@@ -285,7 +287,7 @@ describe("nuits", () => {
   });
 
   it("coche la nuit quand le dîner et le petit-déj du lendemain sont là", () => {
-    expect(follow([FRI_DINNER], [FRI_DINNER, SAT_BREAKFAST])).toEqual([FRI_DINNER, FRI, SAT_BREAKFAST].sort());
+    expect(follow([FRI_DINNER], [FRI_DINNER, SAT_BREAKFAST])).toEqual([FRI_DINNER, FRI, SAT_BREAKFAST].toSorted());
   });
 
   it("décoche la nuit quand ni l'un ni l'autre ne sont là", () => {
@@ -294,17 +296,17 @@ describe("nuits", () => {
 
   it("garde la nuit quand un seul repas l'encadre (arrivée après le dîner, nuit ailleurs)", () => {
     // Cas 1 : tout le séjour, puis plus de dîner vendredi.
-    expect(follow([FRI_DINNER, SAT_BREAKFAST, FRI], [SAT_BREAKFAST, FRI])).toEqual([FRI, SAT_BREAKFAST].sort());
+    expect(follow([FRI_DINNER, SAT_BREAKFAST, FRI], [SAT_BREAKFAST, FRI])).toEqual([FRI, SAT_BREAKFAST].toSorted());
     // Cas 2 : plus de dîner samedi, la nuit du samedi reste à décocher à la main.
-    expect(follow([SAT_DINNER, SUN_BREAKFAST, SAT], [SUN_BREAKFAST, SAT])).toEqual([SAT, SUN_BREAKFAST].sort());
-    expect(follow([SUN_BREAKFAST], [SAT_DINNER, SUN_BREAKFAST])).toEqual([SAT, SAT_DINNER, SUN_BREAKFAST].sort());
+    expect(follow([SAT_DINNER, SUN_BREAKFAST, SAT], [SUN_BREAKFAST, SAT])).toEqual([SAT, SUN_BREAKFAST].toSorted());
+    expect(follow([SUN_BREAKFAST], [SAT_DINNER, SUN_BREAKFAST])).toEqual([SAT, SAT_DINNER, SUN_BREAKFAST].toSorted());
   });
 
   it("ne touche pas aux nuits dont les repas voisins n'ont pas changé", () => {
     expect(follow([FRI_DINNER, SAT_BREAKFAST], [FRI_DINNER, SAT_BREAKFAST, SAT_LUNCH])).toEqual(
-      [FRI_DINNER, SAT_BREAKFAST, SAT_LUNCH].sort(),
+      [FRI_DINNER, SAT_BREAKFAST, SAT_LUNCH].toSorted(),
     );
-    expect(follow([SAT], [SAT, SAT_LUNCH])).toEqual([SAT, SAT_LUNCH].sort());
+    expect(follow([SAT], [SAT, SAT_LUNCH])).toEqual([SAT, SAT_LUNCH].toSorted());
   });
 });
 
@@ -367,8 +369,9 @@ describe("couchages", () => {
   });
 });
 
+const stay = (name: string, start_date: string, end_date: string) => ({ slug: name, name, start_date, end_date, cover_version: null, households: 0, persons: 0 });
+
 describe("groupStays", () => {
-  const stay = (name: string, start_date: string, end_date: string) => ({ slug: name, name, start_date, end_date, cover_version: null, households: 0, persons: 0 });
   it("sépare en cours, à venir et passés", () => {
     const stays = [
       stay("Noël", "2026-12-24", "2026-12-26"),
@@ -398,8 +401,9 @@ describe("couverture", () => {
   });
 });
 
+const action = (name: string, slots: Slot[], nights: string[] = []) => ({ person_id: 1, name, slots, nights, nights_explicit: false });
+
 describe("résumés de l'assistant", () => {
-  const action = (name: string, slots: Slot[], nights: string[] = []) => ({ person_id: 1, name, slots, nights, nights_explicit: false });
 
   it("formate un créneau court", () => {
     expect(slotShortLabel({ date: "2026-10-30", meal: "dinner" })).toBe("ven. dîner");
@@ -507,5 +511,12 @@ describe("lieu et infos pratiques", () => {
     expect(linkify("Code 120612345678")).toEqual([{ text: "Code 120612345678" }]);
     expect(linkify("06123456789")).toEqual([{ text: "06123456789" }]);
     expect(linkify("++0612345678")).toEqual([{ text: "++0612345678" }]);
+  });
+});
+
+describe("oneOf", () => {
+  it("type la valeur d'un <select>, et refuse une valeur hors liste", () => {
+    expect(oneOf(MEALS, "lunch")).toBe("lunch");
+    expect(() => oneOf(MEALS, "brunch")).toThrow("Valeur inattendue : brunch");
   });
 });

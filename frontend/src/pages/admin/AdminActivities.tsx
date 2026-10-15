@@ -19,7 +19,7 @@ export default function AdminActivities() {
     setForm(a ? { ...a, invite_all: false } : empty);
   };
 
-  async function save(e: React.FormEvent) {
+  async function save(e: React.SubmitEvent) {
     e.preventDefault();
     const { invite_all, ...fields } = form;
     const body = { ...fields, id: undefined };
@@ -27,7 +27,7 @@ export default function AdminActivities() {
       editing === "new"
         ? await call("POST", "/activities", { ...body, invite_all }, { admin: true })
         : await call("PATCH", `/activities/${editing}`, body, { admin: true });
-    if (ok) setEditing(null);
+    if (ok !== undefined) setEditing(null);
   }
 
   async function inviteAll(a: Activity) {
@@ -48,7 +48,7 @@ export default function AdminActivities() {
         <div className="card-head">
           <h2>Planning des activités</h2>
           {editing === null && (
-            <button className="btn btn-small" onClick={() => start()}>
+            <button type="button" className="btn btn-small" onClick={() => start()}>
               + Activité
             </button>
           )}
@@ -58,7 +58,7 @@ export default function AdminActivities() {
           jour-là ; chacun peut ensuite se retirer.
         </p>
         {editing !== null && (
-          <form className="form" onSubmit={save}>
+          <form className="form" onSubmit={(e) => void save(e)}>
             <label>
               Nom
               <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required placeholder="Rando au lac" />
@@ -99,7 +99,7 @@ export default function AdminActivities() {
               />
             )}
             <div className="actions">
-              <button className="btn btn-primary">Enregistrer</button>
+              <button type="submit" className="btn btn-primary">Enregistrer</button>
               <button type="button" className="btn btn-ghost" onClick={() => setEditing(null)}>
                 Annuler
               </button>
@@ -131,23 +131,24 @@ export default function AdminActivities() {
                       </summary>
                       <div className="chips">
                         {participants.map((p) => (
-                          <Chip key={p.id} person={p} onRemove={() => call("DELETE", `/activities/${a.id}/signups/${p.id}`)} />
+                          <Chip key={p.id} person={p} onRemove={() => void call("DELETE", `/activities/${a.id}/signups/${p.id}`)} />
                         ))}
                       </div>
                     </details>
                   </div>
                   <div className="actions">
-                    <button className="btn btn-small" onClick={() => inviteAll(a)}>
+                    <button type="button" className="btn btn-small" onClick={() => void inviteAll(a)}>
                       Inscrire tout le monde
                     </button>
-                    <button className="btn btn-small btn-ghost" onClick={() => start(a)}>
+                    <button type="button" className="btn btn-small btn-ghost" onClick={() => start(a)}>
                       Modifier
                     </button>
                     <button
+                      type="button"
                       className="btn btn-small btn-danger"
-                      onClick={() =>
-                        confirm(`Supprimer « ${a.name} » ?`) && call("DELETE", `/activities/${a.id}`, undefined, { admin: true })
-                      }
+                      onClick={() => {
+                        if (confirm(`Supprimer « ${a.name} » ?`)) void call("DELETE", `/activities/${a.id}`, undefined, { admin: true });
+                      }}
                     >
                       ×
                     </button>

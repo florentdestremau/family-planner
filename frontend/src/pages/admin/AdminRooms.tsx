@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { AutoAssignResult, BedAssignResult, BedKind, Person, Room } from "../../api";
 import { AddPersonSelect, Chip } from "../../components/ui";
-import { BED_LABEL, BED_PLACES, dayLabel } from "../../lib";
+import { BED_KINDS, BED_LABEL, BED_PLACES, dayLabel, oneOf } from "../../lib";
 import { useStay } from "../../stay";
 import { toast } from "../../toast";
 
@@ -29,17 +29,17 @@ export default function AdminRooms() {
   const placed = nights.filter((n) => n.bed_id !== null).length;
   const capacity = snap.rooms.reduce((n, r) => n + r.beds.reduce((m, b) => m + BED_PLACES[b.kind], 0), 0);
 
-  async function addRoom(e: React.FormEvent) {
+  async function addRoom(e: React.SubmitEvent) {
     e.preventDefault();
-    if (await call("POST", "/rooms", { name: name.trim() }, { admin: true })) setName("");
+    if ((await call("POST", "/rooms", { name: name.trim() }, { admin: true })) !== undefined) setName("");
   }
 
   async function autoAssign() {
     const r = await call<AutoAssignResult>("POST", "/rooms/auto-assign", undefined, { admin: true });
     if (r) {
       const left = r.unassigned ? `, ${r.unassigned} encore sans lit` : "";
-      const undeclared = r.undeclared ? ` ; ${r.undeclared} personne(s) sans nuit déclarée, pas couchée(s)` : "";
-      toast(`${r.assigned} nuitée(s) attribuée(s)${left}${undeclared}`, r.undeclared ? "warn" : "ok");
+      const noNights = r.undeclared ? ` ; ${r.undeclared} personne(s) sans nuit déclarée, pas couchée(s)` : "";
+      toast(`${r.assigned} nuitée(s) attribuée(s)${left}${noNights}`, r.undeclared ? "warn" : "ok");
     }
   }
 
@@ -54,11 +54,11 @@ export default function AdminRooms() {
         </div>
         {snap.nights.length > 1 && (
           <div className="segmented night-picker" role="group" aria-label="Nuit">
-            <button className={night === null ? "on" : ""} onClick={() => setNight(null)}>
+            <button type="button" className={night === null ? "on" : ""} onClick={() => setNight(null)}>
               Toutes les nuits
             </button>
             {snap.nights.map((d) => (
-              <button key={d} className={night === d ? "on" : ""} onClick={() => setNight(d)}>
+              <button type="button" key={d} className={night === d ? "on" : ""} onClick={() => setNight(d)}>
                 🌙 {dayLabel(d)}
               </button>
             ))}
@@ -68,9 +68,9 @@ export default function AdminRooms() {
           <>
             <p className="small">
               <strong>Sans lit{night ? " cette nuit" : ""} :</strong>{" "}
-              {unbedded.map(({ person, nights }) => person.name + (night ? "" : idx.nightsSuffix(nights))).join(", ")}
+              {unbedded.map(({ person, nights: dates }) => person.name + (night ? "" : idx.nightsSuffix(dates))).join(", ")}
             </p>
-            <button className="btn" onClick={autoAssign} disabled={!snap.rooms.length}>
+            <button type="button" className="btn" onClick={() => void autoAssign()} disabled={snap.rooms.length === 0}>
               ✨ Proposer une répartition pour les non-logés
             </button>
             <p className="hint">
@@ -81,7 +81,7 @@ export default function AdminRooms() {
         ) : (
           nights.length > 0 && (
             <p className="muted small">
-              {night ? "Tout le monde a un lit cette nuit." : undeclared.length ? "Toutes les nuits déclarées ont un lit." : "Tout le monde a un lit."}
+              {night ? "Tout le monde a un lit cette nuit." : undeclared.length > 0 ? "Toutes les nuits déclarées ont un lit." : "Tout le monde a un lit."}
             </p>
           )
         )}
@@ -91,9 +91,9 @@ export default function AdminRooms() {
             les nuits du séjour.
           </p>
         )}
-        <form className="inline-form" onSubmit={addRoom}>
+        <form className="inline-form" onSubmit={(e) => void addRoom(e)}>
           <input placeholder="Nouvelle chambre (ex. Chambre bleue)" value={name} onChange={(e) => setName(e.target.value)} required />
-          <button className="btn btn-primary">Ajouter</button>
+          <button type="submit" className="btn btn-primary">Ajouter</button>
         </form>
       </section>
       <div className="room-grid">
@@ -130,16 +130,20 @@ function RoomCard({ room, night }: { room: Room; night: string | null }) {
     const undeclared = night || !idx.hasRoom(bedId, snap.nights) ? [] : idx.withoutNights();
     return [...waiting, ...undeclared.map((person): Candidate => ({ person, hint: "nuits non déclarées" }))];
   };
-  const save = () =>
-    (name !== room.name || notes !== room.notes) && name.trim() && call("PATCH", `/rooms/${room.id}`, { name: name.trim(), notes }, { admin: true });
+  const save = () => {
+    if ((name !== room.name || notes !== room.notes) && name.trim()) void call("PATCH", `/rooms/${room.id}`, { name: name.trim(), notes }, { admin: true });
+  };
 
   return (
     <section className="card">
       <div className="card-head">
         <input className="input-title" value={name} onChange={(e) => setName(e.target.value)} onBlur={save} />
         <button
+          type="button"
           className="btn btn-small btn-danger"
-          onClick={() => confirm(`Supprimer « ${room.name} » ?`) && call("DELETE", `/rooms/${room.id}`, undefined, { admin: true })}
+          onClick={() => {
+            if (confirm(`Supprimer « ${room.name} » ?`)) void call("DELETE", `/rooms/${room.id}`, undefined, { admin: true });
+          }}
         >
           Supprimer
         </button>
@@ -161,7 +165,7 @@ function RoomCard({ room, night }: { room: Room; night: string | null }) {
                     {night ? "" : " au plus"})
                   </span>
                 </span>
-                <button className="btn-icon" title="Retirer ce lit" onClick={() => call("DELETE", `/beds/${bed.id}`, undefined, { admin: true })}>
+                <button type="button" className="btn-icon" title="Retirer ce lit" onClick={() => void call("DELETE", `/beds/${bed.id}`, undefined, { admin: true })}>
                   🗑
                 </button>
               </div>
@@ -171,13 +175,13 @@ function RoomCard({ room, night }: { room: Room; night: string | null }) {
                     key={person.id}
                     person={person}
                     note={night ? undefined : idx.nightsNote(nights)}
-                    onRemove={() => assign(person.id, null, nights)}
+                    onRemove={() => void assign(person.id, null, nights)}
                   />
                 ))}
                 <AddPersonSelect
                   people={options.map((o) => o.person)}
                   hint={(p) => options.find((o) => o.person.id === p.id)?.hint ?? ""}
-                  onPick={(id) => assign(id, bed.id, options.find((o) => o.person.id === id)?.dates)}
+                  onPick={(id) => void assign(id, bed.id, options.find((o) => o.person.id === id)?.dates)}
                 />
               </div>
             </li>
@@ -185,14 +189,14 @@ function RoomCard({ room, night }: { room: Room; night: string | null }) {
         })}
       </ul>
       <div className="inline-form">
-        <select value={bedKind} onChange={(e) => setBedKind(e.target.value as BedKind)}>
-          {(Object.keys(BED_LABEL) as BedKind[]).map((k) => (
+        <select value={bedKind} onChange={(e) => setBedKind(oneOf(BED_KINDS, e.target.value))}>
+          {BED_KINDS.map((k) => (
             <option key={k} value={k}>
               {BED_LABEL[k]} ({BED_PLACES[k]} pl.)
             </option>
           ))}
         </select>
-        <button className="btn" onClick={() => call("POST", `/rooms/${room.id}/beds`, { kind: bedKind }, { admin: true })}>
+        <button type="button" className="btn" onClick={() => void call("POST", `/rooms/${room.id}/beds`, { kind: bedKind }, { admin: true })}>
           + Lit
         </button>
       </div>

@@ -23,7 +23,7 @@ export default function CoverCard() {
         toast(`Image trop lourde (au plus ${MAX_COVER_BYTES / 1_000_000} Mo)`, "error");
         return;
       }
-      if (await call("PUT", "/cover", image, { admin: true })) toast("Image de couverture enregistrée 🖼️");
+      if ((await call("PUT", "/cover", image, { admin: true })) !== undefined) toast("Image de couverture enregistrée 🖼️");
     } finally {
       setBusy(false);
     }
@@ -31,25 +31,25 @@ export default function CoverCard() {
 
   async function remove() {
     if (!confirm("Retirer l'image de couverture ?")) return;
-    if (await call("DELETE", "/cover", undefined, { admin: true })) toast("Image retirée");
+    if ((await call("DELETE", "/cover", undefined, { admin: true })) !== undefined) toast("Image retirée");
   }
 
   return (
     <section className="card">
       <h2>🖼️ Image de couverture</h2>
-      {version != null ? (
-        <img className="cover-preview" src={coverUrl(slug, version)} alt="Image de couverture actuelle" />
-      ) : (
+      {version == null ? (
         <p className="muted small">Une photo de la maison, du lieu ou de la famille, affichée en tête du séjour et sur l'accueil.</p>
+      ) : (
+        <img className="cover-preview" src={coverUrl(slug, version)} alt="Couverture actuelle du séjour" />
       )}
       <div className="cover-actions">
         {/* Champ masqué mais focalisable : le label sert de bouton, au clavier aussi. */}
         <label className={`btn cover-pick ${version == null ? "btn-primary" : ""}`} aria-disabled={busy}>
-          {busy ? "Envoi…" : version != null ? "📷 Changer l'image" : "📷 Choisir une image"}
-          <input type="file" accept="image/jpeg,image/png,image/webp,image/*" disabled={busy} onChange={pick} />
+          {busy ? "Envoi…" : version == null ? "📷 Choisir une image" : "📷 Changer l'image"}
+          <input type="file" accept="image/jpeg,image/png,image/webp,image/*" disabled={busy} onChange={(e) => void pick(e)} />
         </label>
         {version != null && (
-          <button className="btn btn-ghost" onClick={remove} disabled={busy}>
+          <button type="button" className="btn btn-ghost" onClick={() => void remove()} disabled={busy}>
             Retirer
           </button>
         )}

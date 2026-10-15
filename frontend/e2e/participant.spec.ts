@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
 import { createStay, loginAs, SLOTS } from "./helpers";
 
+const signupKey = (s: { activity_id: number; person_id: number }) => `${s.activity_id}|${s.person_id}`;
+
 test("un participant s'identifie et déclare ses présences", async ({ page, request }) => {
   const stay = await createStay(request);
   await stay.person("Alice");
@@ -41,7 +43,7 @@ test("un participant s'identifie et déclare ses présences", async ({ page, req
 test("un nouveau venu s'ajoute lui-même", async ({ page, request }) => {
   const stay = await createStay(request);
   await page.goto(stay.url);
-  await page.getByPlaceholder(/Je ne suis pas dans la liste/).fill("  Camille ");
+  await page.getByPlaceholder(/Je ne suis pas dans la liste/u).fill("  Camille ");
   await page.getByRole("button", { name: "M'ajouter" }).click();
   await expect(page.getByRole("heading", { name: "Bonjour Camille" })).toBeVisible();
   await expect(page.locator(".who")).toHaveAttribute("title", "Changer de personne");
@@ -58,8 +60,8 @@ test("choisir ses activités et celles de son foyer", async ({ page, request }) 
   await stay.present(alice);
   await stay.present(leo, SLOTS.filter((s) => s.date !== "2026-10-31"));
   await stay.present(paul);
-  const kayak = await stay.adm("POST", "/activities", { name: "Kayak", date: "2026-10-31", start_time: "14:00" });
-  const jeu = await stay.adm("POST", "/activities", { name: "Grand jeu", date: "2026-10-31", invite_all: true });
+  const kayak = await stay.adm<{ id: number }>("POST", "/activities", { name: "Kayak", date: "2026-10-31", start_time: "14:00" });
+  const jeu = await stay.adm<{ id: number }>("POST", "/activities", { name: "Grand jeu", date: "2026-10-31", invite_all: true });
 
   // Accueil : seulement les activités où quelqu'un du foyer est inscrit.
   await loginAs(page, stay.url, "Alice");
@@ -84,10 +86,9 @@ test("choisir ses activités et celles de son foyer", async ({ page, request }) 
   await jeuItem.locator(".toggle").filter({ hasText: "Alice" }).click();
   await expect(jeuItem.getByText("1 inscrit")).toBeVisible();
 
-  const key = (s: { activity_id: number; person_id: number }) => `${s.activity_id}|${s.person_id}`;
   await expect
-    .poll(async () => (await stay.snap()).signups.map(key).sort())
-    .toEqual([`${kayak.id}|${alice}`, `${kayak.id}|${leo}`, `${jeu.id}|${paul}`].sort());
+    .poll(async () => (await stay.snap()).signups.map(signupKey).toSorted())
+    .toEqual([`${kayak.id}|${alice}`, `${kayak.id}|${leo}`, `${jeu.id}|${paul}`].toSorted());
 
   // L'accueil suit : le kayak, avec Alice et Léo.
   await page.getByRole("link", { name: "🏠 Moi" }).click();

@@ -31,7 +31,7 @@ export default function Meals() {
                     </header>
                     <div className="muted small">{countLabel(count)}</div>
                     <DietSummary persons={idx.presentAt(s.date, s.meal)} />
-                    {dishes.length ? (
+                    {dishes.length > 0 ? (
                       <ul className="dishes">
                         {dishes.map((d, i) => (
                           <li key={i}>{d}</li>

@@ -7,7 +7,7 @@ export default function Chores() {
   const { snap, idx, me } = useStay();
   const [view, setView] = useState<"day" | "person">("day");
 
-  if (!snap.chore_assignments.length) return <Empty>Le tirage au sort des corvées n'a pas encore eu lieu.</Empty>;
+  if (snap.chore_assignments.length === 0) return <Empty>Le tirage au sort des corvées n'a pas encore eu lieu.</Empty>;
 
   const workers = snap.persons.filter((p) => snap.chore_assignments.some((a) => a.person_id === p.id));
 
@@ -16,10 +16,10 @@ export default function Chores() {
       <div className="page-head">
         <h1 className="page-title">Corvées</h1>
         <div className="segmented">
-          <button className={view === "day" ? "on" : ""} onClick={() => setView("day")}>
+          <button type="button" className={view === "day" ? "on" : ""} onClick={() => setView("day")}>
             Par jour
           </button>
-          <button className={view === "person" ? "on" : ""} onClick={() => setView("person")}>
+          <button type="button" className={view === "person" ? "on" : ""} onClick={() => setView("person")}>
             Par personne
           </button>
         </div>
@@ -28,7 +28,7 @@ export default function Chores() {
       {view === "day" &&
         snap.days.map((day) => {
           const moments = MOMENTS.filter((m) => snap.chore_types.some((c) => idx.occurrences.has(`${c.id}|${day}|${m}`)));
-          if (!moments.length) return null;
+          if (moments.length === 0) return null;
           return (
             <section key={day} className="card">
               <h2>{dayLabel(day, true)}</h2>
@@ -58,7 +58,7 @@ export default function Chores() {
       {view === "person" && (
         <div className="person-cards">
           {workers.map((p) => {
-            const mine = snap.chore_assignments.filter((a) => a.person_id === p.id).sort(sortedMoments);
+            const mine = snap.chore_assignments.filter((a) => a.person_id === p.id).toSorted(sortedMoments);
             return (
               <section key={p.id} className={`card ${p.id === me?.id ? "card-me" : ""}`}>
                 <div className="card-head">

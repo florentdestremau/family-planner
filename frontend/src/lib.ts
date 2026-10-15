@@ -1,4 +1,4 @@
-import type { Activity, AssistantAction, BedKind, Diet, Meal, Moment, Person, PersonNight, Snapshot, Slot, Stay, StaySummary } from "./api";
+import type { Activity, AssistantAction, BedKind, Diet, Meal, Moment, Person, PersonKind, PersonNight, Slot, Snapshot, Stay, StaySummary } from "./api";
 
 export const MEALS: Meal[] = ["breakfast", "lunch", "dinner"];
 export const MOMENTS: Moment[] = [...MEALS, "day"];
@@ -18,6 +18,15 @@ export const BED_LABEL: Record<BedKind, string> = {
 };
 
 export const BED_PLACES: Record<BedKind, number> = { double: 2, single: 1, bunk: 2, extra: 1 };
+export const BED_KINDS: BedKind[] = ["double", "single", "bunk", "extra"];
+export const PERSON_KINDS: PersonKind[] = ["adult", "child"];
+
+/** Valeur d'un <select> dont les options sont `values` : le DOM ne connaît que des chaînes. */
+export function oneOf<T extends string>(values: readonly T[], value: string): T {
+  const found = values.find((v) => v === value);
+  if (found === undefined) throw new Error(`Valeur inattendue : ${value}`);
+  return found;
+}
 
 /** Régimes, puis allergies et intolérances, dans l'ordre d'affichage. */
 export const REGIMES: Diet[] = ["vegetarian", "vegan"];
@@ -51,8 +60,8 @@ export const dietIcon = (diet: Diet) => (ALLERGIES.includes(diet) ? "⚠️" : "
 /** Coche ou décoche une contrainte ; végétarien et végan s'excluent. */
 export function toggleDiet(diets: Diet[], diet: Diet, on: boolean): Diet[] {
   const excluded = on && REGIMES.includes(diet) ? REGIMES : [diet];
-  const kept = diets.filter((d) => !excluded.includes(d));
-  return DIETS.filter((d) => kept.includes(d) || (on && d === diet));
+  const kept = new Set(diets.filter((d) => !excluded.includes(d)));
+  return DIETS.filter((d) => kept.has(d) || (on && d === diet));
 }
 
 /** La personne a-t-elle déclaré une contrainte ou une précision ? */
@@ -80,7 +89,7 @@ export function dietGroups(persons: Person[]): DietGroups {
 /** « 🌱 2 végétariens · ⚠️ 1 sans gluten · 📝 1 précision » ; vide s'il n'y a rien. */
 export function dietCountLabel({ byDiet, notes }: DietGroups): string {
   const parts = byDiet.map(({ diet, persons }) => `${dietIcon(diet)} ${DIET_COUNT[diet](persons.length)}`);
-  if (notes.length) parts.push(`📝 ${notes.length} précision${plural(notes.length)}`);
+  if (notes.length > 0) parts.push(`📝 ${notes.length} précision${plural(notes.length)}`);
   return parts.join(" · ");
 }
 
@@ -141,9 +150,9 @@ export interface TextPart {
 }
 
 // Liens http(s), et numéros français : 06 12 34 56 78, 06.12.34.56.78, +33 6 12 34 56 78, +33 (0)6 12 34 56 78…
-const LINKS = /(https?:\/\/[^\s<>"]+)|((?:\+33[\s.-]?(?:\(0\)[\s.-]?)?|0)[1-9](?:[\s.-]?\d{2}){4})(?!\d)/g;
+const LINKS = /(https?:\/\/[^\s<>"]+)|((?:\+33[\s.-]?(?:\(0\)[\s.-]?)?|0)[1-9](?:[\s.-]?\d{2}){4})(?!\d)/gu;
 // Ponctuation collée à la fin d'un lien (« voir https://exemple.fr. »), qui n'en fait pas partie.
-const TRAILING = /[.,;:!?)\]'"»]/;
+const TRAILING = /[.,;:!?)\]'"»]/u;
 
 /** Retire la ponctuation finale d'un lien, sauf une parenthèse qui en ferme une du lien (…/wiki/Nyons_(Drôme)). */
 function trimUrl(url: string): string {
@@ -164,10 +173,10 @@ export function linkify(text: string): TextPart[] {
   for (const m of text.matchAll(LINKS)) {
     const start = m.index;
     // Fin d'un nombre plus long (un code, un numéro étranger) : laissé tel quel.
-    if (!m[1] && /[\d+]/.test(text.charAt(start - 1))) continue;
+    if (!m[1] && /[\d+]/u.test(text.charAt(start - 1))) continue;
     const match = m[1] ? trimUrl(m[0]) : m[0];
     if (start > last) parts.push({ text: text.slice(last, start) });
-    parts.push({ text: match, href: m[1] ? match : `tel:${match.replace(/\(0\)|[\s.-]/g, "")}` });
+    parts.push({ text: match, href: m[1] ? match : `tel:${match.replaceAll(/\(0\)|[\s.-]/gu, "")}` });
     last = start + match.length;
   }
   if (last < text.length) parts.push({ text: text.slice(last) });
@@ -183,7 +192,7 @@ const WEEKDAYS = ["dim.", "lun.", "mar.", "mer.", "jeu.", "ven.", "sam."];
 /** Nuits courtes, triées, avec le jour du mois (sans ambiguïté sur un long séjour) : « ven. 30, sam. 31 ». */
 export function nightsLabel(dates: string[]): string {
   return [...dates]
-    .sort()
+    .toSorted()
     .map((d) => `${WEEKDAYS[asDate(d).getDay()]} ${asDate(d).getDate()}`)
     .join(", ");
 }
@@ -227,7 +236,7 @@ export function buildIndex(snap: Snapshot) {
   const householdById = new Map(snap.households.map((h) => [h.id, h]));
   // Membres d'un foyer : adultes d'abord, puis enfants, dans l'ordre d'arrivée.
   const membersByHousehold = new Map<number, Person[]>();
-  for (const p of [...snap.persons].sort((a, b) => (a.kind === b.kind ? a.id - b.id : a.kind === "adult" ? -1 : 1))) {
+  for (const p of snap.persons.toSorted((a, b) => (a.kind === b.kind ? a.id - b.id : a.kind === "adult" ? -1 : 1))) {
     membersByHousehold.set(p.household_id, [...(membersByHousehold.get(p.household_id) ?? []), p]);
   }
   const members = (householdId: number): Person[] => membersByHousehold.get(householdId) ?? [];
@@ -243,7 +252,7 @@ export function buildIndex(snap: Snapshot) {
   const nightsByPerson = new Map<number, PersonNight[]>();
   const byBed = new Map<number | null, Map<number, string[]>>();
   const perBedNight = new Map<string, number>();
-  for (const n of [...snap.person_nights].sort((a, b) => a.date.localeCompare(b.date))) {
+  for (const n of snap.person_nights.toSorted((a, b) => a.date.localeCompare(b.date))) {
     push(nightsByPerson, n.person_id, n);
     const persons = byBed.get(n.bed_id) ?? new Map<number, string[]>();
     byBed.set(n.bed_id, persons);
@@ -258,7 +267,7 @@ export function buildIndex(snap: Snapshot) {
     occurrences.set(key, [...(occurrences.get(key) ?? []), a.person_id]);
   }
 
-  const name = (id: number | null | undefined) => (id != null ? (personById.get(id)?.name ?? "?") : "");
+  const name = (id?: number | null) => (id == null ? "" : (personById.get(id)?.name ?? "?"));
 
   const isPresent = (personId: number, date: string, meal: Meal) => presence.has(presenceKey(personId, date, meal));
   const sleepsOn = (personId: number, date: string) => nightsOf(personId).some((n) => n.date === date);
@@ -286,7 +295,7 @@ export function buildIndex(snap: Snapshot) {
     if (!persons) return [];
     return snap.persons.flatMap((person) => {
       const nights = (persons.get(person.id) ?? []).filter((d) => night === null || d === night);
-      return nights.length ? [{ person, nights }] : [];
+      return nights.length > 0 ? [{ person, nights }] : [];
     });
   };
   /** Occupants d'un lit, une nuit donnée ou toutes nuits confondues. */
@@ -321,23 +330,23 @@ export function buildIndex(snap: Snapshot) {
     snap.persons.filter((p) => signups.has(`${activity.id}|${p.id}`));
 
   /** Mon foyer : moi d'abord, puis les autres membres. */
-  const household = (me: Person | undefined): Person[] =>
+  const household = (me?: Person): Person[] =>
     me ? [me, ...members(me.household_id).filter((p) => p.id !== me.id)] : [];
 
   /** Nom du foyer, ou à défaut les prénoms des adultes (des membres s'il n'y a que des enfants). */
   const householdLabel = (householdId: number): string => {
-    const name = householdById.get(householdId)?.name;
-    if (name) return name;
+    const custom = householdById.get(householdId)?.name;
+    if (custom) return custom;
     const all = members(householdId);
     const adults = all.filter((p) => p.kind === "adult");
-    return (adults.length ? adults : all).map((p) => p.name).join(" & ");
+    return (adults.length > 0 ? adults : all).map((p) => p.name).join(" & ");
   };
 
   /** Foyers triés par libellé, avec leurs membres. */
   const households = () =>
     snap.households
       .map((h) => ({ ...h, label: householdLabel(h.id), members: members(h.id) }))
-      .sort((a, b) => a.label.localeCompare(b.label));
+      .toSorted((a, b) => a.label.localeCompare(b.label));
 
   return {
     personById,
@@ -432,22 +441,22 @@ export function llmExport(snap: Snapshot, idx: Index): string {
     const diets = dietGroups(idx.presentAt(slot.date, slot.meal)).byDiet.map(({ diet, persons }) => DIET_COUNT[diet](persons.length));
     lines.push(
       `- ${dayLabel(slot.date)}, ${MOMENT_LABEL[slot.meal].toLowerCase()} — ${countLabel(count)}${
-        diets.length ? `, dont ${diets.join(", ")}` : ""
-      } : ${dishes.length ? dishes.join(" ; ") : "(menu non défini)"}${menu?.notes ? ` [${menu.notes}]` : ""}`,
+        diets.length > 0 ? `, dont ${diets.join(", ")}` : ""
+      } : ${dishes.length > 0 ? dishes.join(" ; ") : "(menu non défini)"}${menu?.notes ? ` [${menu.notes}]` : ""}`,
     );
   }
   const notes = [...new Set(eating.map((p) => p.diet_note).filter(Boolean))];
-  if (notes.length) lines.push("", `Autres précisions alimentaires : ${notes.join(" ; ")}`);
+  if (notes.length > 0) lines.push("", `Autres précisions alimentaires : ${notes.join(" ; ")}`);
   return lines.join("\n");
 }
 
 /** Séjours de l'accueil : en cours et à venir dans l'ordre chronologique, passés du plus récent au plus ancien. */
 export function groupStays(stays: StaySummary[], today: string) {
-  const byStart = [...stays].sort((a, b) => a.start_date.localeCompare(b.start_date) || a.name.localeCompare(b.name));
+  const byStart = stays.toSorted((a, b) => a.start_date.localeCompare(b.start_date) || a.name.localeCompare(b.name));
   return {
     current: byStart.filter((s) => s.start_date <= today && today <= s.end_date),
     upcoming: byStart.filter((s) => s.start_date > today),
-    past: byStart.filter((s) => s.end_date < today).reverse(),
+    past: byStart.filter((s) => s.end_date < today).toReversed(),
   };
 }
 
@@ -465,15 +474,15 @@ export function slotShortLabel(slot: Slot): string {
  * manquants dans la fourchette (« sauf sam. dîner ») pour qu'un trou ne passe pas inaperçu.
  */
 export function actionSummary(action: AssistantAction): string {
-  const nights = action.nights.length ? ` · nuits : ${nightsLabel(action.nights)}` : " · aucune nuit sur place";
+  const nights = action.nights.length > 0 ? ` · nuits : ${nightsLabel(action.nights)}` : " · aucune nuit sur place";
   return mealsSummary(action) + nights;
 }
 
 function mealsSummary(action: AssistantAction): string {
-  const ordered = [...action.slots].sort((a, b) => a.date.localeCompare(b.date) || MEALS.indexOf(a.meal) - MEALS.indexOf(b.meal));
+  const ordered = action.slots.toSorted((a, b) => a.date.localeCompare(b.date) || MEALS.indexOf(a.meal) - MEALS.indexOf(b.meal));
   if (ordered.length === 0) return `${action.name} : aucun repas`;
-  const first = ordered[0];
-  const last = ordered[ordered.length - 1];
+  const [first, ...rest] = ordered;
+  const last = rest.at(-1) ?? first;
   const label = `${action.name} : ${slotShortLabel(first)}`;
   if (ordered.length === 1) return label;
   const taken = new Set(ordered.map((slot) => `${slot.date}|${slot.meal}`));
@@ -486,5 +495,5 @@ function mealsSummary(action: AssistantAction): string {
     }
   }
   const range = `${label} → ${slotShortLabel(last)}`;
-  return missing.length ? `${range}, sauf ${missing.map(slotShortLabel).join(", ")}` : range;
+  return missing.length > 0 ? `${range}, sauf ${missing.map(slotShortLabel).join(", ")}` : range;
 }

@@ -34,7 +34,7 @@ export default defineConfig({
         // L'interface est mise en cache ; les données passent par le cache de React Query (main.tsx).
         globPatterns: ["**/*.{js,css,html}"],
         navigateFallback: "/index.html",
-        navigateFallbackDenylist: [/^\/api\//, /^\/up$/],
+        navigateFallbackDenylist: [/^\/api\//u, /^\/up$/u],
       },
     }),
   ],

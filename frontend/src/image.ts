@@ -1,4 +1,4 @@
-const ACCEPTED = ["image/jpeg", "image/png", "image/webp"];
+const ACCEPTED = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 /**
  * Allège une photo avant envoi : côté le plus long à `maxSide` px (quelques centaines de Ko).
@@ -10,15 +10,16 @@ export async function shrinkImage(file: Blob, maxSide = 1600, quality = 0.85, ke
   const bitmap = await createImageBitmap(file); // orientation EXIF appliquée
   try {
     const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
-    if (scale === 1 && file.size <= keepBelow && ACCEPTED.includes(file.type)) return file;
+    if (scale === 1 && file.size <= keepBelow && ACCEPTED.has(file.type)) return file;
     const canvas = document.createElement("canvas");
     canvas.width = Math.round(bitmap.width * scale);
     canvas.height = Math.round(bitmap.height * scale);
-    const ctx = canvas.getContext("2d")!;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Image illisible");
     const encode = (type: string) =>
-      new Promise<Blob>((resolve, reject) =>
-        canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("Image illisible"))), type, quality),
-      );
+      new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("Image illisible"))), type, quality);
+      });
     if (file.type !== "image/jpeg") {
       ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
       const webp = await encode("image/webp");

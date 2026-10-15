@@ -51,7 +51,7 @@ test("tout adulte du foyer agit pour tous ; mes présences valent pour tout le f
   await expect(foyer.locator(".chip")).toHaveText(["Claire", "Florent ♥", "Léo", "Emma"]);
   await page.getByLabel("Nom du foyer").fill("Famille Destremau");
   await page.getByLabel("Nom du foyer").blur();
-  await expect.poll(async () => (await stay.snap()).households.map((h: { name: string }) => h.name).sort()).toEqual(["", "", "Famille Destremau"]);
+  await expect.poll(async () => (await stay.snap()).households.map((h: { name: string }) => h.name).toSorted()).toEqual(["", "", "Famille Destremau"]);
 
   // Les présences du foyer pour les inscriptions et les corvées de chacun.
   await page.getByRole("link", { name: "Présences" }).click();
@@ -62,13 +62,13 @@ test("tout adulte du foyer agit pour tous ; mes présences valent pour tout le f
   await page.getByRole("button", { name: "Je ne suis pas Claire" }).click();
   await whoButton(page, "Mamie").click();
   await page.getByLabel("Prénom du nouveau membre").fill("Oncle Paul");
-  await expect(page.getByLabel(/En couple avec/)).toHaveCount(0);
+  await expect(page.getByLabel(/En couple avec/u)).toHaveCount(0);
 });
 
 test("un nouveau venu crée son foyer et y ajoute son conjoint", async ({ page, request }) => {
   const stay = await createStay(request);
   await page.goto(stay.url);
-  await page.getByPlaceholder(/Je ne suis pas dans la liste/).fill("Paul");
+  await page.getByPlaceholder(/Je ne suis pas dans la liste/u).fill("Paul");
   await page.getByRole("button", { name: "M'ajouter" }).click();
   await expect(page.getByRole("heading", { name: "Bonjour Paul" })).toBeVisible();
   await page.getByLabel("Prénom du nouveau membre").fill("Léa");
@@ -83,7 +83,7 @@ test("un nouveau venu crée son foyer et y ajoute son conjoint", async ({ page, 
   ]);
   // Un troisième adulte (Mamie) : plus de couple à proposer.
   await page.getByLabel("Prénom du nouveau membre").fill("Mamie");
-  await expect(page.getByLabel(/En couple avec/)).toHaveCount(0);
+  await expect(page.getByLabel(/En couple avec/u)).toHaveCount(0);
 });
 
 test("l'organisateur fusionne deux foyers puis déplace quelqu'un", async ({ page, request }) => {
@@ -101,7 +101,7 @@ test("l'organisateur fusionne deux foyers puis déplace quelqu'un", async ({ pag
   const card = page.locator(".household-card");
   await expect(card.getByLabel("Nom du foyer")).toHaveAttribute("placeholder", "Paul & Léa");
   await card.getByLabel("Couple de Paul").selectOption({ label: "♥ Léa" });
-  await expect.poll(async () => (await stay.snap()).persons.find((p: { id: number }) => p.id === paul).partner_id).toBe(lea);
+  await expect.poll(async () => (await stay.snap()).persons.find((p) => p.id === paul)?.partner_id).toBe(lea);
   expect((await stay.snap()).presences).toHaveLength(2);
 
   // Léa part dans un nouveau foyer : le couple est défait.
@@ -120,7 +120,9 @@ test("des clics rapides ne perdent aucune présence, même si le réseau désord
   await page.route("**/presences", async (route) => {
     if (first) {
       first = false;
-      await new Promise((r) => setTimeout(r, 800));
+      await new Promise((r) => {
+        setTimeout(r, 800);
+      });
     }
     await route.continue();
   });

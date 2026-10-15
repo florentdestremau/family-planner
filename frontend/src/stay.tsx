@@ -38,7 +38,7 @@ export function StayProvider({ slug, snap, children }: { slug: string; snap: Sna
   const [meId, setMeId] = useState(() => storage.me(slug));
   const [adminKey, setAdminKeyState] = useState(() => storage.adminKey(slug));
   const idx = useMemo(() => buildIndex(snap), [snap]);
-  const me = meId != null ? idx.personById.get(meId) : undefined;
+  const me = meId == null ? undefined : idx.personById.get(meId);
 
   const setMe = useCallback(
     (id: number | null) => {
@@ -56,16 +56,17 @@ export function StayProvider({ slug, snap, children }: { slug: string; snap: Sna
   );
 
   const call = useCallback(
-    async <T,>(method: string, path: string, body?: unknown, opts?: { admin?: boolean }) => {
+    async <T,>(method: string, path: string, body?: unknown, opts?: { admin?: boolean }): Promise<T | undefined> => {
+      const prefix = opts?.admin ? `/stays/${slug}/admin` : `/stays/${slug}`;
+      let result: T | undefined;
       try {
-        const prefix = opts?.admin ? `/stays/${slug}/admin` : `/stays/${slug}`;
-        return await api<T>(method, `${prefix}${path}`, body, opts?.admin ? adminKey : null);
+        result = await api<T>(method, `${prefix}${path}`, body, opts?.admin ? adminKey : null);
       } catch (e) {
         toast(e instanceof Error ? e.message : "Erreur inattendue", "error");
-        return undefined;
       } finally {
         await qc.invalidateQueries({ queryKey: ["stay", slug] });
       }
+      return result;
     },
     [slug, adminKey, qc],
   );

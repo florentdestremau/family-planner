@@ -30,12 +30,12 @@ test("une chambre double sert à un couple vendredi et à un autre samedi", asyn
   for (const id of [c, d]) await stay.pub("PUT", `/persons/${id}/presences`, { slots: SLOTS.slice(3), nights: ["2026-10-31"] });
   const eve = await stay.person("Eve");
   await stay.pub("PUT", `/persons/${eve}/presences`, { slots: [], nights: ["2026-10-30", "2026-10-31"] });
-  const room = await stay.adm("POST", "/rooms", { name: "Chambre d'amis" });
+  const room = await stay.adm<{ id: number }>("POST", "/rooms", { name: "Chambre d'amis" });
   await stay.adm("POST", `/rooms/${room.id}/beds`, { kind: "double" });
 
   await openAdmin(page, stay.slug, stay.key, "Chambres");
   await expect(page.locator("p", { hasText: "Sans lit :" })).toContainText("Alice (ven. 30)");
-  await page.getByRole("button", { name: /Proposer une répartition/ }).click();
+  await page.getByRole("button", { name: /Proposer une répartition/u }).click();
   await expect(page.getByText("4 nuitée(s) attribuée(s)")).toBeVisible();
   const bed = page.locator(".bed").first();
   for (const name of ["Alice ven. 30", "Bob ven. 30", "Chloé sam. 31", "David sam. 31"]) await expect(bed).toContainText(name);

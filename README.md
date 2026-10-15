@@ -24,6 +24,7 @@ Sans clé (`ANTHROPIC_API_KEY` dans `backend/.env`, ignoré par git), l'assistan
 | --- | --- |
 | `cd backend && uv run pytest --cov` | API (droits sur chaque route organisateur, isolation entre séjours, validations, règles métier), propriétés du tirage et des couchages (Hypothesis), service du front, fixtures, script serveur `family-env` (faux `once`). Couverture lignes + branches exigée : 100 %. |
 | `cd frontend && npm run typecheck` | Types TypeScript. |
+| `cd frontend && npm run lint` | Lint strict du front avec oxlint, règles typées comprises (promesses oubliées, `any`, conditions non booléennes, hooks, accessibilité). Config commentée : `frontend/.oxlintrc.json`. |
 | `cd frontend && npm run test:coverage` | Logique du front (`lib`, `storage`, `api`, `pwa`) avec vitest, couverture 100 %. |
 | `cd frontend && npm run test:e2e` | Parcours complets dans Chromium, bureau et mobile, contre le vrai back (base jetable, fixtures). |
 

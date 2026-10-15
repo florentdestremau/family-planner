@@ -1,4 +1,4 @@
-# CI de family-planner : tests back (couverture 100 %), script serveur, types et tests du front
+# CI de family-planner : tests back (couverture 100 %), script serveur, types, lint et tests du front
 # (couverture 100 % de la logique), tests e2e dans Chromium (bureau et mobile), image de production
 # construite et testée (/up, fixtures), publiée sur ghcr.io, puis déployée sur le serveur once
 # (adapté d'ardha-app) :
@@ -52,6 +52,10 @@ jobs:
       - name: Types du front
         working-directory: frontend
         run: npm run typecheck
+
+      - name: Lint du front (oxlint, règles typées)
+        working-directory: frontend
+        run: npm run lint
 
       - name: Tests back (couverture des lignes et des branches ≥ 100 %)
         working-directory: backend

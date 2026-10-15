@@ -5,7 +5,7 @@ import { useStay } from "../stay";
 /** Chambres pour tous : occupants de chaque lit, avec leurs nuits quand ils ne restent pas tout le séjour. */
 export default function Rooms() {
   const { snap, idx, me } = useStay();
-  if (!snap.rooms.length) return <Empty>Les chambres n'ont pas encore été définies.</Empty>;
+  if (snap.rooms.length === 0) return <Empty>Les chambres n'ont pas encore été définies.</Empty>;
   const unbedded = idx.unbedded(null);
   return (
     <div className="stack">
