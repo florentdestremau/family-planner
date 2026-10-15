@@ -1,5 +1,5 @@
 import type { Meal } from "../api";
-import { dayLabel, MOMENT_LABEL } from "../lib";
+import { dayLabel, MOMENT_LABEL, timesSpan } from "../lib";
 import { useStay } from "../stay";
 
 type Column = { date: string; meal: Meal | null }; // meal nul : la nuit du jour
@@ -46,6 +46,7 @@ export function PresenceTable() {
                 <th className="th-person">
                   {p.name}
                   {p.kind === "child" && <span className="muted"> (e)</span>}
+                  {timesSpan(p) !== "" && <div className="th-times">🕒 {timesSpan(p)}</div>}
                 </th>
                 {columns.map((c) => (
                   <td key={colKey(c)} className={`${on(p.id, c) ? "cell-on" : ""} ${c.meal ? "" : "cell-night"}`}>

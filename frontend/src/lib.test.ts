@@ -13,6 +13,7 @@ import {
   TIME_OPTIONS,
   timeLabel,
   timeOrder,
+  timesSpan,
   timesSummary,
   countLabel,
   coverThumbUrl,
@@ -677,5 +678,13 @@ describe("heures d'arrivée et de départ", () => {
     expect(timesSummary({ ...alice, departure_time: "01:00" }, range)).toBe(
       "Arrivée ven. 30 oct. vers 18 h 30 · Départ sam. 31 oct. vers 1 h (dans la nuit)",
     );
+  });
+
+  it("résume les heures sous le nom dans le tableau des présences", () => {
+    const [alice] = withTimes({}).persons;
+    expect(timesSpan(alice)).toBe("");
+    expect(timesSpan({ ...alice, arrival_time: "18:30", departure_time: "15:00" })).toBe("18 h 30 → 15 h");
+    expect(timesSpan({ ...alice, departure_time: "01:00" })).toBe("? → 1 h (nuit)");
+    expect(timesSpan({ ...alice, arrival_time: "00:30" })).toBe("0 h 30 (nuit) → ?");
   });
 });

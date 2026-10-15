@@ -1101,6 +1101,11 @@ legend {
   background: var(--surface);
   font-weight: 700;
 }
+.th-times {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--muted);
+}
 .cell-on {
   color: var(--primary);
   font-weight: 800;
