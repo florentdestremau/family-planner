@@ -110,8 +110,13 @@ test("l'organisateur voit qui n'a pas donné d'heure, corrige et imprime", async
     "vers 11 h — Départ : Marc",
     "vers 14 h — Départ : Anne📝 Anne : Porte ouverte svp",
   ]);
-  // Le tableau des présences rappelle les heures sous chaque nom.
-  await expect(page.locator(".grid-table .th-person")).toHaveText(["Anne🕒 17 h → 14 h", "Marc🕒 20 h → 11 h"]);
+  // Le tableau des présences : l'arrivée sous le nom, le départ juste après la dernière présence
+  // (ici le dernier repas du séjour : colonne « Après »).
+  const table = page.locator(".grid-table");
+  await expect(table.locator(".th-person")).toHaveText(["Anne🕒 arr. 17 h", "Marc🕒 arr. 20 h"]);
+  await expect(table.locator("thead tr").nth(1).locator("th").last()).toHaveText("Après");
+  await expect(table.locator(".cell-departure")).toHaveText(["14 h", "11 h"]);
+  await expect(table.locator("tbody tr").filter({ hasText: "Anne" }).locator("td").last()).toHaveText("14 h");
 
   // Le planning mêle l'activité du samedi, jour sans arrivée ni départ.
   await page.goto(`${stay.url}/planning`);

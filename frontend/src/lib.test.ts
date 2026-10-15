@@ -13,7 +13,8 @@ import {
   TIME_OPTIONS,
   timeLabel,
   timeOrder,
-  timesSpan,
+  arrivalShort,
+  departureColumn,
   timesSummary,
   countLabel,
   coverThumbUrl,
@@ -682,12 +683,15 @@ describe("heures d'arrivée et de départ", () => {
     );
   });
 
-  it("résume les heures sous le nom dans le tableau des présences", () => {
-    const [alice] = withTimes({}).persons;
-    expect(timesSpan(alice)).toBe("");
-    expect(timesSpan({ ...alice, arrival_time: "18:30", departure_time: "15:00" })).toBe("18 h 30 → 15 h");
-    expect(timesSpan({ ...alice, departure_time: "01:00" })).toBe("? → 1 h (nuit)");
-    expect(timesSpan({ ...alice, arrival_time: "00:30" })).toBe("0 h 30 (nuit) → ?");
+  it("place les heures dans le tableau des présences", () => {
+    expect(arrivalShort("")).toBe("");
+    expect(arrivalShort("18:30")).toBe("arr. 18 h 30");
+    expect(arrivalShort("00:30")).toBe("arr. 0 h 30 (nuit)");
+    // Le départ dans la case qui suit la dernière présence, même après une absence.
+    expect(departureColumn([false, true, true, false, true, false], "15:00")).toBe(5);
+    expect(departureColumn([true, true], "15:00")).toBe(2); // colonne de plus après le dernier repas
+    expect(departureColumn([true, true], "")).toBe(-1);
+    expect(departureColumn([false, false], "15:00")).toBe(-1);
   });
 });
 

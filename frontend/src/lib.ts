@@ -208,12 +208,17 @@ export function timesSummary(p: Person, range: StayRange): string {
   return `${timePart("Arrivée", range.arrival, p.arrival_time)} · ${departure}`;
 }
 
-const spanPart = (time: string) => (time === "" ? "?" : `${hourLabel(time)}${isNightTime(time) ? " (nuit)" : ""}`);
+/** Arrivée sous le nom, dans le tableau des présences : « arr. 18 h 30 », « arr. 0 h 30 (nuit) » ; vide sans heure. */
+export const arrivalShort = (time: string) => (time === "" ? "" : `arr. ${hourLabel(time)}${isNightTime(time) ? " (nuit)" : ""}`);
 
-/** Heures sous le nom, dans le tableau des présences : « 18 h 30 → 15 h », « ? → 1 h (nuit) » ; vide sans heure. */
-export function timesSpan(p: Person): string {
-  if (p.arrival_time === "" && p.departure_time === "") return "";
-  return `${spanPart(p.arrival_time)} → ${spanPart(p.departure_time)}`;
+/**
+ * Colonne du départ dans le tableau des présences : celle qui suit la dernière présence (une colonne
+ * de plus après le dernier repas du séjour) ; -1 sans heure de départ ou sans présence.
+ */
+export function departureColumn(present: boolean[], time: string): number {
+  if (time === "") return -1;
+  const last = present.lastIndexOf(true);
+  return last === -1 ? -1 : last + 1;
 }
 
 /** Note telle que le serveur l'enregistre : sur une ligne, sans espaces superflus. */

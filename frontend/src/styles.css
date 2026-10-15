@@ -1126,6 +1126,11 @@ legend {
   font-weight: 600;
   color: var(--muted);
 }
+.cell-departure {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--muted);
+}
 .cell-on {
   color: var(--primary);
   font-weight: 800;
