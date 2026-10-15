@@ -13,66 +13,79 @@ L'application sait déjà quand chacun arrive et repart, mais seulement au repas
 
 ## La proposition
 
-Chaque foyer indique, en plus de ses repas, vers quelle heure il arrive et vers quelle heure il repart, pour tout le foyer d'un coup ou personne par personne, et peut la changer jusqu'au dernier moment. Le séjour montre ensuite, jour par jour, qui arrive et qui part, dans l'ordre des heures.
+Chaque personne a une heure d'arrivée et une heure de départ, saisies d'un bloc pour tout le foyer par un adulte, avec une courte note, et modifiables jusqu'au dernier moment. Le planning montre, jour par jour et dans l'ordre des heures, qui arrive et qui part.
 
 ## User stories
 
 **Adulte du foyer**
 
-1. En tant qu'adulte du foyer, je veux indiquer l'heure d'arrivée et l'heure de départ de tout mon foyer en une fois, afin que l'organisateur sache quand nous attendre.
-   *Critère : la saisie se fait dans « Moi », à côté de la grille des présences ; le jour est celui du premier et du dernier repas (ou nuit) déclarés, on ne choisit que l'heure ; elle est facultative.*
-2. En tant qu'adulte du foyer, je veux donner une autre heure à un membre de mon foyer, afin de signaler que le cousin nous rejoint plus tard.
-   *Critère : même principe que « Tout le foyer a les mêmes présences » : une heure commune par défaut, qu'on décale pour une personne.*
-3. En tant qu'adulte du foyer, je veux être prévenu quand mon heure ne colle pas avec mes repas, afin de ne pas compter un déjeuner que nous ne prendrons pas.
-   *Critère : arriver à 15 h avec le déjeuner coché fait proposer de décocher le déjeuner ; rien ne change sans mon accord. Modifier les repas ne fabrique jamais d'heure.*
-4. En tant qu'adulte du foyer, je veux ajouter une courte note à notre arrivée ou à notre départ, afin de dire ce que l'heure ne dit pas (« nous aurons déjà dîné », « ne nous attendez pas, laissez la porte ouverte »).
+1. En tant qu'adulte du foyer, je veux indiquer vers quelle heure arrive et repart chaque membre de mon foyer, afin que l'organisateur sache quand nous attendre.
+   *Critère : sous la grille de la carte « ✅ Présences » de « Moi », une ligne par membre (arrivée, départ, note) ; on ne saisit que l'heure, au quart d'heure, affichée « vers 18 h 30 ». Le jour est déduit des présences : celui du premier repas ou de la première nuit pour l'arrivée, celui du dernier repas ou le lendemain de la dernière nuit pour le départ. Sans présence déclarée, pas d'heure possible.*
+2. En tant qu'adulte du foyer, je veux recopier une ligne sur tout mon foyer en un geste, afin de ne pas tout saisir quatre fois quand nous arrivons ensemble.
+   *Critère : un bouton « Même heure pour tout le foyer » recopie l'arrivée, le départ et la note ; on corrige ensuite le cousin qui arrive plus tard.*
+3. En tant qu'adulte du foyer, je veux qu'on me demande notre heure tant que je ne l'ai pas donnée, afin de ne pas l'oublier.
+   *Critère : l'invitation « À quelle heure arrivez-vous ? » reste visible dans la carte Présences tant qu'un membre présent n'a pas son heure d'arrivée ou de départ ; elle disparaît dès que tout est rempli et ne se masque pas autrement.*
+4. En tant qu'adulte du foyer, je veux ajouter une courte note pour chaque personne, afin de dire ce que l'heure ne dit pas (« nous aurons déjà dîné », « ne nous attendez pas, laissez la porte ouverte »).
+   *Critère : une note par personne, environ 200 caractères, valable pour l'arrivée comme pour le départ, visible de tous.*
 5. En tant qu'adulte du foyer, je veux modifier notre heure pendant le séjour, afin de prévenir d'un retard sans passer par le groupe familial.
-   *Critère : la mention « mis à jour à … » est visible de tous à côté de l'heure.*
-6. En tant qu'adulte du foyer, je veux pouvoir dire à l'assistant « on arrive vers 18 h vendredi, Paul nous rejoint vers 23 h » ou « on aura une heure de retard », afin de ne pas chercher où se règle l'heure.
-   *Critère : comme pour les présences, l'assistant propose et je valide d'un clic.*
+   *Critère : quand une heure change le jour même, « mis à jour à 16 h 12 » s'affiche à côté.*
+6. En tant qu'adulte du foyer arrivant tard dans la nuit, je veux pouvoir saisir une heure après minuit, afin de prévenir que nous arriverons à 1 h du matin.
+   *Critère : on peut saisir jusqu'à 4 h du matin ; l'heure reste rattachée à la veille et s'affiche « vendredi, vers 1 h (dans la nuit) ».*
 
 **Organisateur**
 
-7. En tant qu'organisateur, je veux voir, pour chaque jour, qui arrive et qui part et à quelle heure, afin de préparer la maison, les lits et le dîner, et d'être là pour accueillir.
-   *Critère : arrivées et départs sont rangés par heure, avec le nombre de personnes ; ceux qui n'ont pas donné d'heure apparaissent au repas près (« pour le dîner, heure non donnée »).*
-8. En tant qu'organisateur, je veux voir qui n'a pas encore donné d'heure, afin de relancer les retardataires avant le départ.
-9. En tant qu'organisateur, je veux pouvoir saisir ou corriger l'heure d'un foyer, afin de reporter ce qu'on m'a dit au téléphone.
+7. En tant qu'organisateur, je veux voir qui n'a pas encore donné d'heure, afin de relancer de vive voix avant le départ.
+   *Critère : dans l'écran « Foyers » de l'espace organisateur.*
+8. En tant qu'organisateur, je veux saisir ou corriger l'heure d'une personne depuis « Foyers », afin de reporter ce qu'on m'a dit au téléphone.
 
-**Participant**
+**Tout le monde**
 
-10. En tant que participant, je veux voir les arrivées et les départs dans le planning du jour concerné, au milieu des activités, afin de savoir quand les cousins seront là (et de répondre aux enfants qui le demandent toutes les dix minutes).
-11. En tant que participant, je veux être prévenu quand j'inscris quelqu'un à une activité qui commence avant son arrivée ou finit après son départ, afin de ne pas compter sur lui pour rien.
-    *Critère : un avertissement discret, comme l'actuel « absent ce jour-là » ; l'inscription reste possible.*
+9. En tant que participant ou organisateur, je veux voir les arrivées et les départs dans le planning du jour concerné, au milieu des activités et dans l'ordre des heures, afin de préparer la maison, les lits et le dîner, et de savoir quand les cousins seront là.
+   *Critère : les personnes d'une même heure sont regroupées sur une ligne (« vers 18 h · Arrivée : Claire, Hugo, Léo »), notes dépliables ; ceux qui n'ont pas donné d'heure figurent en fin de jour, « heure non donnée ». Un jour s'affiche dès qu'il a une activité, une arrivée ou un départ ; « Aucune activité prévue » ne s'affiche que s'il n'y a ni l'un ni l'autre.*
 
 **Sur place**
 
-12. En tant qu'organisateur, je veux imprimer les arrivées et départs du séjour, afin de les afficher sur le frigo pour ceux qui accueillent sans regarder leur téléphone.
+10. En tant qu'organisateur, je veux imprimer les arrivées et départs du séjour, afin de les afficher sur le frigo pour ceux qui accueillent sans regarder leur téléphone.
+    *Critère : une courte section « Arrivées et départs », jour par jour et par heure, en tête de la fiche « Planning de présence ».*
 
 ## Hors périmètre
 
 - Le covoiturage, le moyen de transport, les gares et les trajets (sujet écarté en octobre 2026) : au plus, la note libre permet d'en dire un mot.
+- Tout lien entre l'heure et les repas : aucun contrôle de cohérence, aucune déduction dans un sens ou dans l'autre.
+- Une heure pour chaque absence en cours de séjour : seules la première arrivée et le dernier départ ont une heure.
+- Le choix du jour d'arrivée ou de départ : il découle toujours des présences.
+- La saisie des heures par l'assistant IA.
+- Un avertissement sur les activités qui commencent avant l'arrivée ou finissent après le départ d'un inscrit, et toute prise en compte des heures dans « inscrire tout le monde ».
+- Un historique des changements ou l'ancienne heure barrée.
 - Les alertes envoyées quand une heure change (les notifications sont hors périmètre de l'application).
 - Le suivi en temps réel, la position des voitures ou l'heure d'arrivée estimée.
 - Une heure d'arrivée conseillée ou un départ « au plus tard » fixés par l'organisateur : ils restent dans les infos pratiques, en texte libre.
-- Les heures des repas réglables par séjour.
-- La déduction automatique des repas à partir de l'heure, sans confirmation.
 - La prise en compte des heures dans le tirage des corvées ou la répartition des chambres.
 
-## Questions ouvertes pour le grill-me
+## Décisions (grill-me du 15/10/2026)
 
-1. **Granularité** : une heure par foyer ou par personne ? *Recommandation : par foyer, avec exception par personne. C'est déjà la règle des présences (« tout le foyer pareil », on décoche pour décaler quelqu'un), la plupart des foyers arrivent ensemble, et le cas du cousin qui arrive seul reste à un geste.*
-2. **Précision** : heure pile, créneau (« fin d'après-midi ») ou texte libre ? *Recommandation : une heure approximative au quart d'heure, affichée « vers 18 h 30 », plus la note libre courte. Un créneau ferait doublon avec les repas, déjà connus ; un texte libre ne se range pas dans l'ordre des arrivées.*
-3. **Cohérence avec les repas** : à partir de quelle heure considère-t-on qu'on « a » un repas, et que faire en cas de contradiction ? *Recommandation : des bornes simples et fixes pour tous les séjours (avant 12 h 30, on déjeune ; avant 19 h 30, on dîne…), une proposition d'ajuster les repas, jamais de changement silencieux, et des repas qui ne fabriquent jamais d'heure.*
-4. **Changement de jour** : que devient l'heure quand le foyer change son premier ou son dernier repas de jour ? *Recommandation : elle est retirée, avec un message qui invite à la redonner ; garder « 18 h » sur un autre jour induirait en erreur.*
-5. **Facultative ou demandée** : faut-il insister pour obtenir une heure ? *Recommandation : facultative, sans relance automatique, mais l'organisateur voit qui ne l'a pas donnée. Contrairement aux régimes, une heure absente se voit : la liste de ceux qui manquent est fiable.*
-6. **Absences en cours de séjour** : une seule arrivée et un seul départ, ou une heure pour chaque aller-retour (parti samedi soir, revenu dimanche matin) ? *Recommandation : une seule arrivée et un seul départ par personne ; les absences du milieu restent au repas près.*
-7. **Où afficher** : une vue réservée à l'organisateur ou visible de tous ? *Recommandation : visible de tous, comme le reste du séjour, dans le planning des jours d'arrivée et de départ, avec la ligne « heure non donnée » qui sert surtout à l'organisateur. Pas de nouvel onglet.*
-8. **Impression** : une fiche dédiée ou une section dans une fiche existante ? *Recommandation : une courte section « Arrivées et départs » en tête de la fiche « Planning de présence », plutôt qu'une fiche de plus.*
-9. **Assistant IA** : faut-il qu'il comprenne les heures dès la première version ? *Recommandation : oui. Il saisit déjà présences et nuits, et « on aura une heure de retard » est exactement la phrase qu'on a envie de lui dire sur place. À retirer si la taille grossit.*
-10. **Activités** : avertir quand une activité tombe avant l'arrivée ou après le départ d'un inscrit ? *Recommandation : oui, avec le même avertissement discret que « absent ce jour-là », sans bloquer l'inscription.*
+1. **Granularité** : l'heure appartient à chaque personne ; la saisie du foyer reste d'un bloc grâce à la recopie.
+2. **Précision** : une heure au quart d'heure, affichée « vers … », plus une note libre courte ; ni créneau, ni texte libre.
+3. **Repas** : aucun lien. L'heure ne contrôle ni ne modifie les repas, les repas ne fabriquent pas d'heure.
+4. **Jour** : implicite, déduit du premier et du dernier repas ou nuit ; si les présences changent de jour, l'heure suit sans message.
+5. **Saisie du foyer** : une ligne par membre et un bouton « Même heure pour tout le foyer ».
+6. **Allers-retours** : une seule arrivée et un seul départ par personne ; les absences du milieu restent au repas près.
+7. **Obligation** : facultative, mais une invitation non masquable reste dans la carte Présences tant qu'il manque une heure à un membre présent, et l'organisateur voit les manquants dans « Foyers ».
+8. **Affichage** : dans le planning, visible de tous, mêlé aux activités et rangé par heure ; pas de nouvel onglet ni de vue réservée.
+9. **Regroupement** : une ligne par heure qui réunit les personnes concernées.
+10. **Jours sans activité** : affichés dès qu'ils ont une arrivée ou un départ.
+11. **Impression** : une section en tête de la fiche « Planning de présence », pas de fiche nouvelle.
+12. **Assistant IA** : non concerné en v1.
+13. **Activités** : rien ne change en v1.
+14. **Changements** : modifiables à tout moment ; « mis à jour à … » quand l'heure change le jour même ; pas d'historique.
+15. **Organisateur** : il saisit et corrige depuis « Foyers ».
+16. **Note** : une par personne, environ 200 caractères, recopiée avec l'heure.
+17. **Après minuit** : jusqu'à 4 h du matin, rattaché à la veille.
 
 ## Pistes notées pour plus tard
 
+- L'assistant IA qui comprend « on arrive vers 18 h, Paul vers 23 h » et « on aura une heure de retard ».
+- Un avertissement discret sur les activités qui tombent avant l'arrivée ou après le départ d'un inscrit.
 - Le nombre de personnes présentes heure par heure le jour d'arrivée (« qui est là à 20 h ? »).
 - Une heure de libération de la maison fixée par l'organisateur, rappelée à ceux qui partent après.
 - Des corvées d'accueil ou de départ (faire les lits, rangement final) tirées parmi les présents à l'heure dite.
@@ -80,4 +93,4 @@ Chaque foyer indique, en plus de ses repas, vers quelle heure il arrive et vers 
 
 ## Taille
 
-**Petit à moyen** : une heure facultative et une note par foyer ou par personne, affichées dans le planning et l'impression, mais la cohérence avec les repas et la compréhension par l'assistant demandent des règles claires et des tests de bout en bout.
+**Petit** : deux heures et une note par personne, une saisie sous la grille des présences, l'affichage dans le planning, « Foyers » et une section imprimée, sans règle métier avec les repas ni assistant.
