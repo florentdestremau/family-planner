@@ -74,7 +74,7 @@ def create_person(db: Session, stay: Stay, body: s.PersonCreate) -> Person:
     db.flush()
     if body.partner_id is not None:
         link_partners(db, p, person(db, body.partner_id, stay))
-    db.commit()
+    db.flush()
     return p
 
 
@@ -92,7 +92,6 @@ def move(db: Session, stay: Stay, p: Person, household_id: int | None) -> Person
     unlink(db, p)
     p.household_id = target.id
     drop_if_empty(db, old)
-    db.commit()
     return p
 
 
@@ -104,7 +103,7 @@ def merge(db: Session, stay: Stay, source_id: int, into_id: int) -> Household:
         p.household_id = into.id
     db.flush()
     db.delete(source)
-    db.commit()
+    db.flush()
     return into
 
 
@@ -143,4 +142,4 @@ def replace_presences(db: Session, stay: Stay, members: list[Member]) -> None:
         db.execute(delete(Presence).where(Presence.person_id == p.id))
         db.add_all(Presence(person_id=p.id, date=d, meal=m) for d, m in {(slot.date, slot.meal) for slot in slots})
         n.write(db, p, wanted)
-    db.commit()
+    db.flush()

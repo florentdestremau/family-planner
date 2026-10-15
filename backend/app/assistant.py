@@ -18,7 +18,7 @@ from . import households as h
 from . import schemas as s
 from .deps import person
 from .models import AssistantCall, Night, Person, Presence, Stay
-from .slots import MEALS, WEEKDAYS, short_day, stay_nights, stay_slots
+from .slots import MEAL_LABELS, MEALS, WEEKDAYS, short_day, stay_nights, stay_slots
 
 MODEL = "claude-sonnet-5-5"
 MAX_TOOL_ROUNDS = 4
@@ -27,8 +27,6 @@ RATE_WINDOW = timedelta(hours=24)
 
 PENDING_TEXT = "Proposition prête, en attente de validation par l'utilisateur : rien n'est encore enregistré."
 REFUSAL_TEXT = "Désolé, je ne peux pas traiter cette demande. Je m'occupe uniquement des présences (repas et nuits)."
-
-MEAL_LABELS = {"breakfast": "petit-déjeuner", "lunch": "déjeuner", "dinner": "dîner"}
 
 PROPOSE_TOOL = {
     "name": "propose_household_presences",

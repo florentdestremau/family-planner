@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from . import schemas as s
 from .db import SessionLocal
+from .journal import Actor
 from .models import Stay
 from .routers import admin, public
 from .slots import night_sides, stay_nights, stay_slots
@@ -227,7 +228,9 @@ def load(db: Session, fx: Fixture) -> Stay:
     stay.slug = fx.slug
     stay.admin_key = os.environ.get("DEMO_ADMIN_KEY", "demo")
     db.commit()
-    admin.update_stay(s.StayUpdate(address=fx.address, practical_info=fx.practical_info), stay, db)
+    # Journal de démonstration : l'organisateur est le premier adulte, chacun saisit ses présences.
+    organizer = Actor(organizer=True)
+    admin.update_stay(s.StayUpdate(address=fx.address, practical_info=fx.practical_info), stay, db, organizer)
 
     slots = stay_slots(start, end, fx.first_meal, fx.last_meal)
     ids: dict[str, int] = {}
@@ -236,11 +239,13 @@ def load(db: Session, fx: Fixture) -> Stay:
         for i, name in enumerate(fam.adults):
             partner = ids[fam.adults[0]] if i == 1 and fam.couple else None
             body = s.PersonCreate(name=name, household_id=household_id, partner_id=partner, does_chores=name not in fam.no_chores)
-            created = admin.create_person(body, stay, db)
+            created = admin.create_person(body, stay, db, organizer)
             ids[name], household_id = created.id, created.household_id
+            if organizer.id is None:
+                organizer = Actor(created.id, created.name, organizer=True)
         for name in fam.children:
             body = s.PersonCreate(name=name, kind="child", household_id=household_id, does_chores=name in fam.teens)
-            ids[name] = admin.create_person(body, stay, db).id
+            ids[name] = admin.create_person(body, stay, db, organizer).id
         index = {(d, m): i for i, (d, m) in enumerate(slots)}
 
         def position(meal: Meal | None, default: int) -> int:
@@ -257,27 +262,28 @@ def load(db: Session, fx: Fixture) -> Stay:
                 nights = [n for n in stay_nights(start, end) if set(night_sides(n)) <= span]
             else:
                 nights = [start + timedelta(days=day) for day in fam.nights]
-            public.set_presences(ids[name], s.PresencesIn(slots=present, nights=nights), stay, db)
+            adult = Actor(ids[fam.adults[0]], fam.adults[0])
+            public.set_presences(ids[name], s.PresencesIn(slots=present, nights=nights), stay, db, adult)
             if name in fam.diets or name in fam.diet_notes:
                 body = s.DietIn(diets=fam.diets.get(name, []), diet_note=fam.diet_notes.get(name, ""))
-                public.set_diet(ids[name], body, stay, db)
+                public.set_diet(ids[name], body, stay, db, adult)
 
     for room_name, beds in fx.rooms:
-        room = admin.create_room(s.RoomIn(name=room_name), stay, db)
+        room = admin.create_room(s.RoomIn(name=room_name), stay, db, organizer)
         for kind in beds:
-            admin.create_bed(room.id, s.BedIn(kind=kind), stay, db)
-    admin.rooms_auto_assign(stay, db)
-    admin.draw_chores(stay, db)
+            admin.create_bed(room.id, s.BedIn(kind=kind), stay, db, organizer)
+    admin.rooms_auto_assign(stay, db, organizer)
+    admin.draw_chores(stay, db, organizer)
 
     for a in fx.activities:
         a = dict(a)
         signups = a.pop("signups", None)
         a["date"] = start + timedelta(days=a.pop("day"))
-        activity = admin.create_activity(s.ActivityCreate(**a, invite_all=signups is None), stay, db)
+        activity = admin.create_activity(s.ActivityCreate(**a, invite_all=signups is None), stay, db, organizer)
         for name in signups or []:
-            public.sign_up(activity.id, ids[name], stay, db)
+            public.sign_up(activity.id, ids[name], stay, db, Actor(ids[name], name))
     for day, meal, dishes, notes in fx.menus:
-        admin.set_menu(s.MenuIn(date=start + timedelta(days=day), meal=meal, dishes=dishes, notes=notes), stay, db)
+        admin.set_menu(s.MenuIn(date=start + timedelta(days=day), meal=meal, dishes=dishes, notes=notes), stay, db, organizer)
     return stay
 
 

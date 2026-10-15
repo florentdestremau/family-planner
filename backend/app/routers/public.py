@@ -2,15 +2,18 @@
 
 import secrets
 from datetime import timedelta
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, HTTPException, Query, Response
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from .. import assistant
 from .. import households as h
+from .. import journal as j
 from .. import schemas as s
 from ..deps import DB, StayDep, person
+from ..journal import ActorDep
 from ..models import (
     Activity,
     AssistantCall,
@@ -57,6 +60,7 @@ def create_stay(body: s.StayCreate, db: DB) -> Stay:
     db.flush()
     for name, moments, needed, every in DEFAULT_CHORES:
         db.add(ChoreType(stay_id=stay.id, name=name, moments=moments, people_needed=needed, every_n_days=every))
+    j.record(db, stay, None, f"Séjour {j.quoted(stay.name)} créé")
     db.commit()
     return stay
 
@@ -144,37 +148,70 @@ def cover_thumb(stay: StayDep, db: DB, v: int | None = None) -> Response:
 
 
 @router.post("/stays/{slug}/persons", response_model=s.PersonOut, status_code=201)
-def add_person(body: s.PersonCreate, stay: StayDep, db: DB) -> Person:
+def add_person(body: s.PersonCreate, stay: StayDep, db: DB, actor: ActorDep) -> Person:
     """Un participant s'ajoute (nouveau foyer) ou ajoute quelqu'un à son foyer (conjoint, enfant)."""
-    return h.create_person(db, stay, body)
+    return create_person(db, stay, body, actor)
+
+
+def create_person(db: Session, stay: Stay, body: s.PersonCreate, actor: j.Actor) -> Person:
+    """Ajout d'une personne, depuis l'espace participant ou organisateur."""
+    joined = j.household_label(db, h.household(db, body.household_id, stay)) if body.household_id is not None else None
+    p = h.create_person(db, stay, body)
+    j.record_person_added(db, stay, actor, p, joined)
+    db.commit()
+    return p
 
 
 @router.patch("/stays/{slug}/households/{household_id}", response_model=s.HouseholdOut)
-def rename_household(household_id: int, body: s.HouseholdIn, stay: StayDep, db: DB) -> Household:
+def rename_household(household_id: int, body: s.HouseholdIn, stay: StayDep, db: DB, actor: ActorDep) -> Household:
     found = h.household(db, household_id, stay)
-    found.name = body.name
+    if body.name != found.name:
+        before = j.household_label(db, found)
+        found.name = body.name
+        after = j.household_label(db, found)
+        members = db.scalars(select(Person.id).where(Person.household_id == found.id)).all()
+        j.record(db, stay, actor, f"a renommé le foyer {j.quoted(before)} en {j.quoted(after)}", members)
     db.commit()
     return found
 
 
 @router.put("/stays/{slug}/persons/{person_id}/diet", response_model=s.PersonOut)
-def set_diet(person_id: int, body: s.DietIn, stay: StayDep, db: DB) -> Person:
+def set_diet(person_id: int, body: s.DietIn, stay: StayDep, db: DB, actor: ActorDep) -> Person:
     """Régimes et allergies, saisis par un adulte du foyer (ou corrigés par l'organisateur)."""
     p = person(db, person_id, stay)
+    before = [d for d in p.diets.split(",") if d]
+    changes = []
+    if added := [d for d in body.diets if d not in before]:
+        changes.append("coché " + ", ".join(j.DIET_LABELS[d] for d in added))
+    if removed := [d for d in before if d not in body.diets and d in j.DIET_LABELS]:
+        changes.append("décoché " + ", ".join(j.DIET_LABELS[d] for d in removed))
+    if body.diet_note != p.diet_note:
+        # Le texte de la précision n'est pas recopié : il ne resterait pas lisible une fois corrigé.
+        changes.append("précision modifiée")
+    if changes:
+        j.record(db, stay, actor, f"a modifié les régimes et allergies {j.of(p.name)} — {' ; '.join(changes)}", [p.id])
     p.diets, p.diet_note = ",".join(body.diets), body.diet_note
     db.commit()
     return p
 
 
 @router.put("/stays/{slug}/persons/{person_id}/presences", status_code=204)
-def set_presences(person_id: int, body: s.PresencesIn, stay: StayDep, db: DB) -> None:
-    h.replace_presences(db, stay, [h.Member(person(db, person_id, stay), body.slots, body.nights)])
+def set_presences(person_id: int, body: s.PresencesIn, stay: StayDep, db: DB, actor: ActorDep) -> None:
+    replace_presences(db, stay, [h.Member(person(db, person_id, stay), body.slots, body.nights)], actor)
+
+
+def replace_presences(db: Session, stay: Stay, members: list[h.Member], actor: j.Actor) -> None:
+    persons = [m.person for m in members]
+    before = {p.id: j.presences_of(db, p.id) for p in persons}
+    h.replace_presences(db, stay, members)
+    j.record_presences(db, stay, actor, before, persons)
+    db.commit()
 
 
 @router.put("/stays/{slug}/households/{household_id}/presences", status_code=204)
-def set_household_presences(household_id: int, body: s.HouseholdPresencesIn, stay: StayDep, db: DB) -> None:
-    """Présences de plusieurs membres d'un foyer en une fois (par exemple « tout le foyer pareil »)."""
-    h.replace_presences(db, stay, h.household_members(db, stay, household_id, body))
+def set_household_presences(household_id: int, body: s.HouseholdPresencesIn, stay: StayDep, db: DB, actor: ActorDep) -> None:
+    """Présences de plusieurs membres d'un foyer en une fois (« tout le foyer pareil », assistant)."""
+    replace_presences(db, stay, h.household_members(db, stay, household_id, body), actor)
 
 
 def _activity(db: DB, activity_id: int, stay: Stay) -> Activity:
@@ -185,27 +222,36 @@ def _activity(db: DB, activity_id: int, stay: Stay) -> Activity:
 
 
 @router.put("/stays/{slug}/activities/{activity_id}/signups/{person_id}", status_code=204)
-def sign_up(activity_id: int, person_id: int, stay: StayDep, db: DB) -> None:
+def sign_up(activity_id: int, person_id: int, stay: StayDep, db: DB, actor: ActorDep) -> None:
     """Inscription libre, même absent ce jour-là ; efface un éventuel désistement."""
-    _activity(db, activity_id, stay)
-    person(db, person_id, stay)
+    activity = _activity(db, activity_id, stay)
+    p = person(db, person_id, stay)
     db.execute(delete(Decline).where(Decline.activity_id == activity_id, Decline.person_id == person_id))
     exists = db.scalar(select(Signup).where(Signup.activity_id == activity_id, Signup.person_id == person_id))
     if exists is None:
         db.add(Signup(activity_id=activity_id, person_id=person_id))
+        j.record(db, stay, actor, f"a inscrit {p.name} à {j.activity_label(activity)}", [p.id])
     db.commit()
 
 
 @router.delete("/stays/{slug}/activities/{activity_id}/signups/{person_id}", status_code=204)
-def sign_out(activity_id: int, person_id: int, stay: StayDep, db: DB) -> None:
+def sign_out(activity_id: int, person_id: int, stay: StayDep, db: DB, actor: ActorDep) -> None:
     """Désinscription, mémorisée : « inscrire tout le monde » ne réinscrira pas la personne."""
-    _activity(db, activity_id, stay)
-    person(db, person_id, stay)
-    db.execute(delete(Signup).where(Signup.activity_id == activity_id, Signup.person_id == person_id))
+    activity = _activity(db, activity_id, stay)
+    p = person(db, person_id, stay)
+    if db.execute(delete(Signup).where(Signup.activity_id == activity_id, Signup.person_id == person_id)).rowcount:
+        j.record(db, stay, actor, f"a désinscrit {p.name} de {j.activity_label(activity)}", [p.id])
     exists = db.scalar(select(Decline).where(Decline.activity_id == activity_id, Decline.person_id == person_id))
     if exists is None:
         db.add(Decline(activity_id=activity_id, person_id=person_id))
     db.commit()
+
+
+@router.get("/stays/{slug}/journal", response_model=s.JournalOut)
+def journal(stay: StayDep, db: DB, query: Annotated[s.JournalQuery, Query()]) -> dict:
+    """Activité du séjour, la plus récente d'abord, sans le détail réservé à l'organisateur."""
+    rows, more = j.entries(db, stay, query.limit, query.before, query.persons)
+    return {"entries": rows, "more": more}
 
 
 @router.get("/assistant", response_model=s.AssistantStatus)
