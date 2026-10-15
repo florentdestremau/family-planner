@@ -78,7 +78,9 @@ class Person(Base):
     arrival_time: Mapped[str] = mapped_column(String(5), default="")
     departure_time: Mapped[str] = mapped_column(String(5), default="")
     times_note: Mapped[str] = mapped_column(String(200), default="")  # « nous aurons déjà dîné »…
-    times_updated_at: Mapped[datetime | None]  # dernier changement des heures ou de la note
+    # Dernier changement de chaque heure ; la note, commune aux deux, compte pour l'une et l'autre.
+    arrival_updated_at: Mapped[datetime | None]
+    departure_updated_at: Mapped[datetime | None]
 
 
 class Presence(Base):

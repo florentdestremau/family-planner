@@ -57,8 +57,9 @@ export interface Person {
   departure_time: string;
   /** Note libre, valable pour l'arrivée comme pour le départ. */
   times_note: string;
-  /** Dernier changement des heures ou de la note (ISO, UTC) ; null : jamais données. */
-  times_updated_at: string | null;
+  /** Dernier changement de l'heure d'arrivée, de départ (la note compte pour les deux), ISO UTC ; null : jamais. */
+  arrival_updated_at: string | null;
+  departure_updated_at: string | null;
 }
 
 /** Heures d'une personne, telles qu'envoyées pour son foyer. */

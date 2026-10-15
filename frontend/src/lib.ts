@@ -189,10 +189,27 @@ export const sameDay = (iso: string, day: string) => toIso(new Date(iso)) === da
 
 const timePart = (label: string, day: string, time: string) => `${label} ${dayLabel(day).toLowerCase()} ${timeLabel(time)}`;
 
-/** Arrivée et départ d'une personne, en une ligne : « Arrivée ven. 30 oct. vers 18 h 30 · Départ … ». */
-export function timesSummary(p: Person, range: { arrival: string; departure: string }): string {
-  return `${timePart("Arrivée", range.arrival, p.arrival_time)} · ${timePart("Départ", range.departure, p.departure_time)}`;
+/** Jours sur place d'une personne, déduits de ses présences. */
+export interface StayRange {
+  /** Premier repas ou première nuit. */
+  arrival: string;
+  /** Dernier repas, ou lendemain de la dernière nuit. */
+  departure: string;
+  /** Dernier jour d'un repas ou d'une nuit : un départ dans la nuit s'y rattache (la veille). */
+  lastDay: string;
 }
+
+/** Jour de départ : celui de la dernière présence pour un départ dans la nuit, rattaché à la veille. */
+export const departureDay = (range: StayRange, time: string) => (isNightTime(time) ? range.lastDay : range.departure);
+
+/** Arrivée et départ d'une personne, en une ligne : « Arrivée ven. 30 oct. vers 18 h 30 · Départ … ». */
+export function timesSummary(p: Person, range: StayRange): string {
+  const departure = timePart("Départ", departureDay(range, p.departure_time), p.departure_time);
+  return `${timePart("Arrivée", range.arrival, p.arrival_time)} · ${departure}`;
+}
+
+/** Note telle que le serveur l'enregistre : sur une ligne, sans espaces superflus. */
+export const oneLine = (text: string) => text.split(/\s+/u).filter(Boolean).join(" ");
 
 export type MovementKind = "arrival" | "departure";
 
@@ -207,7 +224,7 @@ export interface Movement {
   persons: Person[];
   /** Notes, chacune avec les personnes qui la partagent (recopiée sur le foyer). */
   notes: { text: string; persons: Person[] }[];
-  /** Dernier changement d'heure ou de note, s'il date de ce jour-là ; sinon null. */
+  /** Dernier changement de cette heure (ou de la note), s'il date de ce jour-là ; sinon null. */
   updatedAt: string | null;
 }
 
@@ -331,12 +348,13 @@ export function buildIndex(snap: Snapshot) {
   const presence = new Set(snap.presences.map((p) => presenceKey(p.person_id, p.date, p.meal)));
   const presentDays = new Set(snap.presences.map((p) => `${p.person_id}|${p.date}`));
   // Premier et dernier jour sur place : repas, nuits, et lendemain de la dernière nuit.
-  const range = new Map<number, { arrival: string; departure: string }>();
-  const extend = (personId: number, first: string, last: string) => {
+  const range = new Map<number, StayRange>();
+  const extend = (personId: number, day: string, departure: string) => {
     const known = range.get(personId);
     range.set(personId, {
-      arrival: known && known.arrival < first ? known.arrival : first,
-      departure: known && known.departure > last ? known.departure : last,
+      arrival: known && known.arrival < day ? known.arrival : day,
+      departure: known && known.departure > departure ? known.departure : departure,
+      lastDay: known && known.lastDay > day ? known.lastDay : day,
     });
   };
   for (const p of snap.presences) extend(p.person_id, p.date, p.date);
@@ -428,14 +446,15 @@ export function buildIndex(snap: Snapshot) {
   const stayRange = (personId: number) => range.get(personId);
 
   /** Arrivées et départs du séjour, regroupés par jour et par heure, dans l'ordre d'affichage. */
-  const movements = (): Movement[] => {
+  let movementList: Movement[] | undefined;
+  const computeMovements = (): Movement[] => {
     const groups = new Map<string, Movement>();
     for (const p of snap.persons) {
       const days = range.get(p.id);
       if (!days) continue;
-      for (const [kind, day, time] of [
-        ["arrival", days.arrival, p.arrival_time],
-        ["departure", days.departure, p.departure_time],
+      for (const [kind, day, time, updated] of [
+        ["arrival", days.arrival, p.arrival_time, p.arrival_updated_at],
+        ["departure", departureDay(days, p.departure_time), p.departure_time, p.departure_updated_at],
       ] as const) {
         const key = `${day}|${kind}|${time}`;
         const group = groups.get(key) ?? { day, kind, time, persons: [], notes: [], updatedAt: null };
@@ -446,12 +465,13 @@ export function buildIndex(snap: Snapshot) {
           if (note) note.persons.push(p);
           else group.notes.push({ text: p.times_note, persons: [p] });
         }
-        const updated = p.times_updated_at;
         if (updated !== null && sameDay(updated, day) && (group.updatedAt === null || updated > group.updatedAt)) group.updatedAt = updated;
       }
     }
     return [...groups.values()].toSorted(movementOrder);
   };
+  // Calculées une fois par séjour chargé, à la première demande.
+  const movements = (): Movement[] => (movementList ??= computeMovements());
 
   /** Inscrits à une activité (toutes les activités sont sur inscription). */
   const activityParticipants = (activity: Activity): Person[] =>

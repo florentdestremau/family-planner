@@ -1,6 +1,6 @@
 import type { Snapshot } from "./api";
 
-const NO_TIMES = { arrival_time: "", departure_time: "", times_note: "", times_updated_at: null };
+const NO_TIMES = { arrival_time: "", departure_time: "", times_note: "", arrival_updated_at: null, departure_updated_at: null };
 
 /** Snapshot minimal et cohérent pour les tests : ven. dîner → dim. déjeuner. */
 export function makeSnapshot(overrides: Partial<Snapshot> = {}): Snapshot {

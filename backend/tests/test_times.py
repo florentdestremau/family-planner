@@ -10,14 +10,15 @@ def times_of(api, person_id: int) -> tuple[str, str, str]:
     return p["arrival_time"], p["departure_time"], p["times_note"]
 
 
-def put(api, household_id: int, members: list[dict], status: int = 204):
+def put(api, household_id: int, members: list[dict], status: int = 200):
     return api.pub("PUT", f"/households/{household_id}/times", {"members": members}, status=status)
 
 
 def test_a_new_person_has_no_time(api) -> None:
     alice = api.person("Alice")
     assert times_of(api, alice) == ("", "", "")
-    assert api.persons()[alice]["times_updated_at"] is None
+    assert api.persons()[alice]["arrival_updated_at"] is None
+    assert api.persons()[alice]["departure_updated_at"] is None
 
 
 def test_same_time_for_the_whole_household_but_one(api) -> None:
@@ -45,21 +46,35 @@ def test_times_are_replaced_as_a_whole(api) -> None:
     assert times_of(api, alice) == ("19:00", "", "")
 
 
-def test_change_time_is_noted_only_when_something_changes(api) -> None:
+def test_change_time_is_noted_only_for_what_changes(api) -> None:
     alice = api.person("Alice")
     bob = api.person("Bob", with_=alice)
-    alice_home = api.household_of(alice)
-    put(api, alice_home, [{"person_id": alice, "arrival_time": "18:00"}])
-    first = api.persons()[alice]["times_updated_at"]
-    when = datetime.fromisoformat(first)
+    home = api.household_of(alice)
+    stamps = lambda p: (p["arrival_updated_at"], p["departure_updated_at"])  # noqa: E731
+    put(api, home, [{"person_id": alice, "arrival_time": "18:00"}])
+    arrival, departure = stamps(api.persons()[alice])
+    when = datetime.fromisoformat(arrival)
     assert when.tzinfo is not None and abs(datetime.now(timezone.utc) - when) < timedelta(minutes=1)
-    assert api.persons()[bob]["times_updated_at"] is None
-    put(api, alice_home, [{"person_id": alice, "arrival_time": "18:00"}, {"person_id": bob, "arrival_time": ""}])
+    assert departure is None, "le départ n'a pas changé"
+    assert stamps(api.persons()[bob]) == (None, None)
+    # Rien ne change : rien n'est daté.
+    put(api, home, [{"person_id": alice, "arrival_time": "18:00"}, {"person_id": bob, "arrival_time": ""}])
     persons = api.persons()
-    assert persons[alice]["times_updated_at"] == first, "rien n'a changé"
-    assert persons[bob]["times_updated_at"] is None
-    put(api, alice_home, [{"person_id": alice, "arrival_time": "18:00", "times_note": "Une heure de retard"}])
-    assert api.persons()[alice]["times_updated_at"] >= first
+    assert stamps(persons[alice]) == (arrival, None) and stamps(persons[bob]) == (None, None)
+    # Le départ seul.
+    put(api, home, [{"person_id": alice, "arrival_time": "18:00", "departure_time": "15:00"}])
+    later_arrival, later_departure = stamps(api.persons()[alice])
+    assert later_arrival == arrival and later_departure is not None
+    # La note vaut pour les deux.
+    put(api, home, [{"person_id": alice, "arrival_time": "18:00", "departure_time": "15:00", "times_note": "Une heure de retard"}])
+    noted = stamps(api.persons()[alice])
+    assert noted[0] > arrival and noted[1] > later_departure
+
+
+def test_answer_gives_the_updated_persons(api) -> None:
+    alice = api.person("Alice")
+    out = put(api, api.household_of(alice), [{"person_id": alice, "arrival_time": "18:00"}]).json()
+    assert [(p["id"], p["arrival_time"]) for p in out] == [(alice, "18:00")]
 
 
 @pytest.mark.parametrize(

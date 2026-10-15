@@ -121,20 +121,25 @@ def household_members(db: Session, stay: Stay, household_id: int, body: s.Househ
     return members
 
 
-def replace_times(db: Session, stay: Stay, household_id: int, body: s.HouseholdTimesIn) -> None:
-    """Heures d'arrivée et de départ de membres d'un foyer ; l'heure du changement n'est notée que
-    pour ceux dont quelque chose change vraiment."""
+def replace_times(db: Session, stay: Stay, household_id: int, body: s.HouseholdTimesIn) -> list[Person]:
+    """Heures d'arrivée et de départ de membres d'un foyer. L'heure du changement n'est notée que
+    pour ce qui change vraiment : l'arrivée, le départ, ou les deux quand la note change."""
     found = household(db, household_id, stay)
     now = datetime.now(timezone.utc)
+    persons = []
     for member in body.members:
         p = person(db, member.person_id, stay)
         if p.household_id != found.id:
             raise HTTPException(422, f"{p.name} n'appartient pas à ce foyer")
-        wanted = (member.arrival_time, member.departure_time, member.times_note)
-        if (p.arrival_time, p.departure_time, p.times_note) != wanted:
-            p.arrival_time, p.departure_time, p.times_note = wanted
-            p.times_updated_at = now
+        note = member.times_note != p.times_note
+        if note or member.arrival_time != p.arrival_time:
+            p.arrival_updated_at = now
+        if note or member.departure_time != p.departure_time:
+            p.departure_updated_at = now
+        p.arrival_time, p.departure_time, p.times_note = member.arrival_time, member.departure_time, member.times_note
+        persons.append(p)
     db.commit()
+    return persons
 
 
 def check_slots(stay: Stay, members: list[Member]) -> None:

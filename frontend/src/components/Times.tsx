@@ -1,6 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 import type { MemberTimes, Person } from "../api";
-import { clockLabel, dayLabel, hourLabel, isNightTime, MAX_TIMES_NOTE, MOVEMENT_LABEL, type Movement, TIME_OPTIONS, timeLabel } from "../lib";
+import {
+  clockLabel,
+  dayLabel,
+  departureDay,
+  hourLabel,
+  isNightTime,
+  MAX_TIMES_NOTE,
+  MOVEMENT_LABEL,
+  type Movement,
+  oneLine,
+  type StayRange,
+  TIME_OPTIONS,
+  timeLabel,
+} from "../lib";
 import { useStay } from "../stay";
 
 type Times = Omit<MemberTimes, "person_id">;
@@ -10,6 +23,9 @@ const given = (p: Person) => p.arrival_time !== "" || p.departure_time !== "" ||
 
 const timesOf = (p: Person): Times => ({ arrival_time: p.arrival_time, departure_time: p.departure_time, times_note: p.times_note });
 
+const sameTimes = (a: Times, b: Times) =>
+  a.arrival_time === b.arrival_time && a.departure_time === b.departure_time && a.times_note === b.times_note;
+
 /**
  * Enregistrement des heures d'un foyer, un envoi à la fois : chaque envoi remplace les heures des
  * personnes concernées, deux envois en parallèle pourraient arriver dans le désordre et l'ancien
@@ -18,8 +34,11 @@ const timesOf = (p: Person): Times => ({ arrival_time: p.arrival_time, departure
 export function useTimesSaver(householdId: number) {
   const { call } = useStay();
   const queue = useRef<Promise<unknown>>(Promise.resolve());
-  return (members: MemberTimes[]) => {
-    queue.current = queue.current.then(() => call("PUT", `/households/${householdId}/times`, { members }));
+  /** Résout à `true` une fois enregistré, `false` en cas d'échec (déjà signalé par un message). */
+  return (members: MemberTimes[]): Promise<boolean> => {
+    const done = queue.current.then(async () => (await call<Person[]>("PUT", `/households/${householdId}/times`, { members })) !== undefined);
+    queue.current = done;
+    return done;
   };
 }
 
@@ -48,8 +67,8 @@ export function TimesRow({
   onCopy,
 }: {
   person: Person;
-  range: { arrival: string; departure: string };
-  onSave: (times: Times) => void;
+  range: StayRange;
+  onSave: (times: Times) => Promise<boolean>;
   onCopy?: (times: Times) => void;
 }) {
   const [times, setTimes] = useState(() => timesOf(person));
@@ -67,22 +86,27 @@ export function TimesRow({
     }));
   }, [person.arrival_time, person.departure_time, person.times_note]);
 
-  const change = (next: Times) => {
+  const change = async (next: Times) => {
     setTimes(next);
-    onSave(next);
+    // Échec : on revient à ce que le serveur a vraiment, plutôt que d'afficher une heure perdue.
+    if (!(await onSave(next))) setTimes(saved.current);
   };
-  const note = times.times_note.trim();
+  const note = oneLine(times.times_note);
 
   return (
     <div className="times-row" role="group" aria-label={`Heures de ${person.name}`}>
       <strong className="times-name">{person.name}</strong>
       <label className="times-field">
         <span className="muted small">Arrivée · {dayLabel(range.arrival)}</span>
-        <TimeSelect label={`Heure d'arrivée de ${person.name}`} value={times.arrival_time} onChange={(v) => change({ ...times, arrival_time: v })} />
+        <TimeSelect label={`Heure d'arrivée de ${person.name}`} value={times.arrival_time} onChange={(v) => void change({ ...times, arrival_time: v })} />
       </label>
       <label className="times-field">
-        <span className="muted small">Départ · {dayLabel(range.departure)}</span>
-        <TimeSelect label={`Heure de départ de ${person.name}`} value={times.departure_time} onChange={(v) => change({ ...times, departure_time: v })} />
+        <span className="muted small">Départ · {dayLabel(departureDay(range, times.departure_time))}</span>
+        <TimeSelect
+          label={`Heure de départ de ${person.name}`}
+          value={times.departure_time}
+          onChange={(v) => void change({ ...times, departure_time: v })}
+        />
       </label>
       <input
         className="times-note"
@@ -90,7 +114,7 @@ export function TimesRow({
         maxLength={MAX_TIMES_NOTE}
         onChange={(e) => setTimes({ ...times, times_note: e.target.value })}
         onBlur={() => {
-          if (note !== person.times_note) change({ ...times, times_note: note });
+          if (note !== person.times_note) void change({ ...times, times_note: note });
         }}
         placeholder="Note (facultatif) : nous aurons déjà dîné, laissez la porte ouverte…"
         aria-label={`Note d'arrivée et de départ de ${person.name}`}
@@ -118,9 +142,9 @@ export function HouseholdTimes({ me }: { me: Person }) {
 
   const copy = (from: Person, times: Times) => {
     const others = present.filter(({ person }) => person.id !== from.id).map(({ person }) => person);
-    const overwritten = others.filter((p) => given(p) && JSON.stringify(timesOf(p)) !== JSON.stringify(times));
+    const overwritten = others.filter((p) => given(p) && !sameTimes(timesOf(p), times));
     if (overwritten.length > 0 && !confirm(`Recopier les heures de ${from.name} à ${overwritten.map((p) => p.name).join(", ")} ?`)) return;
-    save(present.map(({ person }) => ({ person_id: person.id, ...times })));
+    void save(present.map(({ person }) => ({ person_id: person.id, ...times })));
   };
 
   return (

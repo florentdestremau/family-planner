@@ -118,7 +118,9 @@ def test_legacy_database_is_converted_without_loss(tmp_path) -> None:
     # Lieu et infos pratiques : vides pour les séjours existants.
     assert query(path, "SELECT address, map_url, practical_info, info_updated_at FROM stays") == [("", "", "", None)] * 2
     # Heures d'arrivée et de départ : pas encore données.
-    assert query(path, "SELECT DISTINCT arrival_time, departure_time, times_note, times_updated_at FROM persons") == [("", "", "", None)]
+    assert query(path, "SELECT DISTINCT arrival_time, departure_time, times_note, arrival_updated_at, departure_updated_at FROM persons") == [
+        ("", "", "", None, None)
+    ]
     assert query(path, "PRAGMA foreign_key_check") == []
     assert query(path, "SELECT version_num FROM alembic_version") == [("0009",)]
 

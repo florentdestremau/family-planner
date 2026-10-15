@@ -20,7 +20,8 @@ def upgrade() -> None:
         batch.add_column(sa.Column("arrival_time", sa.String(length=5), nullable=False, server_default=""))
         batch.add_column(sa.Column("departure_time", sa.String(length=5), nullable=False, server_default=""))
         batch.add_column(sa.Column("times_note", sa.String(length=200), nullable=False, server_default=""))
-        batch.add_column(sa.Column("times_updated_at", sa.DateTime(), nullable=True))
+        batch.add_column(sa.Column("arrival_updated_at", sa.DateTime(), nullable=True))
+        batch.add_column(sa.Column("departure_updated_at", sa.DateTime(), nullable=True))
 
 
 def downgrade() -> None:

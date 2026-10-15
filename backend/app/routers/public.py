@@ -177,11 +177,11 @@ def set_household_presences(household_id: int, body: s.HouseholdPresencesIn, sta
     h.replace_presences(db, stay, h.household_members(db, stay, household_id, body))
 
 
-@router.put("/stays/{slug}/households/{household_id}/times", status_code=204)
-def set_household_times(household_id: int, body: s.HouseholdTimesIn, stay: StayDep, db: DB) -> None:
+@router.put("/stays/{slug}/households/{household_id}/times", response_model=list[s.PersonOut])
+def set_household_times(household_id: int, body: s.HouseholdTimesIn, stay: StayDep, db: DB) -> list[Person]:
     """Heures d'arrivée et de départ de membres d'un foyer (un seul, ou « même heure pour tout le
     foyer »), saisies par un adulte du foyer ou corrigées par l'organisateur."""
-    h.replace_times(db, stay, household_id, body)
+    return h.replace_times(db, stay, household_id, body)
 
 
 def _activity(db: DB, activity_id: int, stay: Stay) -> Activity:

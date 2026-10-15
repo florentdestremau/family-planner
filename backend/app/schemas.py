@@ -263,9 +263,10 @@ class PersonOut(ORM):
     arrival_time: str
     departure_time: str
     times_note: str
-    times_updated_at: datetime | None
+    arrival_updated_at: datetime | None
+    departure_updated_at: datetime | None
 
-    _utc = field_validator("times_updated_at")(as_utc)
+    _utc = field_validator("arrival_updated_at", "departure_updated_at")(as_utc)
 
     @field_validator("diets", mode="before")
     @classmethod

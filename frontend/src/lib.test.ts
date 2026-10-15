@@ -8,6 +8,7 @@ import {
   dayTimeline,
   hourLabel,
   isNightTime,
+  oneLine,
   sameDay,
   TIME_OPTIONS,
   timeLabel,
@@ -567,9 +568,9 @@ describe("heures d'arrivée et de départ", () => {
   it("déduit les jours d'arrivée et de départ des repas et des nuits", () => {
     const idx = buildIndex(makeSnapshot());
     // Alice : dîner de vendredi, nuit de samedi → départ dimanche matin.
-    expect(idx.stayRange(1)).toEqual({ arrival: "2026-10-30", departure: "2026-11-01" });
-    expect(idx.stayRange(3)).toEqual({ arrival: "2026-10-30", departure: "2026-10-31" });
-    expect(idx.stayRange(4)).toEqual({ arrival: "2026-10-31", departure: "2026-10-31" });
+    expect(idx.stayRange(1)).toEqual({ arrival: "2026-10-30", departure: "2026-11-01", lastDay: "2026-10-31" });
+    expect(idx.stayRange(3)).toEqual({ arrival: "2026-10-30", departure: "2026-10-31", lastDay: "2026-10-30" });
+    expect(idx.stayRange(4)).toEqual({ arrival: "2026-10-31", departure: "2026-10-31", lastDay: "2026-10-31" });
     expect(idx.stayRange(5)).toBeUndefined();
   });
 
@@ -578,9 +579,9 @@ describe("heures d'arrivée et de départ", () => {
     const earlier = new Date(2026, 9, 15, 9, 0).toISOString();
     const note = "Nous aurons déjà dîné";
     const snap = withTimes({
-      1: { arrival_time: "18:30", departure_time: "15:00", times_note: note, times_updated_at: friday },
-      2: { arrival_time: "18:30", departure_time: "15:00", times_note: note, times_updated_at: earlier },
-      4: { arrival_time: "01:00", departure_time: "12:00", times_note: "Porte ouverte", times_updated_at: earlier },
+      1: { arrival_time: "18:30", departure_time: "15:00", times_note: note, arrival_updated_at: friday, departure_updated_at: friday },
+      2: { arrival_time: "18:30", departure_time: "15:00", times_note: note, arrival_updated_at: earlier },
+      4: { arrival_time: "01:00", departure_time: "12:00", times_note: "Porte ouverte", arrival_updated_at: earlier },
     });
     const idx = buildIndex(snap);
     const summary = idx.movements().map((m) => [m.day, m.kind, m.time, m.persons.map((p) => p.name).join(","), m.updatedAt]);
@@ -608,9 +609,48 @@ describe("heures d'arrivée et de départ", () => {
     const morning = new Date(2026, 9, 30, 9, 0).toISOString();
     const evening = new Date(2026, 9, 30, 19, 0).toISOString();
     const idx = buildIndex(
-      withTimes({ 1: { arrival_time: "18:30", times_updated_at: evening }, 2: { arrival_time: "18:30", times_updated_at: morning } }),
+      withTimes({ 1: { arrival_time: "18:30", arrival_updated_at: evening }, 2: { arrival_time: "18:30", arrival_updated_at: morning } }),
     );
     expect(idx.movements()[0].updatedAt).toBe(evening);
+  });
+
+  it("ne signale un changement que sur l'heure qui a changé", () => {
+    // Léo part samedi : changer son départ ce jour-là ne marque pas son arrivée de vendredi.
+    const saturday = new Date(2026, 9, 31, 8, 0).toISOString();
+    const friday = new Date(2026, 9, 30, 8, 0).toISOString();
+    const idx = buildIndex(withTimes({ 3: { arrival_time: "18:30", departure_time: "10:00", departure_updated_at: friday } }));
+    const leo = (index: typeof idx) => index.movements().filter((m) => m.persons.some((p) => p.name === "Léo"));
+    expect(leo(idx).map((m) => [m.kind, m.updatedAt])).toEqual([
+      ["arrival", null],
+      ["departure", null], // changé la veille
+    ]);
+    const later = buildIndex(withTimes({ 3: { arrival_time: "18:30", departure_time: "10:00", departure_updated_at: saturday } }));
+    expect(leo(later).map((m) => [m.kind, m.updatedAt])).toEqual([
+      ["arrival", null],
+      ["departure", saturday],
+    ]);
+  });
+
+  it("rattache un départ dans la nuit au dernier jour sur place", () => {
+    // Alice dort là samedi : un départ à 2 h est celui de la nuit de samedi, pas de dimanche soir.
+    const idx = buildIndex(withTimes({ 1: { departure_time: "02:00" }, 2: { departure_time: "10:00" } }));
+    const departures = idx
+      .movements()
+      .filter((m) => m.kind === "departure")
+      .filter((m) => m.time !== "");
+    expect(departures.map((m) => [m.day, m.time])).toEqual([
+      ["2026-10-31", "02:00"],
+      ["2026-11-01", "10:00"],
+    ]);
+  });
+
+  it("met la note sur une ligne, comme le serveur", () => {
+    expect(oneLine("  Porte  ouverte\n svp ")).toBe("Porte ouverte svp");
+  });
+
+  it("calcule les arrivées et départs une seule fois par séjour", () => {
+    const idx = buildIndex(makeSnapshot());
+    expect(idx.movements()).toBe(idx.movements());
   });
 
   it("mêle activités, arrivées et départs dans l'ordre des heures", () => {
@@ -632,8 +672,10 @@ describe("heures d'arrivée et de départ", () => {
 
   it("résume les heures d'une personne", () => {
     const [alice] = withTimes({ 1: { arrival_time: "18:30" } }).persons;
-    expect(timesSummary(alice, { arrival: "2026-10-30", departure: "2026-11-01" })).toBe(
-      "Arrivée ven. 30 oct. vers 18 h 30 · Départ dim. 1 nov. heure non donnée",
+    const range = { arrival: "2026-10-30", departure: "2026-11-01", lastDay: "2026-10-31" };
+    expect(timesSummary(alice, range)).toBe("Arrivée ven. 30 oct. vers 18 h 30 · Départ dim. 1 nov. heure non donnée");
+    expect(timesSummary({ ...alice, departure_time: "01:00" }, range)).toBe(
+      "Arrivée ven. 30 oct. vers 18 h 30 · Départ sam. 31 oct. vers 1 h (dans la nuit)",
     );
   });
 });
