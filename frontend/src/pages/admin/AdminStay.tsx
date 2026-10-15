@@ -22,10 +22,9 @@ export default function AdminStay() {
 
   async function save(e: React.SubmitEvent) {
     e.preventDefault();
-    const { name, start_date, end_date, first_meal, last_meal } = form;
-    const shrinking = start_date > snap.stay.start_date || end_date < snap.stay.end_date;
+    const shrinking = form.start_date > snap.stay.start_date || form.end_date < snap.stay.end_date;
     if (shrinking && !confirm("Les présences, menus et corvées hors de la nouvelle période seront supprimés. Continuer ?")) return;
-    if ((await call("PATCH", "/stay", { name, start_date, end_date, first_meal, last_meal }, { admin: true })) !== undefined) toast("Séjour enregistré");
+    if ((await call("PATCH", "/stay", form, { admin: true })) !== undefined) toast("Séjour enregistré");
   }
 
   const stats = {

@@ -14,15 +14,15 @@ test("l'organisateur renseigne le lieu, la famille le retrouve en tête de « Mo
   await expect(page.getByRole("region", { name: "Lieu et infos pratiques" })).toHaveCount(0);
 
   await openAdmin(page, stay.slug, stay.key);
-  const card = page.locator(".card").filter({ has: page.getByRole("heading", { name: /Lieu et infos pratiques/ }) });
-  await expect(card.getByText(/Visible par toute personne qui ouvre l'application/)).toBeVisible();
+  const card = page.locator(".card").filter({ has: page.getByRole("heading", { name: /Lieu et infos pratiques/u }) });
+  await expect(card.getByText(/Visible par toute personne qui ouvre l'application/u)).toBeVisible();
   await card.getByLabel("Adresse", { exact: true }).fill(ADDRESS);
   await card.getByLabel("Infos pratiques").fill(INFO);
   await expect(card.getByText(`${INFO.length} / 2000`)).toBeVisible();
   // Un lien qui n'est pas Google Maps est refusé, et rien n'est enregistré.
   await card.getByLabel("Lien Google Maps").fill("https://waze.com/ul?q=Nyons");
   await card.getByRole("button", { name: "Enregistrer" }).click();
-  await expect(page.getByText(/Le lien de carte doit être un lien Google Maps/)).toBeVisible();
+  await expect(page.getByText(/Le lien de carte doit être un lien Google Maps/u)).toBeVisible();
   expect((await stay.snap()).stay.address).toBe("");
 
   await card.getByLabel("Lien Google Maps").fill("");
@@ -34,16 +34,16 @@ test("l'organisateur renseigne le lieu, la famille le retrouve en tête de « Mo
   await page.goto(stay.url);
   const place = page.getByRole("region", { name: "Lieu et infos pratiques" });
   await expect(place.getByText(`📍 ${ADDRESS}`)).toBeVisible();
-  const map = place.getByRole("link", { name: /Ouvrir dans Google Maps/ });
+  const map = place.getByRole("link", { name: /Ouvrir dans Google Maps/u });
   await expect(map).toHaveAttribute("href", `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ADDRESS)}`);
   await expect(map).toHaveAttribute("target", "_blank");
   await expect(place.getByRole("button", { name: "Copier l'adresse" })).toBeVisible();
-  await expect(place.getByText(/^Mis à jour le \d\d\/\d\d à \d\d:\d\d$/)).toBeVisible();
+  await expect(place.getByText(/^Mis à jour le \d\d\/\d\d à \d\d:\d\d$/u)).toBeVisible();
 
   // Consignes repliées ; une fois ouvertes, numéro et lien sont cliquables.
   await expect(place.getByText("Portail : code 1984")).toBeHidden();
   await place.getByText("Voir les infos pratiques").click();
-  await expect(place.getByText(/Portail : code 1984/)).toBeVisible();
+  await expect(place.getByText(/Portail : code 1984/u)).toBeVisible();
   await expect(place.getByRole("link", { name: "06 12 34 56 78" })).toHaveAttribute("href", "tel:0612345678");
   const weather = place.getByRole("link", { name: "https://meteofrance.com" });
   await expect(weather).toHaveAttribute("href", "https://meteofrance.com");
@@ -58,15 +58,15 @@ test("l'organisateur renseigne le lieu, la famille le retrouve en tête de « Mo
   // Un lien collé passe devant le lien tiré de l'adresse.
   await stay.adm("PATCH", "/stay", { map_url: "https://maps.app.goo.gl/AbCdEf123" });
   await page.reload();
-  await expect(place.getByRole("link", { name: /Ouvrir dans Google Maps/ })).toHaveAttribute("href", "https://maps.app.goo.gl/AbCdEf123");
+  await expect(place.getByRole("link", { name: /Ouvrir dans Google Maps/u })).toHaveAttribute("href", "https://maps.app.goo.gl/AbCdEf123");
 
   // Fiche à imprimer : adresse, lien collé en clair, consignes.
   await page.goto(`${stay.url}/imprimer`);
-  await page.getByRole("link", { name: /Infos pratiques/ }).click();
+  await page.getByRole("link", { name: /Infos pratiques/u }).click();
   await expect(page.getByRole("heading", { name: "Infos pratiques" })).toBeVisible();
   await expect(page.getByText(`📍 ${ADDRESS}`)).toBeVisible();
   await expect(page.getByText("Carte : https://maps.app.goo.gl/AbCdEf123")).toBeVisible();
-  await expect(page.getByText(/Clés chez Gérard/)).toBeVisible();
+  await expect(page.getByText(/Clés chez Gérard/u)).toBeVisible();
   await expectNoHorizontalScroll(page);
 });
 
@@ -79,7 +79,7 @@ test("une fiche sans infos pratiques le dit", async ({ page, request }) => {
 test("enregistrer un formulaire du séjour ne vide pas la saisie en cours de l'autre", async ({ page, request }) => {
   const stay = await createStay(request, "Brouillons e2e");
   await openAdmin(page, stay.slug, stay.key);
-  const place = page.locator(".card").filter({ has: page.getByRole("heading", { name: /Lieu et infos pratiques/ }) });
+  const place = page.locator(".card").filter({ has: page.getByRole("heading", { name: /Lieu et infos pratiques/u }) });
   const dates = page.locator(".card").filter({ has: page.getByRole("heading", { name: "Dates du séjour" }) });
 
   // Consignes en cours de saisie, puis le nom du séjour enregistré à côté.

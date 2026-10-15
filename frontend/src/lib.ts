@@ -150,9 +150,9 @@ export interface TextPart {
 }
 
 // Liens http(s), et numéros français : 06 12 34 56 78, 06.12.34.56.78, +33 6 12 34 56 78, +33 (0)6 12 34 56 78…
-const LINKS = /(https?:\/\/[^\s<>"]+)|((?:\+33[\s.-]?(?:\(0\)[\s.-]?)?|0)[1-9](?:[\s.-]?\d{2}){4})(?!\d)/g;
+const LINKS = /(https?:\/\/[^\s<>"]+)|((?:\+33[\s.-]?(?:\(0\)[\s.-]?)?|0)[1-9](?:[\s.-]?\d{2}){4})(?!\d)/gu;
 // Ponctuation collée à la fin d'un lien (« voir https://exemple.fr. »), qui n'en fait pas partie.
-const TRAILING = /[.,;:!?)\]'"»]/;
+const TRAILING = /[.,;:!?)\]'"»]/u;
 
 /** Retire la ponctuation finale d'un lien, sauf une parenthèse qui en ferme une du lien (…/wiki/Nyons_(Drôme)). */
 function trimUrl(url: string): string {
@@ -173,10 +173,10 @@ export function linkify(text: string): TextPart[] {
   for (const m of text.matchAll(LINKS)) {
     const start = m.index;
     // Fin d'un nombre plus long (un code, un numéro étranger) : laissé tel quel.
-    if (!m[1] && /[\d+]/.test(text.charAt(start - 1))) continue;
+    if (!m[1] && /[\d+]/u.test(text.charAt(start - 1))) continue;
     const match = m[1] ? trimUrl(m[0]) : m[0];
     if (start > last) parts.push({ text: text.slice(last, start) });
-    parts.push({ text: match, href: m[1] ? match : `tel:${match.replace(/\(0\)|[\s.-]/g, "")}` });
+    parts.push({ text: match, href: m[1] ? match : `tel:${match.replaceAll(/\(0\)|[\s.-]/gu, "")}` });
     last = start + match.length;
   }
   if (last < text.length) parts.push({ text: text.slice(last) });
