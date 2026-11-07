@@ -1820,6 +1820,95 @@ body:has(.update-prompt) .install-nudge {
   @page {
     margin: 12mm;
   }
+  /* Un tableau trop large s'imprime en entier, pas seulement sa partie visible avant défilement. */
+  .table-wrap,
+  .grid-table {
+    overflow: visible;
+  }
+}
+
+/* Planning de présence imprimé : tableau compact, en tranches de jours qui tiennent sur la largeur. */
+.print-slice + .print-slice {
+  margin-top: 1rem;
+}
+.grid-table-compact {
+  table-layout: fixed;
+}
+.print-legend {
+  margin-top: 0.4rem;
+}
+.grid-table-compact .col-person {
+  width: 7.5rem;
+}
+.grid-table-compact .th-day,
+.grid-table-compact .th-person,
+.grid-table-compact tfoot th,
+.grid-table-compact .cell-departure {
+  white-space: normal;
+}
+@media print {
+  .print-presences {
+    font-size: 8pt;
+  }
+  .print-presences .print-header {
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+  }
+  .print-presences .print-header h1 {
+    font-size: 1.4rem;
+  }
+  .print-presences .print-moves {
+    padding: 0.4rem 0.6rem;
+    margin-bottom: 0.6rem;
+    columns: 3;
+    column-gap: 1.5rem;
+  }
+  .print-presences .print-moves h2 {
+    column-span: all;
+    font-size: 1rem;
+    margin-bottom: 0.2rem;
+  }
+  .print-presences .print-moves > div {
+    break-inside: avoid;
+  }
+  .print-presences .print-moves h3 {
+    margin: 0.2rem 0 0.1rem;
+    font-size: 0.9rem;
+  }
+  /* Plusieurs tranches : chacune d'un bloc (une par page pour un long séjour). Seule, elle suit les arrivées. */
+  .print-slice-many {
+    break-inside: avoid;
+  }
+  .grid-table-compact {
+    font-size: 7pt;
+    line-height: 1.15;
+  }
+  .grid-table-compact th,
+  .grid-table-compact td {
+    padding: 0.5mm 0.3mm;
+  }
+  .grid-table-compact .col-person {
+    width: 22mm;
+  }
+  .grid-table-compact .th-person {
+    padding-left: 1mm;
+  }
+  .grid-table-compact .th-meal {
+    font-size: 7.5pt;
+  }
+  .grid-table-compact .th-after {
+    font-size: 5.5pt;
+  }
+  .grid-table-compact .th-times,
+  .grid-table-compact .cell-departure {
+    font-size: 6pt;
+  }
+  .grid-table-compact .row-household th {
+    font-size: 6pt;
+    padding: 0.2mm 1mm;
+  }
 }
 
 /* --- Mobile ------------------------------------------------------------- */
