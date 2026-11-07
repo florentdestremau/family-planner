@@ -20,6 +20,7 @@ import {
   timeOrder,
   arrivalShort,
   departureColumn,
+  printSlices,
   timesSummary,
   countLabel,
   coverThumbUrl,
@@ -707,6 +708,26 @@ describe("heures d'arrivée et de départ", () => {
     expect(departureColumn([true, true], "15:00")).toBe(2); // colonne de plus après le dernier repas
     expect(departureColumn([true, true], "")).toBe(-1);
     expect(departureColumn([false, false], "15:00")).toBe(-1);
+  });
+});
+
+const ownWidth = (n: number) => n;
+
+describe("printSlices", () => {
+  it("garde tout d'un bloc quand ça tient", () => {
+    expect(printSlices([2, 4, 4, 2], ownWidth, 40)).toEqual([[2, 4, 4, 2]]);
+    expect(printSlices([], ownWidth, 40)).toEqual([]);
+  });
+  it("équilibre les tranches plutôt que de remplir la première", () => {
+    // Noël au Platane : 19 jours, 71 colonnes → deux tranches de 34 et 37 colonnes, pas 40 et 31.
+    const noel = [2, ...Array.from({ length: 17 }, () => 4), 1];
+    const slices = printSlices(noel, ownWidth, 40);
+    expect(slices.map((s) => s.reduce((a, b) => a + b, 0))).toEqual([34, 37]);
+    expect(slices.flat()).toEqual(noel);
+    expect(printSlices([4, 4, 4, 4, 4, 4], ownWidth, 8)).toEqual([[4, 4], [4, 4], [4, 4]]);
+  });
+  it("ne coupe jamais un élément trop large", () => {
+    expect(printSlices([10, 1], ownWidth, 4)).toEqual([[10], [1]]);
   });
 });
 

@@ -221,6 +221,34 @@ export function departureColumn(present: boolean[], time: string): number {
   return last === -1 ? -1 : last + 1;
 }
 
+/**
+ * Découpe une suite (les jours du tableau des présences) en tranches à imprimer, chacune d'au plus
+ * `max` colonnes si possible, de largeurs équilibrées : 71 colonnes pour 40 au plus font deux tranches
+ * d'environ 35 plutôt que 40 et 31. Un élément n'est jamais coupé, même plus large que `max`.
+ */
+export function printSlices<T>(items: T[], width: (item: T) => number, max: number): T[][] {
+  const total = items.reduce((sum, item) => sum + width(item), 0);
+  const target = total / Math.max(1, Math.ceil(total / max));
+  const slices: T[][] = [];
+  let current: T[] = [];
+  let slice = 0;
+  let before = 0;
+  for (const item of items) {
+    const w = width(item);
+    // La tranche est celle où tombe le milieu de l'élément.
+    const i = Math.floor((before + w / 2) / target);
+    if (i > slice && current.length > 0) {
+      slices.push(current);
+      current = [];
+    }
+    slice = i;
+    current.push(item);
+    before += w;
+  }
+  if (current.length > 0) slices.push(current);
+  return slices;
+}
+
 /** Note telle que le serveur l'enregistre : sur une ligne, sans espaces superflus. */
 export const oneLine = (text: string) => text.split(/\s+/u).filter(Boolean).join(" ");
 
