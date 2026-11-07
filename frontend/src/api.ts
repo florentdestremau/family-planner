@@ -38,6 +38,8 @@ export interface Household {
   id: number;
   /** Vide : on affiche les prénoms des adultes. */
   name: string;
+  /** Ordre choisi par l'organisateur ; 0 tant qu'il n'en a pas choisi (ordre alphabétique). */
+  position: number;
 }
 
 export interface Person {

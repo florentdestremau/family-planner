@@ -27,6 +27,28 @@ def household(db: Session, household_id: int | None, stay: Stay) -> Household:
     return owned(db, Household, household_id, stay)
 
 
+def new_household(db: Session, stay: Stay) -> Household:
+    """Nouveau foyer : en fin de liste si l'organisateur a choisi un ordre, sinon rangé par ordre alphabétique."""
+    last = db.scalar(select(func.max(Household.position)).where(Household.stay_id == stay.id)) or 0
+    new = Household(stay_id=stay.id, name="", position=last + 1 if last > 0 else 0)
+    db.add(new)
+    db.flush()
+    return new
+
+
+def reorder(db: Session, stay: Stay, household_ids: list[int]) -> bool:
+    """Range les foyers dans l'ordre donné, qui doit les citer tous une fois ; vrai si l'ordre a changé."""
+    found = db.scalars(select(Household).where(Household.stay_id == stay.id)).all()
+    by_id = {x.id: x for x in found}
+    if len(household_ids) != len(set(household_ids)) or set(household_ids) != set(by_id):
+        raise HTTPException(422, "L'ordre doit citer chaque foyer du séjour une fois")
+    changed = False
+    for position, household_id in enumerate(household_ids, start=1):
+        changed |= by_id[household_id].position != position
+        by_id[household_id].position = position
+    return changed
+
+
 def drop_if_empty(db: Session, household_id: int) -> None:
     db.flush()
     if not db.scalar(select(func.count(Person.id)).where(Person.household_id == household_id)):
@@ -59,10 +81,7 @@ def create_person(db: Session, stay: Stay, body: s.PersonCreate) -> Person:
     if body.household_id is not None:
         household_id = household(db, body.household_id, stay).id
     else:
-        new = Household(stay_id=stay.id, name="")
-        db.add(new)
-        db.flush()
-        household_id = new.id
+        household_id = new_household(db, stay).id
     does_chores = body.does_chores if body.does_chores is not None else body.kind == "adult"
     p = Person(
         stay_id=stay.id,
@@ -170,9 +189,7 @@ def move(db: Session, stay: Stay, p: Person, household_id: int | None) -> Person
     """Change de foyer (ou en crée un) ; le couple est défait, l'ancien foyer vide disparaît."""
     old = p.household_id
     if household_id is None:
-        target = Household(stay_id=stay.id, name="")
-        db.add(target)
-        db.flush()
+        target = new_household(db, stay)
     else:
         target = household(db, household_id, stay)
     if target.id == old:

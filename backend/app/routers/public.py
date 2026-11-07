@@ -104,7 +104,7 @@ def snapshot(stay: StayDep, db: DB) -> dict:
         "days": stay_days(stay.start_date, stay.end_date),
         "slots": [{"date": d, "meal": m} for d, m in stay_slots(stay.start_date, stay.end_date, stay.first_meal, stay.last_meal)],
         "nights": stay_nights(stay.start_date, stay.end_date),
-        "households": db.scalars(select(Household).where(Household.stay_id == stay.id).order_by(Household.id)).all(),
+        "households": db.scalars(select(Household).where(Household.stay_id == stay.id).order_by(Household.position, Household.id)).all(),
         "persons": persons,
         "presences": db.scalars(select(Presence).where(Presence.person_id.in_(person_ids))).all(),
         "person_nights": db.scalars(select(Night).where(Night.person_id.in_(person_ids)).order_by(Night.date)).all(),

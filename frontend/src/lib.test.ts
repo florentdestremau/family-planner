@@ -168,6 +168,16 @@ describe("buildIndex", () => {
       ["Nina", 1],
     ]);
   });
+
+  it("foyers dans l'ordre choisi par l'organisateur", () => {
+    const ordered = makeSnapshot();
+    ordered.households = [
+      { id: 50, name: "", position: 3 },
+      { id: 51, name: "Mamie", position: 1 },
+      { id: 52, name: "", position: 2 },
+    ];
+    expect(buildIndex(ordered).households().map((h) => h.label)).toEqual(["Mamie", "Nina", "Alice & Bob"]);
+  });
 });
 
 describe("llmExport", () => {
