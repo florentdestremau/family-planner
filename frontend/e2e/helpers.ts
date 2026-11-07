@@ -52,10 +52,10 @@ export async function createStay(request: APIRequestContext, stayName = "Toussai
   return stay;
 }
 
-/** Bouton « c'est moi » d'une personne : initiale, prénom, puis éventuellement son foyer. */
+/** Bouton « c'est moi » d'une personne : initiale, puis prénom. */
 export function whoButton(page: Page, name: string) {
   const escaped = name.replaceAll(/[.*+?^${}()|[\]\\]/gu, "\\$&");
-  return page.getByRole("button", { name: new RegExp(`^. ${escaped}( Foyer .*)?$`, "u") });
+  return page.getByRole("button", { name: new RegExp(`^. ${escaped}$`, "u") });
 }
 
 /** Revient au choix « Qui êtes-vous ? » si quelqu'un est déjà désigné sur l'appareil. */
