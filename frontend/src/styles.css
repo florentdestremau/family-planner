@@ -954,70 +954,49 @@ legend {
   margin: 0 auto;
   width: 100%;
 }
-/* Choix de la personne : un encadré par foyer, puis les personnes seules. */
+/* Choix de la personne : des pastilles, celles d'un même foyer côte à côte et reliées par un trait. */
 .who-list {
   display: flex;
-  flex-direction: column;
-  gap: 0.9rem;
-}
-.who-picks {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-  gap: 0.6rem;
-}
-.who-family {
-  padding: 0.75rem;
-  border: 2px solid var(--border);
-  border-left: 5px solid var(--accent);
-  border-radius: var(--radius-sm);
-  background: var(--surface-2);
-}
-.who-family-head {
-  display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.25rem 0.75rem;
-  margin-bottom: 0.6rem;
+  gap: 0.6rem 1.4rem;
 }
-.who-family-name {
-  font-weight: 800;
-  overflow-wrap: anywhere;
-}
-.who-family-count {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--muted);
-}
-.who-children {
+.who-group {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.4rem;
-  margin: 0.6rem 0 0;
+  row-gap: 0.6rem;
+  max-width: 100%;
 }
-.who-children-label {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--muted);
+.who-link {
+  width: 0.9rem;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--accent);
 }
-.who-children .chip:hover {
-  transform: none;
-  box-shadow: none;
+/* Teinte d'une personne (--hue, de 0 à 11, dérivée du prénom) : --tone pour l'avatar, --tone-soft pour le fond. */
+.who-pick {
+  --tone: hsl(calc(var(--hue, 1) * 30) 65% 40%);
+  --tone-soft: hsl(calc(var(--hue, 1) * 30) 80% 94%);
 }
-.who-singles-title {
-  margin: 0.4rem 0 0.6rem;
-  font-size: 0.95rem;
-  color: var(--muted);
+:root[data-theme="dark"] .who-pick {
+  --tone: hsl(calc(var(--hue, 1) * 30) 60% 58%);
+  --tone-soft: hsl(calc(var(--hue, 1) * 30) 30% 22%);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .who-pick {
+    --tone: hsl(calc(var(--hue, 1) * 30) 60% 58%);
+    --tone-soft: hsl(calc(var(--hue, 1) * 30) 30% 22%);
+  }
 }
 .who-pick {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 0.7rem;
-  padding: 0.75rem;
+  gap: 0.55rem;
+  max-width: 100%;
+  padding: 0.35rem 0.9rem 0.35rem 0.35rem;
   border: 2px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
+  border-radius: 999px;
+  background: var(--tone-soft);
   cursor: pointer;
   font-weight: 700;
   text-align: left;
@@ -1025,10 +1004,18 @@ legend {
   box-shadow: var(--shadow);
 }
 .who-pick:hover {
-  border-color: var(--primary);
-  background: var(--primary-soft);
+  border-color: var(--tone);
   transform: translateY(-2px);
   box-shadow: var(--shadow-hover);
+}
+.who-pick .avatar {
+  flex-shrink: 0;
+  background: var(--tone);
+  box-shadow: none;
+}
+.who-pick-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 /* --- Présences ---------------------------------------------------------- */
