@@ -94,7 +94,7 @@ export async function openAdmin(page: Page, slug: string, key: string, section?:
     const existing = as === undefined ? page.locator(".who-pick").first() : whoButton(page, as);
     if ((await existing.count()) > 0) await existing.click();
     else {
-      await page.getByPlaceholder("Je ne suis pas dans la liste : mon prénom").fill(as ?? "Orga");
+      await page.getByLabel("Mon prénom", { exact: true }).fill(as ?? "Orga");
       await page.getByRole("button", { name: "M'ajouter" }).click();
     }
   }

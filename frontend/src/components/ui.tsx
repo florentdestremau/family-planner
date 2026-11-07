@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { Person } from "../api";
 import { linkify } from "../lib";
 import { toast } from "../toast";
@@ -27,6 +27,28 @@ export function Chip({
       )}
     </span>
   );
+}
+
+/**
+ * Envoi unique : tant que le premier envoi n'a pas répondu, un second (double tap, Entrée puis clic)
+ * est ignoré. Le verrou est une ref, effectif dès le premier événement, avant même le rendu qui
+ * désactive le bouton (`pending`).
+ */
+export function usePending(): [boolean, (task: () => Promise<unknown>) => Promise<void>] {
+  const running = useRef(false);
+  const [pending, setPending] = useState(false);
+  const run = useCallback(async (task: () => Promise<unknown>) => {
+    if (running.current) return;
+    running.current = true;
+    setPending(true);
+    try {
+      await task();
+    } finally {
+      running.current = false;
+      setPending(false);
+    }
+  }, []);
+  return [pending, run];
 }
 
 export function Empty({ children }: { children: React.ReactNode }) {

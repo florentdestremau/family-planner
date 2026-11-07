@@ -232,6 +232,18 @@ def delete_person(person_id: int, stay: AdminStay, db: DB, actor: AdminActorDep)
     db.commit()
 
 
+@router.post("/persons/{person_id}/merge", status_code=204)
+def merge_duplicate(person_id: int, body: s.MergeIn, stay: AdminStay, db: DB, actor: AdminActorDep) -> None:
+    """Retire un doublon (personne ajoutée deux fois) en gardant ce qu'il avait en plus."""
+    dup, keep = person(db, person_id, stay), person(db, body.into_id, stay)
+    where = [j.household_label(db, db.get(Household, x.household_id)) for x in (dup, keep)]
+    detail = j.person_lines(db, dup)
+    h.merge_duplicate(db, dup, keep)
+    text = f"a fusionné le doublon {dup.name} (foyer {j.quoted(where[0])}) dans {keep.name} (foyer {j.quoted(where[1])})"
+    j.record(db, stay, actor, text, [keep.id], detail)
+    db.commit()
+
+
 @router.put("/persons/{person_id}/partner", response_model=s.PersonOut)
 def set_partner(person_id: int, body: s.PartnerIn, stay: AdminStay, db: DB, actor: AdminActorDep) -> Person:
     """Lien de couple, maintenu symétriquement, entre deux adultes du même foyer."""

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { createStay, loginAs, openAdmin, SLOTS, whoButton } from "./helpers";
+import { createStay, expectNoHorizontalScroll, loginAs, openAdmin, SLOTS, whoButton } from "./helpers";
 
 test("tout adulte du foyer agit pour tous ; mes présences valent pour tout le foyer par défaut", async ({ page, request }) => {
   const stay = await createStay(request);
@@ -68,7 +68,7 @@ test("tout adulte du foyer agit pour tous ; mes présences valent pour tout le f
 test("un nouveau venu crée son foyer et y ajoute son conjoint", async ({ page, request }) => {
   const stay = await createStay(request);
   await page.goto(stay.url);
-  await page.getByPlaceholder(/Je ne suis pas dans la liste/u).fill("Paul");
+  await page.getByLabel("Mon prénom", { exact: true }).fill("Paul");
   await page.getByRole("button", { name: "M'ajouter" }).click();
   await expect(page.getByRole("heading", { name: "Bonjour Paul" })).toBeVisible();
   await page.getByLabel("Prénom du nouveau membre").fill("Léa");
@@ -84,6 +84,66 @@ test("un nouveau venu crée son foyer et y ajoute son conjoint", async ({ page, 
   // Un troisième adulte (Mamie) : plus de couple à proposer.
   await page.getByLabel("Prénom du nouveau membre").fill("Mamie");
   await expect(page.getByLabel(/En couple avec/u)).toHaveCount(0);
+});
+
+test("je m'ajoute d'abord, puis, si je le choisis, les membres de mon foyer", async ({ page, request }) => {
+  const stay = await createStay(request);
+  await stay.person("Mamie");
+  await page.goto(stay.url);
+  await expect(page.getByRole("heading", { name: "Je ne suis pas dans la liste" })).toBeVisible();
+  await page.getByLabel("Mon prénom", { exact: true }).fill("Guillemette");
+  // Les membres ne s'ouvrent qu'à la demande.
+  await expect(page.getByLabel("Prénom du membre 1")).toHaveCount(0);
+  await page.getByText("J'ajoute d'autres membres de mon foyer (conjoint, enfants…)").click();
+  await expect(page.getByText(/Seulement les personnes qui viennent avec vous, Guillemette/u)).toBeVisible();
+
+  // Se ressaisir parmi les membres : refusé, rien n'est créé.
+  await page.getByLabel("Prénom du membre 1").fill("guillemette");
+  await page.getByRole("button", { name: "Nous ajouter (2)" }).click();
+  await expect(page.getByText("guillemette est saisi deux fois : vous ne vous ajoutez qu'une fois, dans « Mon prénom ».")).toBeVisible();
+  expect((await stay.snap()).persons).toHaveLength(1);
+
+  // Conjoint (adulte, en couple par défaut) puis deux enfants ; on en retire un.
+  await page.getByLabel("Prénom du membre 1").fill("Arnaud");
+  await expect(page.getByLabel("Membre 1 : adulte ou enfant")).toHaveValue("adult");
+  await expect(page.getByLabel("En couple avec moi")).toBeChecked();
+  await page.getByRole("button", { name: "+ Un autre membre" }).click();
+  await page.getByLabel("Prénom du membre 2").fill("Rose");
+  await expect(page.getByLabel("Membre 2 : adulte ou enfant")).toHaveValue("child");
+  await page.getByRole("button", { name: "+ Un autre membre" }).click();
+  await page.getByLabel("Prénom du membre 3").fill("Oubli");
+  await page.getByRole("button", { name: "Retirer le membre 3" }).click();
+  await expectNoHorizontalScroll(page);
+  await page.getByRole("button", { name: "Nous ajouter (3)" }).click();
+
+  await expect(page.getByRole("heading", { name: "Bonjour Guillemette" })).toBeVisible();
+  const foyer = page.locator(".card").filter({ has: page.getByRole("heading", { name: "Mon foyer" }) });
+  await expect(foyer.locator(".chip")).toHaveText(["Guillemette", "Arnaud ♥", "Rose"]);
+  const snap = await stay.snap();
+  const by = new Map(snap.persons.map((p) => [p.name, p]));
+  expect(by.get("Arnaud")?.partner_id).toBe(by.get("Guillemette")?.id);
+  expect(by.get("Rose")?.kind).toBe("child");
+  expect(new Set(["Guillemette", "Arnaud", "Rose"].map((n) => by.get(n)?.household_id)).size).toBe(1);
+  // Au journal, Guillemette est l'autrice des ajouts.
+  const journal = await stay.pub<{ entries: { actor: string; text: string }[] }>("GET", "/journal");
+  expect(journal.entries.slice(0, 3).map((e) => `${e.actor} ${e.text}`)).toEqual([
+    "Guillemette a ajouté Rose (enfant) au foyer « Arnaud & Guillemette »",
+    "Guillemette a ajouté Arnaud au foyer « Guillemette », en couple avec Guillemette",
+    "Guillemette a rejoint le séjour",
+  ]);
+});
+
+test("décocher « membres du foyer » n'ajoute que moi", async ({ page, request }) => {
+  const stay = await createStay(request);
+  await page.goto(stay.url);
+  await expect(page.getByRole("heading", { name: "Je m'inscris" })).toBeVisible();
+  await page.getByLabel("Mon prénom", { exact: true }).fill("Paul");
+  await page.getByText("J'ajoute d'autres membres de mon foyer (conjoint, enfants…)").click();
+  await page.getByLabel("Prénom du membre 1").fill("Léa");
+  await page.getByText("J'ajoute d'autres membres de mon foyer (conjoint, enfants…)").click();
+  await page.getByRole("button", { name: "M'ajouter" }).click();
+  await expect(page.getByRole("heading", { name: "Bonjour Paul" })).toBeVisible();
+  expect((await stay.snap()).persons.map((p) => p.name)).toEqual(["Paul"]);
 });
 
 test("l'organisateur fusionne deux foyers puis déplace quelqu'un", async ({ page, request }) => {

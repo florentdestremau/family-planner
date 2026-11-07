@@ -64,7 +64,7 @@ test("l'espace organisateur demande qui l'on est, et signe ses gestes", async ({
   await page.goto(`${stay.url}/admin?key=${stay.key}`);
   await expect(page.getByRole("heading", { name: "Qui êtes-vous ?" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Liens de partage" })).toHaveCount(0);
-  await page.getByPlaceholder("Je ne suis pas dans la liste : mon prénom").fill("Anne");
+  await page.getByLabel("Mon prénom", { exact: true }).fill("Anne");
   await page.getByRole("button", { name: "M'ajouter" }).click();
   await expect(page.getByRole("heading", { name: "Liens de partage" })).toBeVisible();
   await expect(page.locator(".who-name")).toHaveText("Anne");

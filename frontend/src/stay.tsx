@@ -21,8 +21,16 @@ interface StayCtx {
   setMe: (id: number | null) => void;
   adminKey: string | null;
   setAdminKey: (key: string | null) => void;
-  /** Appel API puis rafraîchissement du séjour ; les erreurs sont affichées en toast. */
-  call: <T = unknown>(method: string, path: string, body?: unknown, opts?: { admin?: boolean }) => Promise<T | undefined>;
+  /**
+   * Appel API puis rafraîchissement du séjour ; les erreurs sont affichées en toast. `actor` : auteur
+   * à déclarer au journal à la place de la personne désignée (quelqu'un qui vient de s'inscrire).
+   */
+  call: <T = unknown>(method: string, path: string, body?: unknown, opts?: CallOptions) => Promise<T | undefined>;
+}
+
+interface CallOptions {
+  admin?: boolean;
+  actor?: number;
 }
 
 const Ctx = createContext<StayCtx | null>(null);
@@ -56,12 +64,12 @@ export function StayProvider({ slug, snap, children }: { slug: string; snap: Sna
   );
 
   const call = useCallback(
-    async <T,>(method: string, path: string, body?: unknown, opts?: { admin?: boolean }): Promise<T | undefined> => {
+    async <T,>(method: string, path: string, body?: unknown, opts?: CallOptions): Promise<T | undefined> => {
       const prefix = opts?.admin ? `/stays/${slug}/admin` : `/stays/${slug}`;
       let result: T | undefined;
       try {
         // `me` plutôt que l'id mémorisé : une personne supprimée ne signe plus rien.
-        result = await api<T>(method, `${prefix}${path}`, body, opts?.admin ? adminKey : null, actorHeaders(me?.id));
+        result = await api<T>(method, `${prefix}${path}`, body, opts?.admin ? adminKey : null, actorHeaders(opts?.actor ?? me?.id));
       } catch (e) {
         toast(e instanceof Error ? e.message : "Erreur inattendue", "error");
       } finally {
