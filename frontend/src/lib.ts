@@ -224,6 +224,59 @@ export function departureColumn(present: boolean[], time: string): number {
 /** Note telle que le serveur l'enregistre : sur une ligne, sans espaces superflus. */
 export const oneLine = (text: string) => text.split(/\s+/u).filter(Boolean).join(" ");
 
+// --- Doublons ------------------------------------------------------------------
+
+/** Prénom comparé sans casse, accents ni espaces superflus, comme le serveur : « Aliénor » = « alienor ». */
+export const nameKey = (name: string) => oneLine(name.normalize("NFKD").replaceAll(/\p{M}/gu, "").toLowerCase());
+
+/**
+ * Personne du séjour qui porte déjà ce prénom : du foyer d'abord (`sameHousehold`, refusé : on
+ * s'ajoute soi-même par erreur), sinon d'un autre foyer (à confirmer : homonyme ou doublon ?).
+ * `householdId` null : la personne formera un nouveau foyer.
+ */
+export function homonym(persons: Person[], name: string, householdId: number | null): { person: Person; sameHousehold: boolean } | undefined {
+  const key = nameKey(name);
+  const same = persons.filter((p) => nameKey(p.name) === key);
+  const inHousehold = same.find((p) => p.household_id === householdId);
+  if (inHousehold) return { person: inHousehold, sameHousehold: true };
+  return same.length > 0 ? { person: same[0], sameHousehold: false } : undefined;
+}
+
+/** Membre du foyer saisi à l'inscription, avec la personne qui s'inscrit. */
+export interface JoinMember {
+  name: string;
+  kind: PersonKind;
+  /** En couple avec la personne qui s'inscrit ; ne compte que pour le premier adulte. */
+  couple: boolean;
+}
+
+/** Seul le premier adulte saisi peut être en couple avec la personne qui s'inscrit (-1 : aucun). */
+export const coupleIndex = (members: JoinMember[]) => members.findIndex((m) => m.kind === "adult");
+
+/**
+ * Vérifie une inscription avant envoi : `names`, mon prénom puis ceux des membres de mon foyer.
+ * `repeated` : un prénom saisi deux fois (refusé : on s'est ajouté soi-même parmi les membres) ;
+ * `existing` : les personnes du séjour qui portent déjà l'un de ces prénoms (à confirmer).
+ */
+export function checkJoin(persons: Person[], names: string[]): { repeated?: string; existing: Person[] } {
+  const keys = names.map(nameKey);
+  const repeated = names.find((_, i) => keys.indexOf(keys[i]) !== i);
+  const existing = persons.filter((p) => keys.includes(nameKey(p.name)));
+  return { repeated, existing };
+}
+
+/**
+ * Doublons possibles : les personnes de même prénom, la plus renseignée d'abord (celle à garder),
+ * `weight` mesurant ce qu'une personne a saisi ; à égalité, la plus ancienne.
+ */
+export function duplicateGroups(persons: Person[], weight: (p: Person) => number): Person[][] {
+  const byKey = new Map<string, Person[]>();
+  for (const p of persons) push(byKey, nameKey(p.name), p);
+  return [...byKey.values()]
+    .filter((group) => group.length > 1)
+    .map((group) => group.toSorted((a, b) => weight(b) - weight(a) || a.id - b.id));
+}
+
 export type MovementKind = "arrival" | "departure";
 
 export const MOVEMENT_LABEL: Record<MovementKind, string> = { arrival: "Arrivée", departure: "Départ" };

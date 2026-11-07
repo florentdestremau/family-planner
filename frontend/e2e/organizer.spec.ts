@@ -13,7 +13,7 @@ test("créer un séjour puis le configurer comme organisateur", async ({ page, c
   // modification étant signée au journal ; personne n'est encore inscrit, il s'ajoute.
   await expect(page.getByRole("heading", { name: "Qui êtes-vous ?" })).toBeVisible();
   await expect(page.getByText(/notée au journal/u)).toBeVisible();
-  await page.getByPlaceholder("Je ne suis pas dans la liste : mon prénom").fill("Florent");
+  await page.getByLabel("Mon prénom", { exact: true }).fill("Florent");
   await page.getByRole("button", { name: "M'ajouter" }).click();
   await expect(page.getByRole("heading", { name: "Liens de partage" })).toBeVisible();
   await expect(page.locator(".stay-name")).toHaveText("Noël chez Papi");

@@ -66,6 +66,7 @@ class PersonCreate(In):
     household_id: int | None = None  # absent : la personne forme son propre foyer
     partner_id: int | None = None  # en couple avec un adulte du même foyer
     does_chores: bool | None = None  # défaut : oui pour un adulte, non pour un enfant
+    allow_same_name: bool = False  # homonyme d'une personne d'un autre foyer, confirmé
 
 
 class PersonUpdate(In):

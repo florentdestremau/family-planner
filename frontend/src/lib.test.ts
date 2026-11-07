@@ -1,13 +1,18 @@
 import { describe, expect, it } from "vitest";
-import type { Person, Slot } from "./api";
+import type { Person, PersonKind, Slot } from "./api";
 import {
   actionSummary,
   addDays,
   buildIndex,
+  checkJoin,
   clockLabel,
+  coupleIndex,
   dayTimeline,
+  duplicateGroups,
+  homonym,
   hourLabel,
   isNightTime,
+  nameKey,
   oneLine,
   sameDay,
   TIME_OPTIONS,
@@ -726,5 +731,47 @@ describe("journal", () => {
     });
     expect(journalSentence({ actor: "Claire", via_assistant: true, text: "a modifié" })).toEqual({ who: "Claire, via l'assistant,", what: "a modifié" });
     expect(journalSentence({ actor: "", via_assistant: false, text: "séjour « Noël » créé" })).toEqual({ who: "", what: "Séjour « Noël » créé" });
+  });
+});
+
+const member = (kind: PersonKind) => ({ name: "x", kind, couple: true });
+
+describe("doublons", () => {
+  const { persons } = makeSnapshot();
+  const more = (id: number, name: string, household_id: number) => ({ ...persons[3], id, name, household_id });
+
+  it("compare les prénoms sans casse, accents ni espaces superflus", () => {
+    expect(nameKey("  Aliénor ")).toBe("alienor");
+    expect(nameKey("ALIENOR")).toBe("alienor");
+    expect(nameKey("Marie   Claire")).toBe("marie claire");
+  });
+
+  it("trouve un homonyme, du foyer d'abord", () => {
+    const all = [...persons, more(6, "alice", 52)];
+    expect(homonym(all, "Alice ", 52)).toEqual({ person: all[5], sameHousehold: true });
+    expect(homonym(all, "ALICE", 51)).toEqual({ person: persons[0], sameHousehold: false });
+    expect(homonym(all, "Alice", null)).toEqual({ person: persons[0], sameHousehold: false });
+    expect(homonym(all, "Alix", 50)).toBeUndefined();
+  });
+
+  it("vérifie une inscription : prénom répété, prénoms déjà dans le séjour", () => {
+    expect(checkJoin(persons, ["Guillemette", "Paul", " guillemette"])).toEqual({ repeated: " guillemette", existing: [] });
+    expect(checkJoin(persons, ["alice", "Léo", "Zoé"])).toEqual({ repeated: undefined, existing: [persons[0], persons[2]] });
+    expect(checkJoin(persons, ["Zoé"])).toEqual({ repeated: undefined, existing: [] });
+  });
+
+  it("seul le premier adulte peut être en couple avec moi", () => {
+    expect(coupleIndex([member("child"), member("adult"), member("adult")])).toBe(1);
+    expect(coupleIndex([member("child")])).toBe(-1);
+  });
+
+  it("groupe les doublons, le plus renseigné d'abord puis le plus ancien", () => {
+    const all = [...persons, more(6, "Mamie", 52), more(7, "mamie", 50), more(8, "Bob", 52)];
+    // Seule « mamie » (7) a saisi quelque chose.
+    expect(duplicateGroups(all, (p: Person) => Number(p.name === "mamie")).map((g) => g.map((p) => p.id))).toEqual([
+      [2, 8],
+      [7, 4, 6],
+    ]);
+    expect(duplicateGroups(persons, () => 0)).toEqual([]);
   });
 });

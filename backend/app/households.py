@@ -1,16 +1,17 @@
 """Règles des foyers et des couples, partagées par l'espace participant et l'espace organisateur."""
 
+import unicodedata
 from datetime import date, datetime, timezone
 from typing import NamedTuple
 
 from fastapi import HTTPException
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 
 from . import nights as n
 from . import schemas as s
 from .deps import owned, person
-from .models import Household, Person, Presence, Stay
+from .models import ChoreAssignment, Decline, Household, LogEntry, Person, Presence, Signup, Stay
 from .slots import stay_nights, stay_slots
 
 
@@ -72,10 +73,97 @@ def create_person(db: Session, stay: Stay, body: s.PersonCreate) -> Person:
     )
     db.add(p)
     db.flush()
+    check_homonyms(db, stay, p, body.allow_same_name)
     if body.partner_id is not None:
         link_partners(db, p, person(db, body.partner_id, stay))
     db.flush()
     return p
+
+
+def name_key(name: str) -> str:
+    """Prénom comparé sans casse, accents ni espaces superflus : « Aliénor » = « alienor »."""
+    plain = "".join(c for c in unicodedata.normalize("NFKD", name) if not unicodedata.combining(c))
+    return " ".join(plain.casefold().split())
+
+
+def check_homonyms(db: Session, stay: Stay, p: Person, allowed: bool) -> None:
+    """Refuse un doublon : le même prénom dans le même foyer, ou ailleurs dans le séjour sans
+    confirmation (un homonyme existe, mais c'est le plus souvent la même personne ajoutée deux fois).
+
+    Vérifié une fois `p` écrit : SQLite n'admet qu'un écrivain à la fois, si bien que deux ajouts
+    simultanés (formulaire envoyé deux fois) se voient l'un l'autre et que le second est refusé.
+    """
+    key = name_key(p.name)
+    for other in db.scalars(select(Person).where(Person.stay_id == stay.id, Person.id != p.id).order_by(Person.id)):
+        if name_key(other.name) != key:
+            continue
+        if other.household_id == p.household_id:
+            raise HTTPException(409, f"{other.name} fait déjà partie de ce foyer")
+        if not allowed:
+            raise HTTPException(
+                409,
+                f"« {other.name} » est déjà dans le séjour : si c'est vous, choisissez ce nom dans la liste ;"
+                f" sinon, précisez le prénom (« {other.name} D. »)",
+            )
+
+
+def merge_duplicate(db: Session, dup: Person, keep: Person) -> None:
+    """Retire un doublon : ce qu'il avait en plus passe à la personne gardée, puis il disparaît.
+
+    Repas, nuits, inscriptions et corvées : l'union des deux (une nuit gardée sans lit prend celui
+    du doublon). Régimes et heures : ceux de la personne gardée, ou à défaut ceux du doublon. Le
+    couple du doublon passe à la personne gardée si elle n'en a pas et qu'ils sont du même foyer.
+    """
+    if dup.id == keep.id:
+        raise HTTPException(422, "Une personne ne peut pas être son propre doublon")
+    meals = {(x.date, x.meal) for x in db.scalars(select(Presence).where(Presence.person_id == keep.id))}
+    for x in db.scalars(select(Presence).where(Presence.person_id == dup.id)).all():
+        if (x.date, x.meal) not in meals:
+            x.person_id = keep.id
+    kept_nights = n.nights_of(db, keep.id)
+    for night in n.nights_of(db, dup.id).values():
+        kept = kept_nights.get(night.date)
+        if kept is None:
+            night.person_id = keep.id
+        elif kept.bed_id is None:
+            kept.bed_id = night.bed_id
+    signed = set(db.scalars(select(Signup.activity_id).where(Signup.person_id == keep.id)))
+    declined = set(db.scalars(select(Decline.activity_id).where(Decline.person_id == keep.id)))
+    for signup in db.scalars(select(Signup).where(Signup.person_id == dup.id)).all():
+        if signup.activity_id not in signed:
+            signup.person_id = keep.id
+            db.execute(delete(Decline).where(Decline.person_id == keep.id, Decline.activity_id == signup.activity_id))
+            declined.discard(signup.activity_id)
+            signed.add(signup.activity_id)
+    for decline in db.scalars(select(Decline).where(Decline.person_id == dup.id)).all():
+        if decline.activity_id not in signed | declined:
+            decline.person_id = keep.id
+    chores = {(a.chore_type_id, a.date, a.moment) for a in db.scalars(select(ChoreAssignment).where(ChoreAssignment.person_id == keep.id))}
+    for a in db.scalars(select(ChoreAssignment).where(ChoreAssignment.person_id == dup.id)).all():
+        if (a.chore_type_id, a.date, a.moment) not in chores:
+            a.person_id = keep.id
+    if not keep.diets and not keep.diet_note:
+        keep.diets, keep.diet_note = dup.diets, dup.diet_note
+    if not keep.arrival_time:
+        keep.arrival_time, keep.arrival_updated_at = dup.arrival_time, dup.arrival_updated_at
+    if not keep.departure_time:
+        keep.departure_time, keep.departure_updated_at = dup.departure_time, dup.departure_updated_at
+    if not keep.times_note:
+        keep.times_note = dup.times_note
+    partner = db.get(Person, dup.partner_id) if dup.partner_id not in (None, keep.id) else None
+    unlink(db, dup)
+    if partner is not None and keep.partner_id is None and keep.kind == "adult" and partner.household_id == keep.household_id:
+        link_partners(db, keep, partner)
+    # Le journal suit la personne gardée : « Me concerne » y retrouve les lignes du doublon.
+    db.execute(
+        update(LogEntry)
+        .where(LogEntry.stay_id == keep.stay_id, LogEntry.subjects.contains(f",{dup.id},"))
+        .values(subjects=func.replace(LogEntry.subjects, f",{dup.id},", f",{keep.id},"))
+    )
+    db.flush()
+    household_id = dup.household_id
+    db.delete(dup)
+    drop_if_empty(db, household_id)
 
 
 def move(db: Session, stay: Stay, p: Person, household_id: int | None) -> Person:

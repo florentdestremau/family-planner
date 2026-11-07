@@ -43,7 +43,7 @@ test("un participant s'identifie et déclare ses présences", async ({ page, req
 test("un nouveau venu s'ajoute lui-même", async ({ page, request }) => {
   const stay = await createStay(request);
   await page.goto(stay.url);
-  await page.getByPlaceholder(/Je ne suis pas dans la liste/u).fill("  Camille ");
+  await page.getByLabel("Mon prénom", { exact: true }).fill("  Camille ");
   await page.getByRole("button", { name: "M'ajouter" }).click();
   await expect(page.getByRole("heading", { name: "Bonjour Camille" })).toBeVisible();
   await expect(page.locator(".who")).toHaveAttribute("title", "Changer de personne");
