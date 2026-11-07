@@ -587,7 +587,8 @@ export function buildIndex(snap: Snapshot) {
   const households = () =>
     snap.households
       .map((h) => ({ ...h, label: householdLabel(h.id), members: members(h.id) }))
-      .toSorted((a, b) => a.label.localeCompare(b.label));
+      // Ordre choisi par l'organisateur, sinon alphabétique (un foyer jamais rangé est à 0).
+      .toSorted((a, b) => a.position - b.position || a.label.localeCompare(b.label));
 
   return {
     personById,

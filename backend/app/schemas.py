@@ -104,6 +104,12 @@ class MergeIn(In):
     into_id: int
 
 
+class HouseholdOrderIn(In):
+    """Tous les foyers du séjour, dans l'ordre d'affichage voulu."""
+
+    household_ids: list[int] = Field(min_length=1, max_length=500)
+
+
 class MemberPresences(In):
     person_id: int
     slots: list["SlotIn"]
@@ -256,6 +262,7 @@ class StayCreated(StayOut):
 class HouseholdOut(ORM):
     id: int
     name: str
+    position: int
 
 
 class PersonOut(ORM):

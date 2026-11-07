@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { Person, PersonKind } from "../../api";
 import AddMember from "../../components/AddMember";
 import { DietEditor } from "../../components/Diets";
+import HouseholdOrder from "../../components/HouseholdOrder";
 import { TimesRow, useTimesSaver } from "../../components/Times";
 import { Toggle, usePending } from "../../components/ui";
 import { dietLabel, duplicateGroups, hasDiet, homonym, oneOf, PERSON_KINDS, timesSummary } from "../../lib";
@@ -24,6 +25,7 @@ export default function AdminHouseholds() {
           🕒 <strong>Sans heure d'arrivée ou de départ :</strong> {withoutTimes.map((p) => p.name).join(", ")}
         </p>
       )}
+      <HouseholdOrder />
       <div className="household-grid">
         {households.map((h) => (
           <HouseholdCard key={h.id} id={h.id} members={h.members} />

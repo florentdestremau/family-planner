@@ -561,3 +561,10 @@ def test_journal_goes_with_its_stay(api) -> None:
         db.delete(db.scalar(select(Stay).where(Stay.slug == api.slug)))
         db.commit()
         assert db.scalars(select(LogEntry)).all() == []
+
+
+def test_household_order(api) -> None:
+    anne, paul = api.household_of(api.person("Anne")), api.household_of(api.person("Paul"))
+    adm(api, "PUT", "/households/order", {"household_ids": [paul, anne]}, status=204)
+    assert last(api) == "l'organisateur a changé l'ordre des foyers : Paul, Anne"
+    unchanged(api, lambda: adm(api, "PUT", "/households/order", {"household_ids": [paul, anne]}, status=204))
