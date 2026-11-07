@@ -1953,6 +1953,59 @@ body:has(.update-prompt) .install-nudge {
   }
 }
 
+/* Présences sur mobile en paysage : en-tête allégé et non collant, tableau resserré. La page prend la largeur
+   du tableau au lieu de le faire défiler dans son cadre : le navigateur ne dézoome pas en dessous de la largeur
+   de la page, c'est ce qui permet de pincer jusqu'à voir tout le séjour. */
+@media (orientation: landscape) and (max-height: 540px) {
+  .app:has(.presences-page) .topbar {
+    position: static;
+  }
+  .app:has(.presences-page) .topbar-inner {
+    padding: 0.25rem 16px 0;
+  }
+  .app:has(.presences-page) .brand {
+    font-size: 1.3rem;
+  }
+  .app:has(.presences-page) .stay-dates {
+    display: none;
+  }
+  .app:has(.presences-page) .tab {
+    padding: 0.3rem 0.7rem;
+    font-size: 0.85rem;
+  }
+  .app:has(.presences-page) .content {
+    max-width: none;
+    padding: 0.5rem 16px 2rem;
+  }
+  .presences-page {
+    gap: 0.5rem;
+    width: max-content;
+    min-width: 100%;
+  }
+  .presences-page .page-title {
+    font-size: 1.1rem;
+  }
+  .presences-page .card-flush,
+  .presences-page .table-wrap {
+    overflow: visible;
+  }
+  .presences-page .grid-table {
+    font-size: 0.7rem;
+  }
+  .presences-page .grid-table th,
+  .presences-page .grid-table td {
+    padding: 0.1rem 0.3rem;
+  }
+  .presences-page .th-meal,
+  .presences-page .grid-table .row-household th {
+    font-size: 0.6rem;
+  }
+  .presences-page .th-times,
+  .presences-page .cell-departure {
+    font-size: 0.58rem;
+  }
+}
+
 .person-admin-flags .add-select {
   max-width: 10rem;
 }
