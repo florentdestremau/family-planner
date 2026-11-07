@@ -31,13 +31,11 @@ test("tout adulte du foyer agit pour tous ; mes présences valent pour tout le f
 
   // Claire se connecte : elle voit le foyer, mode individuel (présences différentes).
   await page.getByRole("button", { name: "Je ne suis pas Florent" }).click();
-  // Le choix rassemble les foyers : adultes à choisir, enfants pour reconnaître le foyer, puis les personnes seules.
-  const famille = page.getByRole("region", { name: "Foyer Florent & Claire" });
-  await expect(famille.locator(".who-pick")).toHaveText(["FFlorent", "CClaire"]);
-  await expect(famille.locator(".who-children .chip")).toHaveText(["Léo"]);
-  await expect(famille).toContainText("3 personnes");
-  await expect(page.getByRole("region", { name: "Foyer Julien & Sophie & Mamie" }).locator(".who-pick")).toHaveCount(3);
-  await expect(page.getByRole("region", { name: "Personnes seules" }).locator(".who-pick")).toHaveText(["CCamille"]);
+  // Le choix liste les adultes foyer par foyer : ceux d'un même foyer côte à côte, reliés.
+  await expect(page.locator(".who-pick")).toHaveText(["CCamille", "FFlorent", "CClaire", "JJulien", "SSophie", "MMamie"]);
+  await expect(page.getByRole("group", { name: "Foyer Florent & Claire" }).locator(".who-pick")).toHaveText(["FFlorent", "CClaire"]);
+  await expect(page.getByRole("group", { name: "Foyer Florent & Claire" }).locator(".who-link")).toHaveCount(1);
+  await expect(page.getByRole("group", { name: "Foyer Julien & Sophie & Mamie" }).locator(".who-link")).toHaveCount(2);
   await expectNoHorizontalScroll(page);
   await whoButton(page, "Claire").click();
   await expect(page.getByRole("checkbox", { name: "Tout le foyer a les mêmes présences" })).not.toBeChecked();

@@ -21,6 +21,17 @@ export const BED_PLACES: Record<BedKind, number> = { double: 2, single: 1, bunk:
 export const BED_KINDS: BedKind[] = ["double", "single", "bunk", "extra"];
 export const PERSON_KINDS: PersonKind[] = ["adult", "child"];
 
+/** Nombre de teintes pour distinguer les personnes, réparties sur le cercle chromatique. */
+export const PERSON_HUES = 12;
+
+/** Teinte d'une personne (0 à 11), dérivée de son prénom : toujours la même, sans tenir compte de la casse ni des espaces autour. */
+export function personHue(name: string): number {
+  // FNV-1a sur les octets UTF-8 : des prénoms proches tombent sur des teintes différentes.
+  let hash = 2_166_136_261;
+  for (const byte of new TextEncoder().encode(name.trim().toLocaleLowerCase("fr"))) hash = Math.imul(hash ^ byte, 16_777_619) >>> 0;
+  return hash % PERSON_HUES;
+}
+
 /** Valeur d'un <select> dont les options sont `values` : le DOM ne connaît que des chaînes. */
 export function oneOf<T extends string>(values: readonly T[], value: string): T {
   const found = values.find((v) => v === value);

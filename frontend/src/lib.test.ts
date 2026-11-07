@@ -41,6 +41,8 @@ import {
   nightsLabel,
   occurrenceKey,
   oneOf,
+  PERSON_HUES,
+  personHue,
   presenceKey,
   rangeLabel,
   sameSets,
@@ -105,6 +107,18 @@ describe("countLabel", () => {
     expect(countLabel({ adults: 1, children: 0 })).toBe("1 adulte");
     expect(countLabel({ adults: 2, children: 1 })).toBe("2 adultes · 1 enfant");
     expect(countLabel({ adults: 3, children: 4 })).toBe("3 adultes · 4 enfants");
+  });
+});
+
+describe("personHue", () => {
+  it("dérive du prénom une teinte stable, sans tenir compte de la casse ni des espaces", () => {
+    expect(personHue("Florent")).toBe(personHue(" florent "));
+    const names = ["", "Bertrand", "Odile", "Camille", "Florent", "Claire", "Julien", "Sophie", "Léa", "Marc", "Anne", "Nicolas", "Inès", "Paul", "Sarah"];
+    const hues = names.map(personHue);
+    expect(Math.min(...hues)).toBeGreaterThanOrEqual(0);
+    expect(Math.max(...hues)).toBeLessThan(PERSON_HUES);
+    expect(hues.every((h) => Number.isInteger(h))).toBe(true);
+    expect(new Set(hues).size).toBeGreaterThan(7);
   });
 });
 
