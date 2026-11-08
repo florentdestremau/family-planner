@@ -135,7 +135,7 @@ function DepartureCell({ time, night }: { time: string; night: boolean }) {
 
 export default function Presences() {
   return (
-    <div className="stack">
+    <div className="stack presences-page">
       <h1 className="page-title">Présences</h1>
       <section className="card card-flush">
         <PresenceTable />
