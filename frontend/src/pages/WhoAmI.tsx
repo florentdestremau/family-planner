@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import type { Person, PersonKind } from "../api";
 import { OfflineLock } from "../components/Pwa";
 import { usePending } from "../components/ui";
-import { checkJoin, coupleIndex, oneOf, PERSON_KINDS, type JoinMember } from "../lib";
+import { checkJoin, coupleIndex, oneOf, PERSON_KINDS, personHue, type JoinMember } from "../lib";
 import { useStay } from "../stay";
 import { toast } from "../toast";
 
@@ -27,56 +27,25 @@ export default function WhoAmI({ organizer = false }: { organizer?: boolean }) {
   );
 }
 
-/**
- * Les adultes rassemblés par foyer : un encadré par foyer de plusieurs personnes, avec son nom,
- * ses adultes à choisir et ses enfants (pour reconnaître le foyer) ; les personnes seules ensuite.
- */
+/** Les adultes à choisir, foyer par foyer : ceux d'un même foyer côte à côte, reliés par un petit trait. */
 function WhoList() {
   const { idx } = useStay();
-  const withAdults = idx.households().filter((h) => h.members.some((p) => p.kind === "adult"));
-  const families = withAdults.filter((h) => h.members.length > 1);
-  const singles = withAdults.filter((h) => h.members.length === 1).flatMap((h) => h.members);
+  const groups = idx
+    .households()
+    .map((h) => ({ ...h, adults: h.members.filter((p) => p.kind === "adult") }))
+    .filter((h) => h.adults.length > 0);
   return (
     <div className="who-list">
-      {families.map((h) => {
-        const children = h.members.filter((p) => p.kind === "child");
-        const label = `Foyer ${h.label}`;
-        return (
-          <section key={h.id} className="who-family" aria-label={label}>
-            <header className="who-family-head">
-              <span className="who-family-name">{label}</span>
-              <span className="who-family-count">{h.members.length} personnes</span>
-            </header>
-            <div className="who-picks">
-              {h.members
-                .filter((p) => p.kind === "adult")
-                .map((p) => (
-                  <WhoPick key={p.id} person={p} />
-                ))}
-            </div>
-            {children.length > 0 && (
-              <p className="who-children">
-                <span className="who-children-label">Enfants</span>
-                {children.map((p) => (
-                  <span key={p.id} className="chip chip-child">
-                    {p.name}
-                  </span>
-                ))}
-              </p>
-            )}
-          </section>
-        );
-      })}
-      {singles.length > 0 && (
-        <section className="who-singles" aria-label="Personnes seules">
-          {families.length > 0 && <h3 className="who-singles-title">Personnes seules</h3>}
-          <div className="who-picks">
-            {singles.map((p) => (
-              <WhoPick key={p.id} person={p} />
-            ))}
-          </div>
-        </section>
-      )}
+      {groups.map((h) => (
+        <div key={h.id} className="who-group" {...(h.adults.length > 1 && { role: "group", "aria-label": `Foyer ${h.label}` })}>
+          {h.adults.map((p, i) => (
+            <Fragment key={p.id}>
+              {i > 0 && <span className="who-link" aria-hidden="true" />}
+              <WhoPick person={p} />
+            </Fragment>
+          ))}
+        </div>
+      ))}
     </div>
   );
 }
@@ -84,9 +53,9 @@ function WhoList() {
 function WhoPick({ person }: { person: Person }) {
   const { setMe } = useStay();
   return (
-    <button type="button" className="who-pick" onClick={() => setMe(person.id)}>
+    <button type="button" className="who-pick" style={{ "--hue": personHue(person.name) }} onClick={() => setMe(person.id)}>
       <span className="avatar">{person.name.charAt(0).toUpperCase()}</span>
-      <span>{person.name}</span>
+      <span className="who-pick-name">{person.name}</span>
     </button>
   );
 }

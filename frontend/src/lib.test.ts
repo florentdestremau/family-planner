@@ -20,6 +20,7 @@ import {
   timeOrder,
   arrivalShort,
   departureColumn,
+  printSlices,
   timesSummary,
   countLabel,
   coverThumbUrl,
@@ -41,6 +42,8 @@ import {
   nightsLabel,
   occurrenceKey,
   oneOf,
+  PERSON_HUES,
+  personHue,
   presenceKey,
   rangeLabel,
   sameSets,
@@ -108,6 +111,18 @@ describe("countLabel", () => {
   });
 });
 
+describe("personHue", () => {
+  it("dérive du prénom une teinte stable, sans tenir compte de la casse ni des espaces", () => {
+    expect(personHue("Florent")).toBe(personHue(" florent "));
+    const names = ["", "Bertrand", "Odile", "Camille", "Florent", "Claire", "Julien", "Sophie", "Léa", "Marc", "Anne", "Nicolas", "Inès", "Paul", "Sarah"];
+    const hues = names.map(personHue);
+    expect(Math.min(...hues)).toBeGreaterThanOrEqual(0);
+    expect(Math.max(...hues)).toBeLessThan(PERSON_HUES);
+    expect(hues.every((h) => Number.isInteger(h))).toBe(true);
+    expect(new Set(hues).size).toBeGreaterThan(7);
+  });
+});
+
 describe("buildIndex", () => {
   const snap = makeSnapshot();
   const idx = buildIndex(snap);
@@ -167,6 +182,16 @@ describe("buildIndex", () => {
       ["Mamie", 1],
       ["Nina", 1],
     ]);
+  });
+
+  it("foyers dans l'ordre choisi par l'organisateur", () => {
+    const ordered = makeSnapshot();
+    ordered.households = [
+      { id: 50, name: "", position: 3 },
+      { id: 51, name: "Mamie", position: 1 },
+      { id: 52, name: "", position: 2 },
+    ];
+    expect(buildIndex(ordered).households().map((h) => h.label)).toEqual(["Mamie", "Nina", "Alice & Bob"]);
   });
 });
 
@@ -697,6 +722,26 @@ describe("heures d'arrivée et de départ", () => {
     expect(departureColumn([true, true], "15:00")).toBe(2); // colonne de plus après le dernier repas
     expect(departureColumn([true, true], "")).toBe(-1);
     expect(departureColumn([false, false], "15:00")).toBe(-1);
+  });
+});
+
+const ownWidth = (n: number) => n;
+
+describe("printSlices", () => {
+  it("garde tout d'un bloc quand ça tient", () => {
+    expect(printSlices([2, 4, 4, 2], ownWidth, 40)).toEqual([[2, 4, 4, 2]]);
+    expect(printSlices([], ownWidth, 40)).toEqual([]);
+  });
+  it("équilibre les tranches plutôt que de remplir la première", () => {
+    // Noël au Platane : 19 jours, 71 colonnes → deux tranches de 34 et 37 colonnes, pas 40 et 31.
+    const noel = [2, ...Array.from({ length: 17 }, () => 4), 1];
+    const slices = printSlices(noel, ownWidth, 40);
+    expect(slices.map((s) => s.reduce((a, b) => a + b, 0))).toEqual([34, 37]);
+    expect(slices.flat()).toEqual(noel);
+    expect(printSlices([4, 4, 4, 4, 4, 4], ownWidth, 8)).toEqual([[4, 4], [4, 4], [4, 4]]);
+  });
+  it("ne coupe jamais un élément trop large", () => {
+    expect(printSlices([10, 1], ownWidth, 4)).toEqual([[10], [1]]);
   });
 });
 

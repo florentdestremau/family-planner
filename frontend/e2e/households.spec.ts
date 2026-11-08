@@ -31,13 +31,11 @@ test("tout adulte du foyer agit pour tous ; mes présences valent pour tout le f
 
   // Claire se connecte : elle voit le foyer, mode individuel (présences différentes).
   await page.getByRole("button", { name: "Je ne suis pas Florent" }).click();
-  // Le choix rassemble les foyers : adultes à choisir, enfants pour reconnaître le foyer, puis les personnes seules.
-  const famille = page.getByRole("region", { name: "Foyer Florent & Claire" });
-  await expect(famille.locator(".who-pick")).toHaveText(["FFlorent", "CClaire"]);
-  await expect(famille.locator(".who-children .chip")).toHaveText(["Léo"]);
-  await expect(famille).toContainText("3 personnes");
-  await expect(page.getByRole("region", { name: "Foyer Julien & Sophie & Mamie" }).locator(".who-pick")).toHaveCount(3);
-  await expect(page.getByRole("region", { name: "Personnes seules" }).locator(".who-pick")).toHaveText(["CCamille"]);
+  // Le choix liste les adultes foyer par foyer : ceux d'un même foyer côte à côte, reliés.
+  await expect(page.locator(".who-pick")).toHaveText(["CCamille", "FFlorent", "CClaire", "JJulien", "SSophie", "MMamie"]);
+  await expect(page.getByRole("group", { name: "Foyer Florent & Claire" }).locator(".who-pick")).toHaveText(["FFlorent", "CClaire"]);
+  await expect(page.getByRole("group", { name: "Foyer Florent & Claire" }).locator(".who-link")).toHaveCount(1);
+  await expect(page.getByRole("group", { name: "Foyer Julien & Sophie & Mamie" }).locator(".who-link")).toHaveCount(2);
   await expectNoHorizontalScroll(page);
   await whoButton(page, "Claire").click();
   await expect(page.getByRole("checkbox", { name: "Tout le foyer a les mêmes présences" })).not.toBeChecked();
@@ -203,4 +201,37 @@ test("des clics rapides ne perdent aucune présence, même si le réseau désord
   expect((await stay.snap()).presences).toHaveLength(5);
   await page.reload();
   await expect(page.getByText("5 repas sur 6")).toBeVisible();
+});
+
+test("l'organisateur range les foyers, l'ordre est repris partout", async ({ page, request }) => {
+  const stay = await createStay(request);
+  for (const name of ["Anne", "Bruno", "Chloé"]) await stay.present(await stay.person(name), SLOTS.slice(0, 1));
+
+  await openAdmin(page, stay.slug, stay.key, "Foyers");
+  const order = page.locator(".household-order");
+  await order.getByText("Ordre des foyers").click();
+  // Sans ordre choisi : alphabétique.
+  await expect(order.locator(".order-item strong")).toHaveText(["Foyer Anne", "Foyer Bruno", "Foyer Chloé"]);
+
+  // Au clavier (comme à la souris ou au doigt, par la poignée) : Chloé remonte en tête.
+  const handle = order.getByRole("button", { name: "Déplacer le foyer Chloé" });
+  // La liste entière à l'écran (sur mobile, le dernier foyer est sinon sous la ligne de flottaison).
+  await order.locator(".order-list").evaluate((el) => el.scrollIntoView({ block: "center" }));
+  await handle.focus();
+  await page.keyboard.press("Space");
+  await expect(order.locator(".order-item-dragging")).toContainText("Chloé");
+  // Une flèche par place gagnée, chacune annoncée avant la suivante.
+  const live = page.locator("[id^=DndLiveRegion]");
+  await page.keyboard.press("ArrowUp");
+  await expect(live).toContainText("en position 2");
+  await page.keyboard.press("ArrowUp");
+  await expect(live).toContainText("en position 1");
+  await page.keyboard.press("Space");
+  await expect(order.locator(".order-item strong")).toHaveText(["Foyer Chloé", "Foyer Anne", "Foyer Bruno"]);
+  await expect.poll(async () => (await stay.snap()).households.map((h: { position: number }) => h.position).toSorted((a, b) => a - b)).toEqual([1, 2, 3]);
+  await expect(page.locator(".household-card").first().getByLabel("Nom du foyer")).toHaveAttribute("placeholder", "Chloé");
+
+  // Même ordre dans le tableau des présences.
+  await page.goto(`${stay.url}/presences`);
+  await expect(page.locator(".row-household th")).toHaveText(["Foyer Chloé", "Foyer Anne", "Foyer Bruno"]);
 });

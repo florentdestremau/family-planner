@@ -2,7 +2,7 @@
 
 import pytest
 
-from .conftest import SLOTS
+from .conftest import SLOTS, make_stay
 
 
 def households(api) -> dict[int, list[str]]:
@@ -231,3 +231,42 @@ def test_delete_person_cascades_and_drops_empty_household(api) -> None:
 
     api.adm("DELETE", f"/persons/{b}", status=204)
     assert api.snap()["households"] == []
+
+
+# --- Ordre des foyers -----------------------------------------------------------
+
+
+def order(api) -> list[tuple[int, int]]:
+    """[(foyer, position)] dans l'ordre du séjour."""
+    return [(h["id"], h["position"]) for h in api.snap()["households"]]
+
+
+def test_organizer_orders_households(api) -> None:
+    a, b, c = (api.household_of(api.person(name)) for name in ("Anne", "Bruno", "Chloé"))
+    # Sans ordre choisi, tous à 0 : le front les range par ordre alphabétique, un nouveau aussi.
+    assert order(api) == [(a, 0), (b, 0), (c, 0)]
+    api.adm("PUT", "/households/order", {"household_ids": [c, a, b]}, status=204)
+    assert order(api) == [(c, 1), (a, 2), (b, 3)]
+    # Un nouveau foyer arrive en fin de liste, qu'il naisse d'un ajout ou d'un déplacement.
+    david = api.person("David")
+    d = api.household_of(david)
+    emma = api.person("Emma", with_=david)
+    e = api.adm("PUT", f"/persons/{emma}/household", {"household_id": None}, status=200).json()["household_id"]
+    assert order(api)[-2:] == [(d, 4), (e, 5)]
+
+
+@pytest.mark.parametrize(
+    "ids",
+    [
+        lambda a, b, other: [a],  # il en manque un
+        lambda a, b, other: [a, b, b],  # en double
+        lambda a, b, other: [a, b, other],  # foyer d'un autre séjour
+        lambda a, b, other: [a, b, 999999],  # inconnu
+    ],
+)
+def test_order_must_list_every_household_once(api, client, ids) -> None:
+    a, b = api.household_of(api.person("Anne")), api.household_of(api.person("Bruno"))
+    other = make_stay(client)
+    foreign = other.household_of(other.person("Intrus"))
+    api.adm("PUT", "/households/order", {"household_ids": ids(a, b, foreign)}, status=422)
+    assert order(api) == [(a, 0), (b, 0)]

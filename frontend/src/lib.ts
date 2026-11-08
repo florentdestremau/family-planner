@@ -21,6 +21,17 @@ export const BED_PLACES: Record<BedKind, number> = { double: 2, single: 1, bunk:
 export const BED_KINDS: BedKind[] = ["double", "single", "bunk", "extra"];
 export const PERSON_KINDS: PersonKind[] = ["adult", "child"];
 
+/** Nombre de teintes pour distinguer les personnes, réparties sur le cercle chromatique. */
+export const PERSON_HUES = 12;
+
+/** Teinte d'une personne (0 à 11), dérivée de son prénom : toujours la même, sans tenir compte de la casse ni des espaces autour. */
+export function personHue(name: string): number {
+  // FNV-1a sur les octets UTF-8 : des prénoms proches tombent sur des teintes différentes.
+  let hash = 2_166_136_261;
+  for (const byte of new TextEncoder().encode(name.trim().toLocaleLowerCase("fr"))) hash = Math.imul(hash ^ byte, 16_777_619) >>> 0;
+  return hash % PERSON_HUES;
+}
+
 /** Valeur d'un <select> dont les options sont `values` : le DOM ne connaît que des chaînes. */
 export function oneOf<T extends string>(values: readonly T[], value: string): T {
   const found = values.find((v) => v === value);
@@ -219,6 +230,34 @@ export function departureColumn(present: boolean[], time: string): number {
   if (time === "") return -1;
   const last = present.lastIndexOf(true);
   return last === -1 ? -1 : last + 1;
+}
+
+/**
+ * Découpe une suite (les jours du tableau des présences) en tranches à imprimer, chacune d'au plus
+ * `max` colonnes si possible, de largeurs équilibrées : 71 colonnes pour 40 au plus font deux tranches
+ * d'environ 35 plutôt que 40 et 31. Un élément n'est jamais coupé, même plus large que `max`.
+ */
+export function printSlices<T>(items: T[], width: (item: T) => number, max: number): T[][] {
+  const total = items.reduce((sum, item) => sum + width(item), 0);
+  const target = total / Math.max(1, Math.ceil(total / max));
+  const slices: T[][] = [];
+  let current: T[] = [];
+  let slice = 0;
+  let before = 0;
+  for (const item of items) {
+    const w = width(item);
+    // La tranche est celle où tombe le milieu de l'élément.
+    const i = Math.floor((before + w / 2) / target);
+    if (i > slice && current.length > 0) {
+      slices.push(current);
+      current = [];
+    }
+    slice = i;
+    current.push(item);
+    before += w;
+  }
+  if (current.length > 0) slices.push(current);
+  return slices;
 }
 
 /** Note telle que le serveur l'enregistre : sur une ligne, sans espaces superflus. */
@@ -587,7 +626,8 @@ export function buildIndex(snap: Snapshot) {
   const households = () =>
     snap.households
       .map((h) => ({ ...h, label: householdLabel(h.id), members: members(h.id) }))
-      .toSorted((a, b) => a.label.localeCompare(b.label));
+      // Ordre choisi par l'organisateur, sinon alphabétique (un foyer jamais rangé est à 0).
+      .toSorted((a, b) => a.position - b.position || a.label.localeCompare(b.label));
 
   return {
     personById,

@@ -55,6 +55,8 @@ class Household(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     stay_id: Mapped[int] = mapped_column(ForeignKey("stays.id", ondelete="CASCADE"), index=True)
     name: Mapped[str] = mapped_column(String(100), default="")  # vide : noms des adultes
+    # Ordre d'affichage choisi par l'organisateur ; 0 partout tant qu'il n'en a pas choisi (ordre alphabétique).
+    position: Mapped[int] = mapped_column(default=0)
 
 
 class Person(Base):

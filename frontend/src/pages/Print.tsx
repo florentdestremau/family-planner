@@ -1,10 +1,10 @@
 import { Link, useParams } from "react-router";
 import { Linkified } from "../components/ui";
-import { BED_LABEL, countLabel, dayLabel, MOMENT_LABEL, MOMENTS, rangeLabel, sortedMoments } from "../lib";
+import { BED_LABEL, countLabel, dayLabel, MOMENT_LABEL, MOMENTS, printSlices, rangeLabel, sortedMoments } from "../lib";
 import { DietSummary } from "../components/Diets";
 import { MovementsPrint } from "../components/Times";
 import { useStay } from "../stay";
-import { PresenceTable } from "./Presences";
+import { PRESENCE_LEGEND, presenceColumns, PresenceTable } from "./Presences";
 
 const TITLES: Record<string, string> = {
   presences: "Planning de présence",
@@ -34,18 +34,39 @@ export default function Print() {
           {snap.stay.name} — {rangeLabel(snap.stay.start_date, snap.stay.end_date)}
         </div>
       </header>
-      {kind === "presences" && (
-        <>
-          <MovementsPrint />
-          <PresenceTable />
-        </>
-      )}
+      {kind === "presences" && <PresencesPrint />}
       {kind === "corvees" && <ChoresPrint />}
       {kind === "menus" && <MenusPrint />}
       {kind === "chambres" && <RoomsPrint />}
       {kind === "activites" && <ActivitiesPrint />}
       {kind === "infos" && <InfoPrint />}
     </div>
+  );
+}
+
+/** Colonnes par tranche du tableau imprimé : ce qui reste lisible sur la largeur d'une page en paysage. */
+const PRINT_MAX_COLUMNS = 40;
+
+/**
+ * Planning de présence : en paysage, le tableau découpé en tranches de jours qui tiennent chacune
+ * sur la largeur de la page (un long séjour en donne deux, une par page), au lieu d'un tableau coupé à droite.
+ */
+function PresencesPrint() {
+  const { snap } = useStay();
+  const slices = printSlices(snap.days, (d) => presenceColumns(snap, d).length, PRINT_MAX_COLUMNS);
+  return (
+    <>
+      <style>{"@page { size: landscape; }"}</style>
+      <MovementsPrint />
+      {slices.map((days) => (
+        <div key={days[0]} className={`print-slice ${slices.length > 1 ? "print-slice-many" : ""}`}>
+          <PresenceTable days={days} compact />
+        </div>
+      ))}
+      <p className="small muted print-legend">
+        {PRESENCE_LEGEND} · ● présent · ☾ dort sur place · 🕒 heure d'arrivée · heure de départ dans la case qui suit la dernière présence
+      </p>
+    </>
   );
 }
 

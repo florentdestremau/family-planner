@@ -285,6 +285,15 @@ def move_person(person_id: int, body: s.MoveIn, stay: AdminStay, db: DB, actor: 
 # --- Foyers ------------------------------------------------------------------
 
 
+@router.put("/households/order", status_code=204)
+def reorder_households(body: s.HouseholdOrderIn, stay: AdminStay, db: DB, actor: AdminActorDep) -> None:
+    """Ordre d'affichage des foyers, le même partout (présences, impressions, foyers)."""
+    if h.reorder(db, stay, body.household_ids):
+        labels = [j.household_label(db, h.household(db, x, stay)) for x in body.household_ids]
+        j.record(db, stay, actor, f"a changé l'ordre des foyers : {', '.join(labels)}")
+    db.commit()
+
+
 @router.post("/households/{household_id}/merge", response_model=s.HouseholdOut)
 def merge_households(household_id: int, body: s.MergeIn, stay: AdminStay, db: DB, actor: AdminActorDep) -> Household:
     """Rassemble deux foyers (par exemple deux conjoints inscrits chacun de leur côté)."""

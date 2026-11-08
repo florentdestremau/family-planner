@@ -954,70 +954,49 @@ legend {
   margin: 0 auto;
   width: 100%;
 }
-/* Choix de la personne : un encadré par foyer, puis les personnes seules. */
+/* Choix de la personne : des pastilles, celles d'un même foyer côte à côte et reliées par un trait. */
 .who-list {
   display: flex;
-  flex-direction: column;
-  gap: 0.9rem;
-}
-.who-picks {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-  gap: 0.6rem;
-}
-.who-family {
-  padding: 0.75rem;
-  border: 2px solid var(--border);
-  border-left: 5px solid var(--accent);
-  border-radius: var(--radius-sm);
-  background: var(--surface-2);
-}
-.who-family-head {
-  display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.25rem 0.75rem;
-  margin-bottom: 0.6rem;
+  gap: 0.6rem 1.4rem;
 }
-.who-family-name {
-  font-weight: 800;
-  overflow-wrap: anywhere;
-}
-.who-family-count {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--muted);
-}
-.who-children {
+.who-group {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.4rem;
-  margin: 0.6rem 0 0;
+  row-gap: 0.6rem;
+  max-width: 100%;
 }
-.who-children-label {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--muted);
+.who-link {
+  width: 0.9rem;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--accent);
 }
-.who-children .chip:hover {
-  transform: none;
-  box-shadow: none;
+/* Teinte d'une personne (--hue, de 0 à 11, dérivée du prénom) : --tone pour l'avatar, --tone-soft pour le fond. */
+.who-pick {
+  --tone: hsl(calc(var(--hue, 1) * 30) 65% 40%);
+  --tone-soft: hsl(calc(var(--hue, 1) * 30) 80% 94%);
 }
-.who-singles-title {
-  margin: 0.4rem 0 0.6rem;
-  font-size: 0.95rem;
-  color: var(--muted);
+:root[data-theme="dark"] .who-pick {
+  --tone: hsl(calc(var(--hue, 1) * 30) 60% 58%);
+  --tone-soft: hsl(calc(var(--hue, 1) * 30) 30% 22%);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .who-pick {
+    --tone: hsl(calc(var(--hue, 1) * 30) 60% 58%);
+    --tone-soft: hsl(calc(var(--hue, 1) * 30) 30% 22%);
+  }
 }
 .who-pick {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 0.7rem;
-  padding: 0.75rem;
+  gap: 0.55rem;
+  max-width: 100%;
+  padding: 0.35rem 0.9rem 0.35rem 0.35rem;
   border: 2px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
+  border-radius: 999px;
+  background: var(--tone-soft);
   cursor: pointer;
   font-weight: 700;
   text-align: left;
@@ -1025,10 +1004,18 @@ legend {
   box-shadow: var(--shadow);
 }
 .who-pick:hover {
-  border-color: var(--primary);
-  background: var(--primary-soft);
+  border-color: var(--tone);
   transform: translateY(-2px);
   box-shadow: var(--shadow-hover);
+}
+.who-pick .avatar {
+  flex-shrink: 0;
+  background: var(--tone);
+  box-shadow: none;
+}
+.who-pick-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 /* --- Présences ---------------------------------------------------------- */
@@ -1820,6 +1807,95 @@ body:has(.update-prompt) .install-nudge {
   @page {
     margin: 12mm;
   }
+  /* Un tableau trop large s'imprime en entier, pas seulement sa partie visible avant défilement. */
+  .table-wrap,
+  .grid-table {
+    overflow: visible;
+  }
+}
+
+/* Planning de présence imprimé : tableau compact, en tranches de jours qui tiennent sur la largeur. */
+.print-slice + .print-slice {
+  margin-top: 1rem;
+}
+.grid-table-compact {
+  table-layout: fixed;
+}
+.print-legend {
+  margin-top: 0.4rem;
+}
+.grid-table-compact .col-person {
+  width: 7.5rem;
+}
+.grid-table-compact .th-day,
+.grid-table-compact .th-person,
+.grid-table-compact tfoot th,
+.grid-table-compact .cell-departure {
+  white-space: normal;
+}
+@media print {
+  .print-presences {
+    font-size: 8pt;
+  }
+  .print-presences .print-header {
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+  }
+  .print-presences .print-header h1 {
+    font-size: 1.4rem;
+  }
+  .print-presences .print-moves {
+    padding: 0.4rem 0.6rem;
+    margin-bottom: 0.6rem;
+    columns: 3;
+    column-gap: 1.5rem;
+  }
+  .print-presences .print-moves h2 {
+    column-span: all;
+    font-size: 1rem;
+    margin-bottom: 0.2rem;
+  }
+  .print-presences .print-moves > div {
+    break-inside: avoid;
+  }
+  .print-presences .print-moves h3 {
+    margin: 0.2rem 0 0.1rem;
+    font-size: 0.9rem;
+  }
+  /* Plusieurs tranches : chacune d'un bloc (une par page pour un long séjour). Seule, elle suit les arrivées. */
+  .print-slice-many {
+    break-inside: avoid;
+  }
+  .grid-table-compact {
+    font-size: 7pt;
+    line-height: 1.15;
+  }
+  .grid-table-compact th,
+  .grid-table-compact td {
+    padding: 0.5mm 0.3mm;
+  }
+  .grid-table-compact .col-person {
+    width: 22mm;
+  }
+  .grid-table-compact .th-person {
+    padding-left: 1mm;
+  }
+  .grid-table-compact .th-meal {
+    font-size: 7.5pt;
+  }
+  .grid-table-compact .th-after {
+    font-size: 5.5pt;
+  }
+  .grid-table-compact .th-times,
+  .grid-table-compact .cell-departure {
+    font-size: 6pt;
+  }
+  .grid-table-compact .row-household th {
+    font-size: 6pt;
+    padding: 0.2mm 1mm;
+  }
 }
 
 /* --- Mobile ------------------------------------------------------------- */
@@ -2269,4 +2345,49 @@ body:has(.update-prompt) .install-nudge {
 .print-moves h3 {
   margin: 0.6rem 0 0.2rem;
   font-size: 1rem;
+}
+
+/* --- Ordre des foyers (glisser-déposer) ---------------------------------- */
+
+.household-order summary {
+  cursor: pointer;
+}
+.household-order .hint {
+  margin: 0.5rem 0 0.7rem;
+}
+.order-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.order-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.order-item-dragging {
+  position: relative;
+  z-index: 1;
+  box-shadow: var(--shadow-hover);
+}
+.order-handle {
+  cursor: grab;
+  touch-action: none;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 1.25rem;
+  line-height: 1;
+  padding: 0.3rem 0.45rem;
+  border-radius: var(--radius-sm);
+}
+.order-handle:focus-visible {
+  outline: 2px solid var(--primary);
 }

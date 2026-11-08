@@ -30,9 +30,9 @@ export function makeSnapshot(overrides: Partial<Snapshot> = {}): Snapshot {
     ],
     nights: ["2026-10-30", "2026-10-31"],
     households: [
-      { id: 50, name: "" },
-      { id: 51, name: "Mamie" },
-      { id: 52, name: "" },
+      { id: 50, name: "", position: 0 },
+      { id: 51, name: "Mamie", position: 0 },
+      { id: 52, name: "", position: 0 },
     ],
     persons: [
       { id: 1, name: "Alice", kind: "adult", does_chores: true, household_id: 50, partner_id: 2, diets: [], diet_note: "", ...NO_TIMES },
